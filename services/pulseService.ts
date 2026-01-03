@@ -108,6 +108,7 @@ export const PulseService = {
             joinDate: new Date().toLocaleDateString(),
             balance: 0,
             classesId: [],
+            attendanceHistory: [],
             avatarUrl: newUser.avatarUrl
         };
 

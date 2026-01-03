@@ -19,6 +19,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
     { name: 'Schedule', icon: 'calendar_month', path: '/master/schedule' },
     { name: 'Library', icon: 'video_library', path: '/master/library' },
     { name: 'Finance', icon: 'account_balance_wallet', path: '/master/finance' },
+    { name: 'Communication', icon: 'mail', path: '/master/communication' },
     { name: 'Settings', icon: 'settings', path: '/master/settings' },
   ];
 
@@ -40,19 +41,17 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
   return (
     <>
       {/* Mobile Backdrop */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden transition-opacity"
-          onClick={onClose}
-        />
-      )}
+      <div 
+        className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+      />
 
       {/* Sidebar Container */}
       <aside 
         className={`
-          fixed md:static inset-y-0 left-0 z-40
-          flex flex-col w-72 h-full glassmorphism border-r border-gray-200 bg-white/80 md:bg-transparent
-          transform transition-transform duration-300 ease-in-out
+          fixed md:static inset-y-0 left-0 z-50
+          flex flex-col w-72 h-full glassmorphism border-r border-gray-200 bg-white/95 md:bg-white/50 backdrop-blur-xl
+          transform transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
@@ -75,7 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
                 </div>
               </div>
               {/* Mobile Close Button */}
-              <button onClick={onClose} className="md:hidden text-text-secondary p-1">
+              <button onClick={onClose} className="md:hidden text-text-secondary p-1 hover:bg-gray-100 rounded-full transition-colors">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>

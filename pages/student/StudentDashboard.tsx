@@ -1,9 +1,10 @@
 
 import React, { useMemo } from 'react';
 import { useStore } from '../../context/StoreContext';
+import { Link } from 'react-router-dom';
 
 const StudentDashboard: React.FC = () => {
-  const { currentUser, students, academySettings, events, classes } = useStore();
+  const { currentUser, students, academySettings, events, classes, payments } = useStore();
   const student = students.find(s => s.id === currentUser?.studentId);
   
   // Find current rank configuration
@@ -17,6 +18,10 @@ const StudentDashboard: React.FC = () => {
 
   // Check for upcoming exams
   const upcomingExam = events.find(e => e.type === 'exam' && new Date(e.date) >= new Date());
+
+  // --- PENDING PAYMENTS LOGIC ---
+  const pendingPayments = payments.filter(p => p.studentId === student?.id && p.status === 'pending');
+  const totalDebt = pendingPayments.reduce((acc, p) => acc + p.amount, 0);
 
   // --- NEXT CLASS LOGIC ---
   const todayDate = new Date();
@@ -34,7 +39,17 @@ const StudentDashboard: React.FC = () => {
       // Sort by time (assuming string "HH:MM")
       todaysClasses.sort((a, b) => a.time.localeCompare(b.time));
       
-      return todaysClasses.length > 0 ? todaysClasses[0] : null;
+      // Find first class after current time
+      const currentHours = todayDate.getHours();
+      const currentMinutes = todayDate.getMinutes();
+      const currentTimeVal = currentHours * 60 + currentMinutes;
+
+      const upcoming = todaysClasses.find(c => {
+          const [h, m] = c.time.split(':').map(Number);
+          return (h * 60 + m) > currentTimeVal;
+      });
+
+      return upcoming || (todaysClasses.length > 0 ? todaysClasses[0] : null); // Show first if all passed, or specific logic
   }, [classes, student, currentDayName]);
 
   return (
@@ -54,10 +69,10 @@ const StudentDashboard: React.FC = () => {
                 <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-2 text-blue-100 font-bold text-sm uppercase tracking-wide">
                         <span className="material-symbols-outlined text-lg">schedule</span>
-                        Tu Próxima Clase
+                        Tu Próxima Clase Hoy
                     </div>
                     <h3 className="text-3xl font-black mb-1">{nextClass.name}</h3>
-                    <p className="text-lg opacity-90">Hoy a las {nextClass.time} con {nextClass.instructor}</p>
+                    <p className="text-lg opacity-90">A las {nextClass.time} con {nextClass.instructor}</p>
                 </div>
                 <div className="hidden sm:block relative z-10">
                     <span className="material-symbols-outlined text-8xl opacity-20">sports_martial_arts</span>
@@ -66,7 +81,7 @@ const StudentDashboard: React.FC = () => {
         ) : (
             <div className="md:col-span-2 bg-white rounded-3xl border border-gray-100 p-8 shadow-card flex items-center justify-between">
                  <div>
-                    <h3 className="text-xl font-bold text-text-main">No tienes clases hoy</h3>
+                    <h3 className="text-xl font-bold text-text-main">No tienes más clases hoy</h3>
                     <p className="text-text-secondary mt-1">Aprovecha para revisar la biblioteca técnica o descansar.</p>
                  </div>
                  <div className="size-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
@@ -110,8 +125,47 @@ const StudentDashboard: React.FC = () => {
              </div>
         </div>
 
+        {/* Payments Summary Card */}
+        <div className="xl:col-span-1 bg-white rounded-3xl p-6 shadow-card border border-gray-100 flex flex-col">
+            <h3 className="text-lg font-bold text-text-main mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-gray-400">payments</span>
+                Estado de Cuenta
+            </h3>
+            
+            {pendingPayments.length > 0 ? (
+                <div className="flex-1 flex flex-col gap-4">
+                    <div className="p-4 rounded-2xl bg-orange-50 border border-orange-100 flex flex-col gap-1">
+                        <span className="text-xs font-bold text-orange-600 uppercase tracking-wider">Total Pendiente</span>
+                        <span className="text-2xl font-black text-orange-700">${totalDebt.toFixed(2)}</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto max-h-[200px] space-y-2 pr-2">
+                        {pendingPayments.map(p => (
+                            <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                                <div>
+                                    <p className="text-sm font-semibold text-text-main">{p.category}</p>
+                                    <p className="text-xs text-text-secondary">{new Date(p.date).toLocaleDateString()}</p>
+                                </div>
+                                <span className="text-sm font-bold text-text-main">${p.amount}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <Link to="/student/payments" className="w-full py-3 bg-text-main text-white rounded-xl font-bold text-sm text-center hover:bg-black transition-colors">
+                        Gestionar Pagos
+                    </Link>
+                </div>
+            ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-green-50 rounded-2xl border border-green-100">
+                    <div className="size-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-2">
+                        <span className="material-symbols-outlined">verified</span>
+                    </div>
+                    <p className="font-bold text-green-800">¡Todo al día!</p>
+                    <p className="text-xs text-green-700 mt-1">No tienes pagos pendientes.</p>
+                </div>
+            )}
+        </div>
+
         {/* Notifications / Events Card */}
-        <div className="xl:col-span-3 bg-surface-white rounded-3xl p-6 shadow-card border border-gray-100 flex flex-col">
+        <div className="xl:col-span-2 bg-surface-white rounded-3xl p-6 shadow-card border border-gray-100 flex flex-col">
             <h3 className="text-lg font-bold text-text-main mb-4">Próximos Eventos</h3>
             <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-y-auto">
                 {upcomingExam ? (

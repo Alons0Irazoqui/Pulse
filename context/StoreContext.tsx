@@ -29,7 +29,7 @@ interface StoreContextType {
   markAttendance: (studentId: string) => void;
   promoteStudent: (studentId: string) => void;
   recordPayment: (payment: Payment) => void;
-  generateMonthlyCharges: () => void; // New
+  generateMonthlyCharges: () => void; // New Business Logic
   applyLateFees: () => void;
   addClass: (newClass: ClassCategory) => void;
   deleteClass: (id: string) => void;
@@ -189,23 +189,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (s.id === studentId) {
         const today = new Date().toISOString().split('T')[0];
         
-        // Init history if undefined
+        // Ensure array exists
         const history = s.attendanceHistory || [];
         
-        // Check if already present today
+        // Prevent duplicate check-in for same day
         const alreadyCheckedIn = history.some(record => record.date === today);
         if (alreadyCheckedIn) {
-            // Already checked in, return unchanged or could toggle off? 
-            // For safety, we just return unchanged to prevent double count.
-            return s;
+            return s; // No change
         }
 
-        const newRecord: AttendanceRecord = { date: today, status: 'present' };
+        const newRecord: AttendanceRecord = { 
+            date: today, 
+            status: 'present',
+            timestamp: new Date().toISOString()
+        };
         const newHistory = [newRecord, ...history];
+        
         const newAttendance = s.attendance + 1;
         const totalAttendance = (s.totalAttendance || s.attendance) + 1;
         const lastAttendance = today;
         
+        // Auto-update status if rank requirements met
         const currentRank = academySettings.ranks.find(r => r.id === s.rankId);
         let status = s.status;
         if (currentRank && newAttendance >= currentRank.requiredAttendance && status === 'active') {
@@ -260,16 +264,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setPayments(prev => [updatedPayment, ...prev]);
       }
 
+      // Update Balance Logic
       if (updatedPayment.status === 'paid') {
           setStudents(prev => prev.map(s => {
               if (s.id === updatedPayment.studentId) {
                   const newBalance = Math.max(0, s.balance - updatedPayment.amount);
-                  const newStatus = newBalance <= 0 ? 'active' : 'debtor';
+                  const newStatus = newBalance <= 0 && s.status === 'debtor' ? 'active' : s.status;
                   return { ...s, balance: newBalance, status: newStatus };
               }
               return s;
           }));
       } else if (updatedPayment.status === 'pending' && existingIndex === -1) {
+          // New pending charge increases balance
           setStudents(prev => prev.map(s => {
               if(s.id === updatedPayment.studentId) {
                   return { ...s, balance: s.balance + updatedPayment.amount, status: 'debtor' };
@@ -279,9 +285,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
   };
 
-  // --- AUTOMATED MONTHLY CHARGES ---
+  // --- AUTOMATED MONTHLY BILLING LOGIC ---
   const generateMonthlyCharges = () => {
       if (currentUser?.role !== 'master') return;
+      
       const today = new Date().toISOString().split('T')[0];
       const monthlyAmount = academySettings.paymentSettings.monthlyTuition || 800;
       const monthName = new Date().toLocaleString('es-ES', { month: 'long' });
@@ -290,40 +297,45 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let count = 0;
       const newPayments: Payment[] = [];
 
-      // 1. Generate Payment Records
       const activeStudents = students.filter(s => s.status !== 'inactive');
       
       activeStudents.forEach(s => {
-          // Prevent duplicates for this month? (Simple check: description + studentId)
-          // For simplicity in this demo, we assume the master clicks this once per month.
-          const charge: Payment = {
-              id: generateId('inv'),
-              academyId: currentUser.academyId,
-              studentId: s.id,
-              studentName: s.name,
-              amount: monthlyAmount,
-              date: today,
-              status: 'pending',
-              category: 'Mensualidad',
-              description: concept,
-              method: 'System'
-          };
-          newPayments.push(charge);
-          count++;
+          // Prevent duplicates for current month (Basic check)
+          const alreadyCharged = payments.some(p => 
+              p.studentId === s.id && 
+              p.category === 'Mensualidad' && 
+              p.date.substring(0, 7) === today.substring(0, 7) // Same YYYY-MM
+          );
+
+          if (!alreadyCharged) {
+              const charge: Payment = {
+                  id: generateId('inv'),
+                  academyId: currentUser.academyId,
+                  studentId: s.id,
+                  studentName: s.name,
+                  amount: monthlyAmount,
+                  date: today,
+                  status: 'pending',
+                  category: 'Mensualidad',
+                  description: concept,
+                  method: 'System'
+              };
+              newPayments.push(charge);
+              count++;
+          }
       });
 
-      // 2. Update State
-      setPayments(prev => [...newPayments, ...prev]);
-      
-      // 3. Update Student Balances
-      setStudents(prev => prev.map(s => {
-          if (s.status !== 'inactive') {
-              return { ...s, balance: s.balance + monthlyAmount, status: 'debtor' };
-          }
-          return s;
-      }));
-
-      return count;
+      if (count > 0) {
+          setPayments(prev => [...newPayments, ...prev]);
+          
+          // Update balances
+          setStudents(prev => prev.map(s => {
+              if (s.status !== 'inactive' && newPayments.some(p => p.studentId === s.id)) {
+                  return { ...s, balance: s.balance + monthlyAmount, status: 'debtor' };
+              }
+              return s;
+          }));
+      }
   };
 
   const applyLateFees = () => {

@@ -30,7 +30,7 @@ export interface AcademySettings {
     paymentSettings: {
         lateFeeAmount: number;
         lateFeeGracePeriod: number;
-        monthlyTuition: number; // Added for automation
+        monthlyTuition: number; // Automated billing amount
     };
     bankDetails?: BankDetails;
     ranks: Rank[];
@@ -43,9 +43,11 @@ export interface PromotionHistoryItem {
     notes?: string;
 }
 
+// Detailed attendance record
 export interface AttendanceRecord {
-    date: string;
+    date: string; // ISO Date "YYYY-MM-DD"
     status: 'present' | 'late' | 'excused';
+    timestamp: string; // ISO Full Timestamp
 }
 
 export interface Student {
@@ -61,10 +63,10 @@ export interface Student {
     stripes: number;
     status: StudentStatus;
     program: string;
-    attendance: number;
-    totalAttendance: number;
+    attendance: number; // Total count for quick access
+    totalAttendance: number; // Historical total
     lastAttendance?: string;
-    attendanceHistory?: AttendanceRecord[]; // New field
+    attendanceHistory: AttendanceRecord[]; // The array of objects
     joinDate: string;
     avatarUrl?: string;
     balance: number;
@@ -115,24 +117,23 @@ export interface Payment {
     studentName?: string;
     amount: number;
     date: string;
-    status: 'paid' | 'pending_approval' | 'pending' | 'failed'; // pending_approval = student uploaded receipt
+    status: 'paid' | 'pending_approval' | 'pending' | 'failed'; 
     description: string;
     category: PaymentCategory;
     method?: string;
-    proofUrl?: string; // URL or Base64 of the uploaded receipt
-    proofType?: string; // 'image/jpeg', 'application/pdf', etc.
+    proofUrl?: string; 
+    proofType?: string; 
 }
 
-// Auth Types for Production
 export interface UserProfile {
     id: string;
     email: string;
     role: 'master' | 'student';
     name: string;
     avatarUrl: string;
-    academyId: string; // Context of the current session
-    studentId?: string; // If role is student
-    password?: string; // In real prod, this is hashed. Storing for demo auth logic.
+    academyId: string; 
+    studentId?: string; 
+    password?: string; 
     paymentMethods?: { id: string; brand: string; last4: string; expMonth: number; expYear: number }[];
 }
 
@@ -201,7 +202,7 @@ export interface Message {
     academyId: string;
     senderId: string;
     senderName: string;
-    recipientId: string | 'all'; // 'all' for announcements
+    recipientId: string | 'all'; 
     recipientName: string;
     subject: string;
     content: string;

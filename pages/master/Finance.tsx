@@ -81,11 +81,11 @@ const Finance: React.FC = () => {
       setConfirmModal({
           isOpen: true,
           title: 'Generar Cobros Mensuales',
-          message: '¿Deseas generar automáticamente los cargos de mensualidad para todos los alumnos activos? Esto afectará sus balances.',
+          message: '¿Deseas generar automáticamente los cargos de mensualidad para todos los alumnos activos? Esto sumará el monto configurado a sus balances.',
           action: () => {
               if (generateMonthlyCharges) {
                   generateMonthlyCharges();
-                  addToast('Cargos mensuales generados.', 'success');
+                  addToast('Cargos mensuales generados correctamente.', 'success');
                   setConfirmModal(prev => ({...prev, isOpen: false}));
               }
           }

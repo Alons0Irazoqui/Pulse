@@ -120,7 +120,8 @@ const StudentsList: React.FC = () => {
               attendance: 0,
               totalAttendance: 0,
               joinDate: new Date().toLocaleDateString(),
-              classesId: []
+              classesId: [],
+              attendanceHistory: []
           });
           addToast('Alumno creado exitosamente', 'success');
           // Optional: Alert user about auto-creation via toast detail or modal

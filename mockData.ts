@@ -53,6 +53,7 @@ export const mockStudents: Student[] = [
         stripes: 2,
         balance: 0,
         classesId: [],
+        attendanceHistory: [],
         promotionHistory: [
             { rank: 'White Belt', date: 'Aug 15, 2023', notes: 'Joined Academy' }
         ]
@@ -76,6 +77,7 @@ export const mockStudents: Student[] = [
         stripes: 1,
         balance: 150,
         classesId: [],
+        attendanceHistory: [],
         promotionHistory: [
             { rank: 'White Belt', date: 'Jan 10, 2022', notes: 'Joined Academy' },
             { rank: 'Blue Belt', date: 'Dec 05, 2022', notes: 'Exceptional performance in Guard Passing' }
