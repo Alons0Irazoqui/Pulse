@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { Student, StudentStatus } from '../../types';
 import { exportToCSV } from '../../utils/csvExport';
 import { useNavigate } from 'react-router-dom';
+import ConfirmationModal from '../../components/ConfirmationModal';
 
 const StudentsList: React.FC = () => {
   const { students, updateStudent, deleteStudent, addStudent, academySettings, markAttendance, promoteStudent, libraryResources } = useStore();
@@ -13,6 +15,11 @@ const StudentsList: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  
+  // Confirmation Modal
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void, type?: 'danger'|'info'}>({
+      isOpen: false, title: '', message: '', action: () => {}
+  });
   
   // Dossier View State
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -57,11 +64,18 @@ const StudentsList: React.FC = () => {
 
   const handleDelete = (id: string, e?: React.MouseEvent) => {
       e?.stopPropagation();
-      if(window.confirm('¿Estás seguro de eliminar a este alumno?')) {
-          deleteStudent(id);
-          if (selectedStudentId === id) setSelectedStudentId(null);
-          addToast('Alumno eliminado correctamente', 'success');
-      }
+      setConfirmModal({
+          isOpen: true,
+          title: 'Eliminar Alumno',
+          message: '¿Estás seguro? Esta acción es irreversible y eliminará el historial del alumno.',
+          type: 'danger',
+          action: () => {
+              deleteStudent(id);
+              if (selectedStudentId === id) setSelectedStudentId(null);
+              addToast('Alumno eliminado correctamente', 'success');
+              setConfirmModal(prev => ({...prev, isOpen: false}));
+          }
+      });
   };
 
   const handleEdit = (student: Student, e?: React.MouseEvent) => {
@@ -117,10 +131,17 @@ const StudentsList: React.FC = () => {
 
   const handlePromote = () => {
       if (!selectedStudent) return;
-      if (window.confirm(`¿Promover a ${selectedStudent.name} al siguiente rango?`)) {
-          promoteStudent(selectedStudent.id);
-          addToast(`${selectedStudent.name} ha sido promovido`, 'success');
-      }
+      setConfirmModal({
+          isOpen: true,
+          title: 'Promover de Rango',
+          message: `¿Estás seguro de promover a ${selectedStudent.name} al siguiente cinturón?`,
+          type: 'info',
+          action: () => {
+              promoteStudent(selectedStudent.id);
+              addToast(`${selectedStudent.name} ha sido promovido`, 'success');
+              setConfirmModal(prev => ({...prev, isOpen: false}));
+          }
+      });
   };
 
   const handleSendMessage = () => {
@@ -138,6 +159,15 @@ const StudentsList: React.FC = () => {
       
       return (
           <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:px-10 h-full animate-in fade-in slide-in-from-right-4 duration-300">
+              <ConfirmationModal 
+                isOpen={confirmModal.isOpen}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                onConfirm={confirmModal.action}
+                onCancel={() => setConfirmModal(prev => ({...prev, isOpen: false}))}
+                type={confirmModal.type}
+              />
+
               <button onClick={() => setSelectedStudentId(null)} className="flex items-center gap-2 text-text-secondary hover:text-primary mb-6 transition-colors">
                   <span className="material-symbols-outlined">arrow_back</span>
                   <span>Volver a Lista</span>
@@ -316,6 +346,15 @@ const StudentsList: React.FC = () => {
   // -------------------- GRID VIEW --------------------
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:px-10 h-full">
+      <ConfirmationModal 
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.action}
+        onCancel={() => setConfirmModal(prev => ({...prev, isOpen: false}))}
+        type={confirmModal.type}
+      />
+
       <div className="max-w-[1600px] mx-auto flex flex-col gap-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
           <div>

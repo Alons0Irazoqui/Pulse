@@ -1,3 +1,4 @@
+
 export type RankColor = 'white' | 'yellow' | 'orange' | 'green' | 'blue' | 'purple' | 'brown' | 'black';
 export type StudentStatus = 'active' | 'inactive' | 'debtor' | 'exam_ready';
 
@@ -29,6 +30,7 @@ export interface AcademySettings {
     paymentSettings: {
         lateFeeAmount: number;
         lateFeeGracePeriod: number;
+        monthlyTuition: number; // Added for automation
     };
     bankDetails?: BankDetails;
     ranks: Rank[];
@@ -39,6 +41,11 @@ export interface PromotionHistoryItem {
     rank: string;
     date: string;
     notes?: string;
+}
+
+export interface AttendanceRecord {
+    date: string;
+    status: 'present' | 'late' | 'excused';
 }
 
 export interface Student {
@@ -57,6 +64,7 @@ export interface Student {
     attendance: number;
     totalAttendance: number;
     lastAttendance?: string;
+    attendanceHistory?: AttendanceRecord[]; // New field
     joinDate: string;
     avatarUrl?: string;
     balance: number;

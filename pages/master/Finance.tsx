@@ -1,12 +1,14 @@
+
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { Payment, PaymentCategory } from '../../types';
 import { exportToCSV } from '../../utils/csvExport';
 import { generateReceipt } from '../../utils/pdfGenerator';
+import ConfirmationModal from '../../components/ConfirmationModal';
 
 const Finance: React.FC = () => {
-  const { payments, recordPayment, students, academySettings, currentUser } = useStore();
+  const { payments, recordPayment, students, academySettings, currentUser, generateMonthlyCharges } = useStore();
   const { addToast } = useToast();
   
   // Filtering States
@@ -17,6 +19,11 @@ const Finance: React.FC = () => {
   // Modal States
   const [showModal, setShowModal] = useState(false); // For manual recording
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+  
+  // Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void}>({
+      isOpen: false, title: '', message: '', action: () => {}
+  });
 
   // New Payment Form State (Manual Entry by Master)
   const initialPaymentState = {
@@ -70,6 +77,21 @@ const Finance: React.FC = () => {
       addToast('Reporte generado exitosamente', 'success');
   };
 
+  const handleGenerateMonthly = () => {
+      setConfirmModal({
+          isOpen: true,
+          title: 'Generar Cobros Mensuales',
+          message: '¿Deseas generar automáticamente los cargos de mensualidad para todos los alumnos activos? Esto afectará sus balances.',
+          action: () => {
+              if (generateMonthlyCharges) {
+                  generateMonthlyCharges();
+                  addToast('Cargos mensuales generados.', 'success');
+                  setConfirmModal(prev => ({...prev, isOpen: false}));
+              }
+          }
+      });
+  };
+
   const handleRegisterPayment = (e: React.FormEvent) => {
       e.preventDefault();
       if (!newPayment.studentId || !newPayment.amount) return;
@@ -95,19 +117,24 @@ const Finance: React.FC = () => {
       addToast('Ingreso registrado y balance actualizado', 'success');
   };
 
-  // Helper to approve payment - NOW USES UPDATED STORE LOGIC
+  // Helper to approve payment - NOW USES UPDATED STORE LOGIC + CONFIRM MODAL
   const handleApprovePayment = (payment: Payment) => {
       const isCash = payment.method === 'Efectivo en Academia';
       const msg = isCash 
         ? '¿Confirmas que has recibido el dinero en efectivo?'
         : '¿Has verificado el comprobante? Esto marcará el pago como completado.';
 
-      if(window.confirm(msg)) {
-          // This calls recordPayment with an EXISTING ID, which StoreContext now treats as an UPDATE
-          recordPayment({ ...payment, status: 'paid' }); 
-          setSelectedTransactionId(null);
-          addToast(isCash ? 'Pago en efectivo confirmado' : 'Comprobante verificado. Pago aprobado.', 'success');
-      }
+      setConfirmModal({
+          isOpen: true,
+          title: isCash ? 'Confirmar Recepción' : 'Aprobar Transferencia',
+          message: msg,
+          action: () => {
+              recordPayment({ ...payment, status: 'paid' }); 
+              setSelectedTransactionId(null);
+              addToast(isCash ? 'Pago en efectivo confirmado' : 'Comprobante verificado. Pago aprobado.', 'success');
+              setConfirmModal(prev => ({...prev, isOpen: false}));
+          }
+      });
   };
 
   const selectedTransaction = payments.find(t => t.id === selectedTransactionId);
@@ -121,13 +148,30 @@ const Finance: React.FC = () => {
 
   return (
     <div className="max-w-[1600px] w-full mx-auto p-6 md:p-10 flex flex-col gap-8 h-full animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-10">
+        
+        <ConfirmationModal 
+            isOpen={confirmModal.isOpen}
+            title={confirmModal.title}
+            message={confirmModal.message}
+            onConfirm={confirmModal.action}
+            onCancel={() => setConfirmModal(prev => ({...prev, isOpen: false}))}
+            type="info"
+        />
+
         {/* Header & Actions */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div className="flex flex-col gap-1">
                 <h2 className="text-4xl font-black tracking-tight text-text-main">Control Financiero</h2>
                 <p className="text-text-secondary text-lg">Ingresos, cuentas por cobrar y revisión de transferencias.</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap md:flex-nowrap">
+                <button 
+                    onClick={handleGenerateMonthly}
+                    className="glass-panel hover:bg-white px-5 py-3 rounded-xl font-semibold shadow-sm flex items-center gap-2 transition-all text-text-main"
+                >
+                    <span className="material-symbols-outlined text-[20px]">calendar_add_on</span>
+                    Generar Cobros
+                </button>
                 <button 
                     onClick={handleExport}
                     className="glass-panel hover:bg-white px-5 py-3 rounded-xl font-semibold shadow-sm flex items-center gap-2 transition-all text-text-main"
