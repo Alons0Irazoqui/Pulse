@@ -2,9 +2,11 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Link } from 'react-router-dom';
+import { useToast } from '../../context/ToastContext';
 
 const StudentDashboard: React.FC = () => {
-  const { currentUser, students, academySettings, events, classes, payments } = useStore();
+  const { currentUser, students, academySettings, events, classes, payments, registerForEvent } = useStore();
+  const { addToast } = useToast();
   const student = students.find(s => s.id === currentUser?.studentId);
   
   // Find current rank configuration
@@ -16,8 +18,11 @@ const StudentDashboard: React.FC = () => {
   const current = student?.attendance || 0;
   const progressPercent = Math.min((current / required) * 100, 100);
 
-  // Check for upcoming exams
-  const upcomingExam = events.find(e => e.type === 'exam' && new Date(e.date) >= new Date());
+  // --- UPCOMING EVENTS LOGIC ---
+  const today = new Date().toISOString().split('T')[0];
+  const upcomingEvents = events
+    .filter(e => e.date >= today)
+    .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // --- PENDING PAYMENTS LOGIC ---
   const pendingPayments = payments.filter(p => p.studentId === student?.id && p.status === 'pending');
@@ -71,6 +76,22 @@ const StudentDashboard: React.FC = () => {
 
       return upcoming || (todaysClasses.length > 0 ? todaysClasses[0] : null); // Show first if all passed, or specific logic
   }, [classes, student, currentDayName, todayStr]);
+
+  const handleRegister = (eventId: string) => {
+      if(student) {
+          registerForEvent(student.id, eventId);
+          addToast('Inscripción exitosa', 'success');
+      }
+  };
+
+  const getEventTypeLabel = (type: string) => {
+      switch(type) {
+          case 'exam': return { icon: 'workspace_premium', color: 'text-purple-600', bg: 'bg-purple-50', label: 'Examen' };
+          case 'tournament': return { icon: 'emoji_events', color: 'text-orange-600', bg: 'bg-orange-50', label: 'Torneo' };
+          case 'seminar': return { icon: 'school', color: 'text-blue-600', bg: 'bg-blue-50', label: 'Seminario' };
+          default: return { icon: 'event', color: 'text-gray-600', bg: 'bg-gray-50', label: 'Evento' };
+      }
+  };
 
   return (
     <div className="max-w-[1400px] mx-auto p-6 md:p-10 flex flex-col gap-8 relative overflow-hidden">
@@ -185,26 +206,66 @@ const StudentDashboard: React.FC = () => {
         </div>
 
         {/* Notifications / Events Card */}
-        <div className="xl:col-span-2 bg-surface-white rounded-3xl p-6 shadow-card border border-gray-100 flex flex-col">
-            <h3 className="text-lg font-bold text-text-main mb-4">Próximos Eventos</h3>
-            <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-y-auto">
-                {upcomingExam ? (
-                    <div className="flex-1 p-4 rounded-2xl bg-blue-50 border border-blue-100 flex flex-col gap-2">
-                        <div className="flex items-center gap-2 text-blue-700 font-bold text-sm">
-                            <span className="material-symbols-outlined text-lg">workspace_premium</span>
-                            Examen de Grado
-                        </div>
-                        <p className="text-text-main font-semibold text-lg">{upcomingExam.title}</p>
-                        <p className="text-text-secondary text-sm">{upcomingExam.date} • {upcomingExam.time}</p>
-                        {student?.status === 'exam_ready' && (
-                            <button className="mt-2 w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm">
-                                Inscribirse al Examen
-                            </button>
-                        )}
-                    </div>
+        <div className="xl:col-span-2 bg-surface-white rounded-3xl p-6 shadow-card border border-gray-100 flex flex-col h-[350px]">
+            <h3 className="text-lg font-bold text-text-main mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-yellow-500">campaign</span>
+                Próximos Eventos y Torneos
+            </h3>
+            <div className="flex-1 overflow-y-auto flex flex-col gap-3 pr-2">
+                {upcomingEvents.length > 0 ? (
+                    upcomingEvents.map(event => {
+                        const style = getEventTypeLabel(event.type);
+                        const isRegistered = student && event.registrants?.includes(student.id);
+
+                        return (
+                            <div key={event.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex flex-col items-center justify-center min-w-[60px] h-[60px] bg-gray-50 rounded-2xl border border-gray-200">
+                                        <span className="text-[10px] font-bold text-red-500 uppercase">{new Date(event.date).toLocaleString('es-ES', { month: 'short' })}</span>
+                                        <span className="text-xl font-black text-text-main leading-none">{new Date(event.date).getDate()}</span>
+                                    </div>
+                                    <div>
+                                        <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit mb-1 flex items-center gap-1 ${style.bg} ${style.color}`}>
+                                            <span className="material-symbols-outlined text-[12px]">{style.icon}</span>
+                                            {style.label}
+                                        </div>
+                                        <h4 className="font-bold text-text-main text-lg leading-tight">{event.title}</h4>
+                                        <p className="text-xs text-text-secondary mt-1 flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[14px]">schedule</span> {event.time}
+                                            <span className="mx-1">•</span>
+                                            {event.description}
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <button 
+                                    onClick={() => handleRegister(event.id)}
+                                    disabled={!!isRegistered}
+                                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 min-w-[140px] ${
+                                        isRegistered 
+                                        ? 'bg-green-100 text-green-700 cursor-default' 
+                                        : 'bg-primary text-white hover:bg-primary-hover shadow-blue-500/20 active:scale-95'
+                                    }`}
+                                >
+                                    {isRegistered ? (
+                                        <>
+                                            <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                                            Inscrito
+                                        </>
+                                    ) : (
+                                        <>
+                                            Inscribirse
+                                            <span className="material-symbols-outlined text-[18px]">login</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        );
+                    })
                 ) : (
-                    <div className="w-full text-center py-8 text-text-secondary text-sm bg-gray-50 rounded-2xl border-dashed border-2 border-gray-200">
-                        No hay eventos próximos.
+                    <div className="flex-1 flex flex-col items-center justify-center text-text-secondary bg-gray-50 rounded-2xl border-dashed border-2 border-gray-200">
+                        <span className="material-symbols-outlined text-4xl opacity-30 mb-2">event_busy</span>
+                        <p className="text-sm font-medium">No hay eventos próximos.</p>
                     </div>
                 )}
             </div>

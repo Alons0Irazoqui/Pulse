@@ -13,6 +13,7 @@ const StudentsList: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid'); // NEW: View Mode State
   
   // Modal States
   const [showModal, setShowModal] = useState(false); // Create/Edit Modal
@@ -168,43 +169,187 @@ const StudentsList: React.FC = () => {
       />
 
       <div className="max-w-[1600px] mx-auto flex flex-col gap-8">
-        <div className="flex justify-between items-center pb-2">
-          <h2 className="text-3xl font-bold text-text-main">Gestión de Alumnos</h2>
-          <button onClick={handleCreate} className="bg-primary hover:bg-primary-hover text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all flex items-center gap-2">
-            <span className="material-symbols-outlined">person_add</span> Nuevo Alumno
-          </button>
+        {/* Header & Controls */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-2">
+          <div>
+              <h2 className="text-3xl font-bold text-text-main">Gestión de Alumnos</h2>
+              <p className="text-text-secondary text-sm mt-1">Administra tu lista de estudiantes.</p>
+          </div>
+          
+          <div className="flex flex-wrap gap-3 items-center">
+              {/* View Toggle */}
+              <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+                  <button 
+                    onClick={() => setViewMode('grid')}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-gray-100 text-primary shadow-sm' : 'text-text-secondary hover:bg-gray-50'}`}
+                    title="Vista Cuadrícula"
+                  >
+                      <span className="material-symbols-outlined">grid_view</span>
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('table')}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-gray-100 text-primary shadow-sm' : 'text-text-secondary hover:bg-gray-50'}`}
+                    title="Vista Tabla"
+                  >
+                      <span className="material-symbols-outlined">table_rows</span>
+                  </button>
+              </div>
+
+              {/* Create Button */}
+              <button onClick={handleCreate} className="bg-primary hover:bg-primary-hover text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2">
+                <span className="material-symbols-outlined">person_add</span> 
+                <span className="hidden sm:inline">Nuevo Alumno</span>
+              </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredStudents.map((student) => (
-                <div key={student.id} className="bg-white p-6 rounded-2xl shadow-soft border border-gray-100 flex flex-col gap-4 group transition-all relative">
-                    <div className="flex justify-between">
-                        <img src={student.avatarUrl} className="size-16 rounded-full object-cover" />
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold h-fit ${getStatusColor(student.status)} border`}>{getStatusLabel(student.status)}</span>
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-text-main">{student.name}</h3>
-                        <p className="text-sm text-text-secondary">{student.rank}</p>
-                    </div>
-                    <div className="w-full bg-gray-100 h-1.5 rounded-full">
-                        <div className="bg-primary h-1.5 rounded-full" style={{width: `${student.attendance}%`}}></div>
-                    </div>
-                    
-                    {/* Action Buttons */}
-                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-50">
-                        <button onClick={(e) => handleViewDetails(student, e)} className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors" title="Ver Información Completa">
-                            <span className="material-symbols-outlined text-[20px]">visibility</span>
-                        </button>
-                        <button onClick={(e) => handleEdit(student, e)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="Editar">
-                            <span className="material-symbols-outlined text-[20px]">edit</span>
-                        </button>
-                        <button onClick={(e) => handleDelete(student.id, e)} className="p-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors" title="Eliminar">
-                            <span className="material-symbols-outlined text-[20px]">delete</span>
-                        </button>
-                    </div>
-                </div>
-            ))}
+        {/* Filters Bar */}
+        <div className="flex flex-col md:flex-row gap-4 bg-white p-2 rounded-2xl shadow-sm border border-gray-100 items-center">
+            <div className="relative flex-1 w-full">
+                <span className="absolute left-3 top-2.5 text-gray-400 material-symbols-outlined">search</span>
+                <input 
+                    type="text" 
+                    placeholder="Buscar por nombre o email..." 
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/20"
+                />
+            </div>
+            <div className="w-px h-8 bg-gray-200 hidden md:block"></div>
+            <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+                {['all', 'active', 'debtor', 'inactive'].map(status => (
+                    <button
+                        key={status}
+                        onClick={() => setFilterStatus(status)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-all border ${
+                            filterStatus === status 
+                            ? 'bg-black text-white border-black' 
+                            : 'bg-white text-text-secondary border-gray-200 hover:bg-gray-50'
+                        }`}
+                    >
+                        {status === 'all' ? 'Todos' : getStatusLabel(status)}
+                    </button>
+                ))}
+            </div>
         </div>
+
+        {/* --- GRID VIEW --- */}
+        {viewMode === 'grid' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                {filteredStudents.map((student) => (
+                    <div key={student.id} className="bg-white p-6 rounded-[1.5rem] shadow-card border border-gray-100 flex flex-col gap-4 group hover:-translate-y-1 transition-all relative overflow-hidden">
+                        {/* Status Badge */}
+                        <div className={`absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(student.status)}`}>
+                            {getStatusLabel(student.status)}
+                        </div>
+
+                        <div className="flex gap-4 items-center">
+                            <img src={student.avatarUrl} className="size-16 rounded-2xl object-cover bg-gray-100 shadow-sm" />
+                            <div>
+                                <h3 className="text-lg font-bold text-text-main leading-tight line-clamp-1">{student.name}</h3>
+                                <p className="text-sm text-text-secondary font-medium">{student.rank}</p>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                            <div className="flex justify-between text-xs text-text-secondary font-semibold">
+                                <span>Asistencia</span>
+                                <span>{student.attendance} Clases</span>
+                            </div>
+                            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                                <div className="bg-primary h-full rounded-full" style={{width: `${Math.min(student.attendance, 100)}%`}}></div>
+                            </div>
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="flex justify-end gap-2 pt-4 border-t border-gray-50 mt-auto">
+                            <button onClick={(e) => handleViewDetails(student, e)} className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors" title="Ver Perfil">
+                                <span className="material-symbols-outlined text-[20px]">visibility</span>
+                            </button>
+                            <button onClick={(e) => handleEdit(student, e)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-text-main transition-colors" title="Editar">
+                                <span className="material-symbols-outlined text-[20px]">edit</span>
+                            </button>
+                            <button onClick={(e) => handleDelete(student.id, e)} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-colors" title="Eliminar">
+                                <span className="material-symbols-outlined text-[20px]">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        )}
+
+        {/* --- TABLE VIEW --- */}
+        {viewMode === 'table' && (
+            <div className="bg-white rounded-[1.5rem] shadow-card border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-gray-50/80 border-b border-gray-100">
+                            <tr>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Alumno</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Rango & Programa</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Asistencia</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Saldo</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {filteredStudents.map((student) => (
+                                <tr key={student.id} className="hover:bg-blue-50/30 transition-colors group cursor-pointer" onClick={(e) => handleViewDetails(student, e)}>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <img src={student.avatarUrl} className="size-10 rounded-full object-cover bg-gray-100" />
+                                            <div>
+                                                <p className="font-bold text-sm text-text-main">{student.name}</p>
+                                                <p className="text-xs text-text-secondary">{student.email}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <p className="font-semibold text-sm text-text-main">{student.rank}</p>
+                                        <p className="text-xs text-text-secondary">{student.program}</p>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(student.status)}`}>
+                                            {getStatusLabel(student.status)}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 w-48">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                                                <div className="bg-primary h-full rounded-full" style={{width: `${Math.min(student.attendance, 100)}%`}}></div>
+                                            </div>
+                                            <span className="text-xs font-bold text-text-secondary">{student.attendance}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <span className={`font-bold text-sm ${student.balance > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                            ${student.balance.toFixed(2)}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={(e) => handleEdit(student, e)} className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-primary transition-colors">
+                                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                                            </button>
+                                            <button onClick={(e) => handleDelete(student.id, e)} className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors">
+                                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {filteredStudents.length === 0 && (
+                        <div className="p-12 text-center text-text-secondary">
+                            <span className="material-symbols-outlined text-4xl opacity-30 mb-2">person_off</span>
+                            <p>No se encontraron alumnos.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
       </div>
 
       {/* CREATE / EDIT MODAL */}

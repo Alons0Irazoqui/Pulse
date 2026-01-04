@@ -18,7 +18,6 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
     { name: 'Dashboard', icon: 'grid_view', path: '/master/dashboard' },
     { name: 'Students', icon: 'groups', path: '/master/students' },
     { name: 'Schedule', icon: 'calendar_month', path: '/master/schedule' },
-    { name: 'Calendar', icon: 'event', path: '/master/calendar' }, // New Link
     { name: 'Library', icon: 'video_library', path: '/master/library' },
     { name: 'Finance', icon: 'account_balance_wallet', path: '/master/finance' },
     { name: 'Communication', icon: 'mail', path: '/master/communication' },
@@ -27,8 +26,8 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
   const studentLinks = [
     { name: 'Progress Profile', icon: 'dashboard', path: '/student/dashboard' },
-    { name: 'Schedule', icon: 'calendar_month', path: '/student/schedule' },
     ...(academySettings.modules.library ? [{ name: 'Library', icon: 'school', path: '/student/library' }] : []),
+    { name: 'Schedule', icon: 'calendar_today', path: '/student/schedule' },
     ...(academySettings.modules.payments ? [{ name: 'Payments', icon: 'credit_card', path: '/student/payments' }] : []),
     { name: 'Settings', icon: 'settings', path: '/student/settings' },
   ];
