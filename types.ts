@@ -82,16 +82,28 @@ export interface Note {
     author: string;
 }
 
+// --- SESSION EXCEPTION LOGIC ---
+export interface SessionModification {
+    date: string; // The original date of the class (YYYY-MM-DD)
+    type: 'cancel' | 'move' | 'instructor' | 'time';
+    newDate?: string; // If moved
+    newStartTime?: string; // Overrides default start time
+    newEndTime?: string;   // Overrides default end time
+    newInstructor?: string; // Overrides default instructor
+}
+
 export interface ClassCategory {
     id: string;
     academyId: string;
     name: string;
     schedule: string; // Display string (e.g. "Lun/Mie 17:00")
     days: string[]; // Structured data: ['Monday', 'Wednesday']
-    time: string; // Structured data: '17:00'
-    instructor: string;
+    startTime: string; // "17:00" - Mandatory
+    endTime: string;   // "18:15" - Mandatory
+    instructor: string; // Default instructor
     studentCount: number;
     studentIds: string[];
+    modifications: SessionModification[]; // Array of exceptions to the rule
 }
 
 export interface Event {

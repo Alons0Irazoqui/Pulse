@@ -23,21 +23,41 @@ const StudentDashboard: React.FC = () => {
   const pendingPayments = payments.filter(p => p.studentId === student?.id && p.status === 'pending');
   const totalDebt = pendingPayments.reduce((acc, p) => acc + p.amount, 0);
 
-  // --- NEXT CLASS LOGIC ---
+  // --- NEXT CLASS LOGIC (SMART) ---
   const todayDate = new Date();
   const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const currentDayName = daysOfWeek[todayDate.getDay()];
+  const todayStr = todayDate.toISOString().split('T')[0];
 
   const nextClass = useMemo(() => {
       if (!student) return null;
-      // Filter classes student is enrolled in that happen TODAY
-      const todaysClasses = classes.filter(cls => 
-          student.classesId?.includes(cls.id) && 
-          cls.days.includes(currentDayName)
-      );
       
-      // Sort by time (assuming string "HH:MM")
-      todaysClasses.sort((a, b) => a.time.localeCompare(b.time));
+      // Get all potential classes for today
+      let todaysClasses = classes.filter(cls => 
+          student.classesId?.includes(cls.id) // Must be enrolled
+      ).filter(cls => {
+          // 1. Is it a regular day for this class?
+          const isRegular = cls.days.includes(currentDayName);
+          
+          // 2. Check exceptions for TODAY
+          const modification = cls.modifications.find(m => m.date === todayStr);
+          const isMovedHere = cls.modifications.find(m => m.newDate === todayStr && m.type === 'move');
+
+          if (modification?.type === 'cancel') return false; // Explicitly cancelled today
+          if (modification?.type === 'move') return false; // Moved AWAY from today
+
+          return isRegular || isMovedHere;
+      }).map(cls => {
+          // Apply Modifiers (Instructor)
+          const modification = cls.modifications.find(m => m.date === todayStr);
+          return {
+              ...cls,
+              instructor: (modification?.type === 'instructor' ? modification.newInstructor : cls.instructor) || cls.instructor
+          };
+      });
+      
+      // Sort by start time
+      todaysClasses.sort((a, b) => a.startTime.localeCompare(b.startTime));
       
       // Find first class after current time
       const currentHours = todayDate.getHours();
@@ -45,12 +65,12 @@ const StudentDashboard: React.FC = () => {
       const currentTimeVal = currentHours * 60 + currentMinutes;
 
       const upcoming = todaysClasses.find(c => {
-          const [h, m] = c.time.split(':').map(Number);
+          const [h, m] = c.startTime.split(':').map(Number);
           return (h * 60 + m) > currentTimeVal;
       });
 
       return upcoming || (todaysClasses.length > 0 ? todaysClasses[0] : null); // Show first if all passed, or specific logic
-  }, [classes, student, currentDayName]);
+  }, [classes, student, currentDayName, todayStr]);
 
   return (
     <div className="max-w-[1400px] mx-auto p-6 md:p-10 flex flex-col gap-8 relative overflow-hidden">
@@ -72,7 +92,7 @@ const StudentDashboard: React.FC = () => {
                         Tu Próxima Clase Hoy
                     </div>
                     <h3 className="text-3xl font-black mb-1">{nextClass.name}</h3>
-                    <p className="text-lg opacity-90">A las {nextClass.time} con {nextClass.instructor}</p>
+                    <p className="text-lg opacity-90">A las {nextClass.startTime} con {nextClass.instructor}</p>
                 </div>
                 <div className="hidden sm:block relative z-10">
                     <span className="material-symbols-outlined text-8xl opacity-20">sports_martial_arts</span>

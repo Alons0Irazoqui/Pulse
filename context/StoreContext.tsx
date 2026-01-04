@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Student, ClassCategory, Payment, UserProfile, LibraryResource, Event, AcademySettings, PromotionHistoryItem, Message, AttendanceRecord } from '../types';
+import { Student, ClassCategory, Payment, UserProfile, LibraryResource, Event, AcademySettings, PromotionHistoryItem, Message, AttendanceRecord, SessionModification } from '../types';
 import { PulseService } from '../services/pulseService';
 import { mockMessages } from '../mockData';
 
@@ -29,9 +29,11 @@ interface StoreContextType {
   markAttendance: (studentId: string) => void;
   promoteStudent: (studentId: string) => void;
   recordPayment: (payment: Payment) => void;
-  generateMonthlyCharges: () => void; // New Business Logic
+  generateMonthlyCharges: () => void;
   applyLateFees: () => void;
   addClass: (newClass: ClassCategory) => void;
+  updateClass: (updatedClass: ClassCategory) => void; // New: Edit General Rule
+  modifyClassSession: (classId: string, modification: SessionModification) => void; // New: Exception
   deleteClass: (id: string) => void;
   enrollStudent: (studentId: string, classId: string) => void;
   unenrollStudent: (studentId: string, classId: string) => void;
@@ -368,7 +370,35 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addClass = (newClass: ClassCategory) => {
       if (currentUser?.role !== 'master') return;
-      setClasses(prev => [...prev, { ...newClass, id: generateId('cls'), academyId: currentUser!.academyId }]);
+      setClasses(prev => [...prev, { 
+          ...newClass, 
+          id: generateId('cls'), 
+          academyId: currentUser!.academyId, 
+          modifications: []
+      }]);
+  };
+
+  const updateClass = (updatedClass: ClassCategory) => {
+      if (currentUser?.role !== 'master') return;
+      setClasses(prev => prev.map(c => c.id === updatedClass.id ? updatedClass : c));
+  };
+
+  const modifyClassSession = (classId: string, modification: SessionModification) => {
+      setClasses(prev => prev.map(c => {
+          if (c.id === classId) {
+              // Upsert logic: if modification for this date exists, update it. Else add.
+              const existingIndex = c.modifications.findIndex(m => m.date === modification.date);
+              let newModifications = [...c.modifications];
+              
+              if (existingIndex >= 0) {
+                  newModifications[existingIndex] = modification;
+              } else {
+                  newModifications.push(modification);
+              }
+              return { ...c, modifications: newModifications };
+          }
+          return c;
+      }));
   };
 
   const deleteClass = (id: string) => {
@@ -506,7 +536,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         students, classes, events, currentUser, payments, libraryResources, academySettings, stats, messages,
         refreshData: loadData,
         addStudent, updateStudent, deleteStudent, updateStudentStatus, 
-        markAttendance, promoteStudent, recordPayment, generateMonthlyCharges, applyLateFees, addClass, deleteClass, enrollStudent, unenrollStudent, 
+        markAttendance, promoteStudent, recordPayment, generateMonthlyCharges, applyLateFees, addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
         addEvent, deleteEvent, registerForEvent,
         addLibraryResource, deleteLibraryResource, toggleResourceCompletion, updateAcademySettings,
         sendMessage, markMessageRead, updateUserProfile,

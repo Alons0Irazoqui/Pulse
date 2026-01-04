@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
@@ -102,16 +103,23 @@ const ScheduleManager: React.FC = () => {
       
       const scheduleString = `${dayLabels} ${newClass.time}`;
 
+      // Calculate endTime (defaulting to +1 hour)
+      const [h, m] = newClass.time.split(':').map(Number);
+      const endH = (h + 1) % 24;
+      const endTime = `${endH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+
       addClass({
           id: Date.now().toString(),
           academyId: '', // Will be injected by StoreContext
           name: newClass.name,
           schedule: scheduleString, // For display
           days: selectedDays,       // Structured for logic
-          time: newClass.time,      // Structured for logic
+          startTime: newClass.time, // Structured for logic
+          endTime: endTime,
           instructor: newClass.instructor,
           studentCount: 0,
-          studentIds: []
+          studentIds: [],
+          modifications: []
       });
       setShowClassModal(false);
       setNewClass({ name: '', instructor: '', time: '17:00' });
@@ -528,10 +536,10 @@ const ScheduleManager: React.FC = () => {
   // --- MAIN DASHBOARD VIEW (Level 1) ---
   return (
     <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
+      <div className="flex items-center justify-between mb-8">
         <div>
             <h1 className="text-3xl font-bold tracking-tight text-[#111318]">Gestión de Horarios</h1>
-            <p className="text-[#606e8a] mt-1">Administra clases recurrentes y eventos especiales.</p>
+            <p className="text-text-secondary mt-1">Organiza tus horarios y grupos de entrenamiento.</p>
         </div>
         <div className="flex bg-white p-1 rounded-xl shadow-sm border border-[#e5e7eb]">
             <button 
@@ -681,57 +689,36 @@ const ScheduleManager: React.FC = () => {
                           <p className="text-xs text-[#606e8a] mt-2">Selecciona los días que se imparte la clase.</p>
                       </div>
 
-                      <div>
-                          <label className="block text-sm font-semibold text-[#111318] mb-1.5">Horario de Inicio</label>
-                          <input 
-                            required 
-                            type="time" 
-                            value={newClass.time} 
-                            onChange={e => setNewClass({...newClass, time: e.target.value})} 
-                            className="block w-full rounded-xl border-[#d1d5db] shadow-sm focus:border-[#0d59f2] focus:ring focus:ring-[#0d59f2]/20 p-3 text-sm transition-all" 
-                          />
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-sm font-semibold text-[#111318] mb-1.5">Inicio</label>
+                              <input 
+                                required 
+                                type="time" 
+                                value={newClass.time} 
+                                onChange={e => setNewClass({...newClass, time: e.target.value})} 
+                                className="block w-full rounded-xl border-[#d1d5db] shadow-sm focus:border-[#0d59f2] focus:ring focus:ring-[#0d59f2]/20 p-3 text-sm transition-all" 
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-semibold text-[#111318] mb-1.5">Fin (auto)</label>
+                              <input 
+                                disabled
+                                type="time" 
+                                value={newClass.time ? `${((parseInt(newClass.time.split(':')[0]) + 1) % 24).toString().padStart(2, '0')}:${newClass.time.split(':')[1]}` : ''} 
+                                className="block w-full rounded-xl border-[#d1d5db] bg-gray-50 shadow-sm p-3 text-sm transition-all text-gray-500" 
+                              />
+                          </div>
                       </div>
 
                       <div>
                           <label className="block text-sm font-semibold text-[#111318] mb-1.5">Instructor</label>
-                          <input 
-                            required 
-                            value={newClass.instructor} 
-                            onChange={e => setNewClass({...newClass, instructor: e.target.value})} 
-                            className="block w-full rounded-xl border-[#d1d5db] shadow-sm focus:border-[#0d59f2] focus:ring focus:ring-[#0d59f2]/20 p-3 text-sm transition-all" 
-                            placeholder="Ej. Sensei Miguel" 
-                          />
+                          <input required value={newClass.instructor} onChange={e => setNewClass({...newClass, instructor: e.target.value})} className="block w-full rounded-xl border-[#d1d5db] shadow-sm focus:border-[#0d59f2] focus:ring focus:ring-[#0d59f2]/20 p-3 text-sm transition-all" placeholder="Ej. Sensei Miguel" />
                       </div>
 
                       <div className="flex gap-3 mt-4 pt-2 border-t border-gray-100">
                           <button type="button" onClick={() => setShowClassModal(false)} className="flex-1 py-3 rounded-xl border border-[#d1d5db] font-bold hover:bg-gray-50 text-[#606e8a] transition-colors">Cancelar</button>
                           <button type="submit" className="flex-1 py-3 rounded-xl bg-[#0d59f2] text-white font-bold hover:bg-[#0b4bcc] shadow-lg shadow-blue-500/20 transition-all transform active:scale-95">Guardar Clase</button>
-                      </div>
-                  </form>
-              </div>
-          </div>
-      )}
-
-      {/* Event Modal */}
-      {showEventModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                  <h2 className="text-2xl font-bold mb-6 text-[#111318]">Crear Evento</h2>
-                  <form onSubmit={handleCreateEvent} className="flex flex-col gap-4">
-                      <input required value={newEvent.title} onChange={e => setNewEvent({...newEvent, title: e.target.value})} className="w-full rounded-xl border-gray-300 p-3" placeholder="Título del Evento" />
-                      <div className="grid grid-cols-2 gap-4">
-                          <input required type="date" value={newEvent.date} onChange={e => setNewEvent({...newEvent, date: e.target.value})} className="w-full rounded-xl border-gray-300 p-3" />
-                          <input required type="time" value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})} className="w-full rounded-xl border-gray-300 p-3" />
-                      </div>
-                      <select value={newEvent.type} onChange={e => setNewEvent({...newEvent, type: e.target.value as any})} className="w-full rounded-xl border-gray-300 p-3">
-                          <option value="exam">Examen de Grado</option>
-                          <option value="seminar">Seminario</option>
-                          <option value="tournament">Torneo</option>
-                      </select>
-                      <textarea value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})} className="w-full rounded-xl border-gray-300 p-3" placeholder="Descripción..." rows={3}></textarea>
-                      <div className="flex gap-3 mt-4">
-                          <button type="button" onClick={() => setShowEventModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-300 font-medium hover:bg-gray-50">Cancelar</button>
-                          <button type="submit" className="flex-1 py-2.5 rounded-xl bg-[#0d59f2] text-white font-bold">Publicar</button>
                       </div>
                   </form>
               </div>

@@ -1,301 +1,479 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { ClassCategory } from '../../types';
+import { ClassCategory, SessionModification } from '../../types';
+import { useToast } from '../../context/ToastContext';
 
 const ClassesManager: React.FC = () => {
-  const { classes, students, addClass, deleteClass, enrollStudent, unenrollStudent } = useStore();
-  const [showModal, setShowModal] = useState(false);
+  const { classes, addClass, updateClass, deleteClass, modifyClassSession } = useStore();
+  const { addToast } = useToast();
   
-  // New Class State
-  const [className, setClassName] = useState('');
-  const [instructor, setInstructor] = useState('');
-  const [selectedDays, setSelectedDays] = useState<string[]>([]);
-  const [classTime, setClassTime] = useState('17:00');
+  // -- GLOBAL STATES --
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
   
-  // Deep View State (Drill Down)
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
-  const selectedClass = classes.find(c => c.id === selectedClassId);
+  // -- CALENDAR MANAGER STATES --
+  const [managingClassId, setManagingClassId] = useState<string | null>(null);
+  const managingClass = classes.find(c => c.id === managingClassId);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  // Session Detail Modal State
+  const [selectedSession, setSelectedSession] = useState<{date: string, modification?: SessionModification, isGhost?: boolean} | null>(null);
+  const [sessionAction, setSessionAction] = useState<'edit' | 'move' | null>(null);
 
-  // Search State for Enrollment
-  const [enrollSearch, setEnrollSearch] = useState('');
+  // Forms
+  const [classForm, setClassForm] = useState({
+      name: '', instructor: '', selectedDays: [] as string[], startTime: '17:00', endTime: '18:15'
+  });
+
+  const [sessionForm, setSessionForm] = useState({
+      newInstructor: '',
+      newStartTime: '',
+      newEndTime: '',
+      newDate: ''
+  });
 
   const daysOptions = [
-      { key: 'Monday', label: 'Lun' },
-      { key: 'Tuesday', label: 'Mar' },
-      { key: 'Wednesday', label: 'Mie' },
-      { key: 'Thursday', label: 'Jue' },
-      { key: 'Friday', label: 'Vie' },
-      { key: 'Saturday', label: 'Sab' },
-      { key: 'Sunday', label: 'Dom' },
+      { key: 'Monday', label: 'Lun', full: 'Lunes' },
+      { key: 'Tuesday', label: 'Mar', full: 'Martes' },
+      { key: 'Wednesday', label: 'Mie', full: 'Miércoles' },
+      { key: 'Thursday', label: 'Jue', full: 'Jueves' },
+      { key: 'Friday', label: 'Vie', full: 'Viernes' },
+      { key: 'Saturday', label: 'Sab', full: 'Sábado' },
+      { key: 'Sunday', label: 'Dom', full: 'Domingo' },
   ];
 
-  const toggleDay = (dayKey: string) => {
-      if (selectedDays.includes(dayKey)) {
-          setSelectedDays(selectedDays.filter(d => d !== dayKey));
-      } else {
-          setSelectedDays([...selectedDays, dayKey]);
-      }
+  // --- CRUD HELPERS ---
+
+  const resetClassForm = () => {
+      setClassForm({ name: '', instructor: '', selectedDays: [], startTime: '17:00', endTime: '18:15' });
+      setEditingClassId(null);
   };
 
-  const handleCreateClass = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (selectedDays.length === 0) {
-          alert("Por favor selecciona al menos un día.");
-          return;
-      }
-
-      // Generate display string (e.g. "Lun/Mie 17:00")
-      const dayLabels = selectedDays.map(d => daysOptions.find(opt => opt.key === d)?.label).join('/');
-      const scheduleString = `${dayLabels} ${classTime}`;
-
-      addClass({
-          id: Date.now().toString(),
-          academyId: '', // Will be injected by StoreContext
-          name: className,
-          schedule: scheduleString,
-          days: selectedDays,
-          time: classTime,
-          instructor: instructor,
-          studentCount: 0,
-          studentIds: []
+  const handleOpenEditClass = (cls: ClassCategory) => {
+      setClassForm({
+          name: cls.name,
+          instructor: cls.instructor,
+          selectedDays: cls.days,
+          startTime: cls.startTime,
+          endTime: cls.endTime
       });
-      
-      // Reset and Close
-      setShowModal(false);
-      setClassName('');
-      setInstructor('');
-      setSelectedDays([]);
-      setClassTime('17:00');
+      setEditingClassId(cls.id);
+      setShowCreateModal(true);
   };
 
-  // --- RELATIONAL LOGIC ---
-  const enrolledStudents = selectedClass 
-    ? students.filter(s => selectedClass.studentIds.includes(s.id))
-    : [];
+  const toggleDay = (dayKey: string) => {
+      if (classForm.selectedDays.includes(dayKey)) {
+          setClassForm(prev => ({...prev, selectedDays: prev.selectedDays.filter(d => d !== dayKey)}));
+      } else {
+          setClassForm(prev => ({...prev, selectedDays: [...prev.selectedDays, dayKey]}));
+      }
+  };
 
-  const availableStudents = selectedClass 
-    ? students.filter(s => !selectedClass.studentIds.includes(s.id) && s.status === 'active' && s.name.toLowerCase().includes(enrollSearch.toLowerCase()))
-    : [];
+  const handleSaveClass = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (classForm.selectedDays.length === 0) return addToast("Selecciona al menos un día.", 'error');
+      if (classForm.startTime >= classForm.endTime) return addToast("Hora inicio debe ser antes del fin.", 'error');
 
-  // --- DEEP DETAIL VIEW ---
-  if (selectedClass) {
-      return (
-        <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col h-[calc(100vh-80px)]">
-            <div className="flex items-center gap-4 mb-6">
-                <button 
-                    onClick={() => setSelectedClassId(null)} 
-                    className="size-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-text-secondary hover:text-primary hover:border-primary transition-colors shadow-sm"
-                >
-                    <span className="material-symbols-outlined">arrow_back</span>
-                </button>
-                <div>
-                    <h1 className="text-2xl font-bold text-text-main">{selectedClass.name}</h1>
-                    <p className="text-sm text-text-secondary">{selectedClass.schedule} • {selectedClass.instructor}</p>
-                </div>
+      const dayLabels = classForm.selectedDays.map(d => daysOptions.find(opt => opt.key === d)?.label).join('/');
+      const scheduleString = `${dayLabels} ${classForm.startTime}`;
+
+      const commonData = {
+          name: classForm.name,
+          schedule: scheduleString,
+          days: classForm.selectedDays,
+          startTime: classForm.startTime,
+          endTime: classForm.endTime,
+          instructor: classForm.instructor,
+      };
+
+      if (editingClassId) {
+          const original = classes.find(c => c.id === editingClassId);
+          if (original) {
+              updateClass({ ...original, ...commonData });
+              addToast('Clase actualizada', 'success');
+          }
+      } else {
+          addClass({
+              id: '', academyId: '', studentCount: 0, studentIds: [], modifications: [],
+              ...commonData
+          });
+          addToast('Clase creada', 'success');
+      }
+      setShowCreateModal(false);
+      resetClassForm();
+  };
+
+  // --- CALENDAR LOGIC ---
+
+  const getDaysInMonth = (date: Date) => {
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const days = [];
+      for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
+      return days;
+  };
+
+  const getSessionsForCalendar = () => {
+      if (!managingClass) return [];
+      const days = getDaysInMonth(currentMonth);
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const sessions: any[] = [];
+
+      days.forEach(day => {
+          const dateStr = day.toISOString().split('T')[0];
+          const dayName = dayNames[day.getDay()];
+          
+          const modification = managingClass.modifications.find(m => m.date === dateStr);
+          const isRegularDay = managingClass.days.includes(dayName);
+          const isMovedHere = managingClass.modifications.find(m => m.newDate === dateStr && m.type === 'move');
+
+          const isCancelled = modification?.type === 'cancel';
+          const isMovedAway = modification?.type === 'move';
+
+          // Session Data Construction
+          const baseSession = {
+              date: dateStr,
+              dayObj: day,
+              startTime: modification?.newStartTime || managingClass.startTime,
+              endTime: modification?.newEndTime || managingClass.endTime,
+              instructor: modification?.newInstructor || managingClass.instructor,
+              modification: modification
+          };
+
+          if (isMovedHere) {
+              sessions.push({
+                  ...baseSession,
+                  type: 'moved_here',
+                  startTime: isMovedHere.newStartTime || managingClass.startTime, // Respect overrides if any
+                  endTime: isMovedHere.newEndTime || managingClass.endTime,
+                  instructor: isMovedHere.newInstructor || managingClass.instructor,
+                  originalDate: isMovedHere.date
+              });
+          } else if (isRegularDay) {
+              if (isCancelled) {
+                  sessions.push({ ...baseSession, type: 'cancelled' });
+              } else if (isMovedAway) {
+                  sessions.push({ ...baseSession, type: 'ghost', note: `Movida al ${modification?.newDate}` });
+              } else {
+                  // Normal or Just Modified Time/Instructor
+                  sessions.push({ 
+                      ...baseSession, 
+                      type: modification ? 'modified' : 'normal' 
+                  });
+              }
+          }
+      });
+      return sessions;
+  };
+
+  // --- SESSION ACTIONS ---
+
+  const handleSessionClick = (session: any) => {
+      if (session.type === 'ghost') return;
+      setSelectedSession(session);
+      // Pre-fill form
+      setSessionForm({
+          newInstructor: session.instructor,
+          newStartTime: session.startTime,
+          newEndTime: session.endTime,
+          newDate: ''
+      });
+      setSessionAction(null); // Reset to selection menu
+  };
+
+  const saveSessionChanges = (type: 'cancel' | 'move' | 'edit') => {
+      if (!managingClass || !selectedSession) return;
+
+      const mod: SessionModification = {
+          date: selectedSession.date,
+          type: type === 'edit' ? 'time' : type as any, // 'time' is a generic "update" type or use 'instructor'
+          newInstructor: type !== 'cancel' ? sessionForm.newInstructor : undefined,
+          newStartTime: type !== 'cancel' ? sessionForm.newStartTime : undefined,
+          newEndTime: type !== 'cancel' ? sessionForm.newEndTime : undefined,
+          newDate: type === 'move' ? sessionForm.newDate : undefined
+      };
+
+      // If just changing instructor, strictly use 'instructor' type? 
+      // For simplicity in store, we used specific types, but upsert handles it.
+      // Refined logic:
+      if (type === 'edit') {
+          // Determine what changed to be semantically correct or just allow general updates
+          // StoreContext logic handles upsert.
+      }
+
+      modifyClassSession(managingClass.id, mod);
+      addToast('Sesión actualizada', 'success');
+      setSelectedSession(null);
+  };
+
+  // --- RENDER ---
+
+  return (
+    <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full h-full flex flex-col font-sans">
+        {/* Header */}
+        <div className="flex justify-between items-end mb-8">
+            <div>
+                <h1 className="text-4xl font-black tracking-tight text-text-main">Gestión de Clases</h1>
+                <p className="text-text-secondary mt-1 text-lg">Define horarios y gestiona excepciones.</p>
             </div>
+            <button 
+                onClick={() => { resetClassForm(); setShowCreateModal(true); }}
+                className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-primary/25 flex items-center gap-2 transition-all active:scale-95"
+            >
+                <span className="material-symbols-outlined">add</span>
+                Nueva Clase
+            </button>
+        </div>
 
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-0">
-                {/* Left Column: Enrolled Students List */}
-                <div className="lg:col-span-7 flex flex-col bg-white rounded-3xl border border-gray-200 shadow-card overflow-hidden h-full">
-                    <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                        <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">groups</span>
-                            <h3 className="font-bold text-lg text-text-main">Alumnos Inscritos</h3>
-                            <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-full">{enrolledStudents.length}</span>
+        {/* Classes Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {classes.map(cls => (
+                <div key={cls.id} className="bg-white p-6 rounded-[2rem] shadow-card border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all group relative flex flex-col">
+                    {/* Actions */}
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <button onClick={() => handleOpenEditClass(cls)} className="size-9 bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-full flex items-center justify-center transition-colors shadow-sm">
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button onClick={() => { if(confirm('¿Eliminar clase?')) deleteClass(cls.id) }} className="size-9 bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-600 rounded-full flex items-center justify-center transition-colors shadow-sm">
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                    </div>
+                    
+                    <div className="mb-5 mt-2">
+                        <div className="size-16 rounded-2xl bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 text-primary flex items-center justify-center shadow-sm mb-4">
+                            <span className="material-symbols-outlined text-4xl">sports_martial_arts</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-text-main mb-1 truncate leading-tight">{cls.name}</h3>
+                        <p className="text-sm text-text-secondary font-medium">{cls.instructor}</p>
+                    </div>
+                    
+                    <div className="space-y-3 mb-8">
+                        <div className="flex items-center gap-3 text-sm text-text-secondary">
+                            <div className="size-8 rounded-full bg-gray-50 flex items-center justify-center"><span className="material-symbols-outlined text-[18px]">schedule</span></div>
+                            <div className="flex flex-col">
+                                <span className="font-semibold text-text-main">{cls.days.map(d => d.substring(0,3)).join(', ')}</span>
+                                <span className="text-xs">{cls.startTime} - {cls.endTime}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-text-secondary">
+                            <div className="size-8 rounded-full bg-gray-50 flex items-center justify-center"><span className="material-symbols-outlined text-[18px]">groups</span></div>
+                            <span className="font-medium">{cls.studentIds?.length || 0} Alumnos Inscritos</span>
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                        {enrolledStudents.map(student => (
-                            <div key={student.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 hover:border-primary/30 hover:shadow-sm rounded-2xl transition-all group">
-                                <div className="flex items-center gap-4">
-                                    <div className="size-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold overflow-hidden">
-                                        {student.avatarUrl ? <img src={student.avatarUrl} className="w-full h-full object-cover"/> : student.name.charAt(0)}
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-text-main">{student.name}</p>
-                                        <div className="flex items-center gap-2 text-xs text-text-secondary">
-                                            <span>{student.rank}</span>
-                                            <span className="size-1 rounded-full bg-gray-300"></span>
-                                            <span>Asistencia: {student.attendance}%</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => unenrollStudent(student.id, selectedClass.id)}
-                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                                    title="Dar de baja de esta clase"
-                                >
-                                    <span className="material-symbols-outlined">person_remove</span>
-                                </button>
-                            </div>
-                        ))}
-                        {enrolledStudents.length === 0 && (
-                            <div className="h-full flex flex-col items-center justify-center text-text-secondary opacity-60">
-                                <span className="material-symbols-outlined text-4xl mb-2">person_off</span>
-                                <p className="text-sm">No hay alumnos inscritos en esta clase.</p>
-                            </div>
-                        )}
+                    
+                    <button 
+                        onClick={() => setManagingClassId(cls.id)}
+                        className="mt-auto w-full py-4 rounded-2xl bg-gray-900 text-white font-bold hover:bg-black transition-all shadow-lg shadow-gray-200 flex items-center justify-center gap-2 active:scale-[0.98]"
+                    >
+                        <span className="material-symbols-outlined">calendar_month</span>
+                        Gestionar Calendario
+                    </button>
+                </div>
+            ))}
+        </div>
+
+        {/* --- FULL SCREEN CALENDAR OVERLAY (Apple Style) --- */}
+        {managingClass && (
+            <div className="fixed inset-0 z-50 bg-white/30 backdrop-blur-xl flex flex-col animate-in fade-in duration-300">
+                {/* Overlay Header */}
+                <div className="bg-white/80 border-b border-gray-200 px-8 py-4 flex justify-between items-center shadow-sm backdrop-blur-md">
+                    <div className="flex items-center gap-6">
+                        <button onClick={() => setManagingClassId(null)} className="size-10 rounded-full bg-gray-100 hover:bg-gray-200 text-text-main flex items-center justify-center transition-colors">
+                            <span className="material-symbols-outlined">arrow_back</span>
+                        </button>
+                        <div>
+                            <h2 className="text-2xl font-bold text-text-main flex items-center gap-3">
+                                {managingClass.name} 
+                                <span className="text-sm font-medium bg-gray-100 px-3 py-1 rounded-full text-text-secondary">{managingClass.schedule}</span>
+                            </h2>
+                        </div>
+                    </div>
+                    <div className="flex items-center bg-gray-100 rounded-full p-1 shadow-inner">
+                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="size-9 rounded-full bg-white text-text-main shadow-sm hover:scale-105 transition-transform flex items-center justify-center">
+                            <span className="material-symbols-outlined text-sm">chevron_left</span>
+                        </button>
+                        <span className="w-40 text-center font-bold text-text-main capitalize">{currentMonth.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</span>
+                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="size-9 rounded-full bg-white text-text-main shadow-sm hover:scale-105 transition-transform flex items-center justify-center">
+                            <span className="material-symbols-outlined text-sm">chevron_right</span>
+                        </button>
                     </div>
                 </div>
 
-                {/* Right Column: Add Student Interface */}
-                <div className="lg:col-span-5 flex flex-col bg-surface-white rounded-3xl border border-gray-200 shadow-card overflow-hidden h-full">
-                    <div className="p-6 border-b border-gray-100 bg-indigo-50/30">
-                         <h3 className="font-bold text-lg text-text-main mb-4">Inscribir Nuevo Alumno</h3>
-                         <div className="relative group">
-                             <span className="material-symbols-outlined absolute left-3 top-3 text-gray-400 group-focus-within:text-primary transition-colors">search</span>
-                             <input 
-                                type="text" 
-                                value={enrollSearch}
-                                onChange={(e) => setEnrollSearch(e.target.value)}
-                                placeholder="Buscar alumno..." 
-                                className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
-                             />
-                         </div>
+                {/* Calendar Grid */}
+                <div className="flex-1 overflow-y-auto p-8 bg-[#F5F5F7]">
+                    <div className="grid grid-cols-7 gap-4 max-w-[1600px] mx-auto">
+                        {['Dom','Lun','Mar','Mie','Jue','Vie','Sab'].map(d => (
+                            <div key={d} className="text-center text-xs font-bold text-text-secondary uppercase mb-2 tracking-widest">{d}</div>
+                        ))}
+                        
+                        {/* Empty Slots */}
+                        {Array.from({ length: new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay() }).map((_, i) => (
+                            <div key={`empty-${i}`} className="min-h-[160px]"></div>
+                        ))}
+
+                        {/* Session Cards */}
+                        {getDaysInMonth(currentMonth).map(day => {
+                            const dateStr = day.toISOString().split('T')[0];
+                            const sessions = getSessionsForCalendar().filter(s => s.date === dateStr);
+                            const isToday = dateStr === new Date().toISOString().split('T')[0];
+
+                            return (
+                                <div key={dateStr} className={`min-h-[160px] p-3 rounded-[1.5rem] flex flex-col gap-2 transition-all ${isToday ? 'bg-white shadow-glow border border-primary/20' : 'bg-white/60 hover:bg-white border border-transparent hover:shadow-card'}`}>
+                                    <span className={`text-sm font-bold ml-1 ${isToday ? 'text-primary' : 'text-text-secondary'}`}>{day.getDate()}</span>
+                                    
+                                    {sessions.map((s, idx) => (
+                                        <div 
+                                            key={idx}
+                                            onClick={() => handleSessionClick(s)}
+                                            onDoubleClick={() => { handleSessionClick(s); setSessionAction('edit'); }}
+                                            className={`p-3 rounded-xl cursor-pointer transition-all border shadow-sm group relative overflow-hidden ${
+                                                s.type === 'cancelled' ? 'bg-red-50 border-red-100 opacity-60' :
+                                                s.type === 'ghost' ? 'bg-gray-100 border-dashed border-gray-300 opacity-50' :
+                                                s.type === 'moved_here' ? 'bg-purple-50 border-purple-200 hover:bg-purple-100' :
+                                                s.type === 'modified' ? 'bg-green-50 border-green-200 hover:bg-green-100' :
+                                                'bg-blue-50/50 border-blue-100 hover:bg-blue-100 hover:border-blue-300'
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <span className={`text-xs font-bold ${s.type === 'cancelled' ? 'text-red-500 line-through' : 'text-text-main'}`}>
+                                                    {s.startTime} - {s.endTime}
+                                                </span>
+                                                {s.type === 'moved_here' && <span className="material-symbols-outlined text-purple-500 text-xs">event_available</span>}
+                                                {s.type === 'modified' && <span className="material-symbols-outlined text-green-600 text-xs">edit</span>}
+                                            </div>
+                                            
+                                            <p className={`text-xs mt-1 truncate ${s.type === 'cancelled' ? 'text-red-400' : 'text-text-secondary'}`}>
+                                                {s.type === 'ghost' ? s.note : s.instructor}
+                                            </p>
+
+                                            {s.type === 'cancelled' && <div className="mt-1 text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded w-fit">CANCELADA</div>}
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })}
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/50">
-                        <p className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2 ml-1">Resultados Disponibles</p>
-                        {availableStudents.map(student => (
-                            <div key={student.id} className="flex items-center justify-between p-3 bg-white border border-gray-200 hover:border-primary/50 rounded-2xl transition-all shadow-sm">
-                                <div className="flex items-center gap-3">
-                                    <div className="size-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold overflow-hidden">
-                                        {student.avatarUrl ? <img src={student.avatarUrl} className="w-full h-full object-cover"/> : student.name.charAt(0)}
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-semibold text-text-main">{student.name}</p>
-                                        <p className="text-[10px] text-text-secondary">{student.program}</p>
+                </div>
+
+                {/* --- SESSION EDIT MODAL (Floating) --- */}
+                {selectedSession && (
+                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setSelectedSession(null)}>
+                        <div className="bg-white rounded-[2rem] shadow-2xl p-8 w-full max-w-md border border-gray-100" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h3 className="text-2xl font-bold text-text-main">Editar Sesión</h3>
+                                    <p className="text-text-secondary font-medium">{selectedSession.date}</p>
+                                </div>
+                                <button onClick={() => setSelectedSession(null)} className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-gray-600"><span className="material-symbols-outlined">close</span></button>
+                            </div>
+
+                            {/* Selection Menu */}
+                            {!sessionAction ? (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button onClick={() => setSessionAction('edit')} className="col-span-2 p-4 rounded-2xl bg-blue-50 border border-blue-100 text-blue-700 hover:bg-blue-100 hover:scale-[1.02] transition-all flex items-center gap-4 text-left group">
+                                        <div className="size-12 rounded-xl bg-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-2xl">edit_calendar</span></div>
+                                        <div>
+                                            <span className="font-bold block text-lg">Editar Detalles</span>
+                                            <span className="text-xs opacity-70">Hora, duración o instructor</span>
+                                        </div>
+                                    </button>
+                                    <button onClick={() => setSessionAction('move')} className="p-4 rounded-2xl bg-purple-50 border border-purple-100 text-purple-700 hover:bg-purple-100 hover:scale-[1.02] transition-all flex flex-col gap-2 group">
+                                        <div className="size-10 rounded-xl bg-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-xl">event_repeat</span></div>
+                                        <span className="font-bold">Mover de Día</span>
+                                    </button>
+                                    <button onClick={() => saveSessionChanges('cancel')} className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-700 hover:bg-red-100 hover:scale-[1.02] transition-all flex flex-col gap-2 group">
+                                        <div className="size-10 rounded-xl bg-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-xl">event_busy</span></div>
+                                        <span className="font-bold">Cancelar Clase</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                /* Edit Form */
+                                <div className="space-y-5 animate-in slide-in-from-right-8 duration-300">
+                                    {sessionAction === 'move' && (
+                                        <div>
+                                            <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Nueva Fecha</label>
+                                            <input type="date" className="w-full rounded-xl border-gray-200 p-3 font-medium text-text-main focus:ring-purple-500 focus:border-purple-500" value={sessionForm.newDate} onChange={e => setSessionForm({...sessionForm, newDate: e.target.value})} />
+                                        </div>
+                                    )}
+
+                                    {sessionAction === 'edit' && (
+                                        <>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Inicio</label>
+                                                    <input type="time" className="w-full rounded-xl border-gray-200 p-3 font-medium text-text-main" value={sessionForm.newStartTime} onChange={e => setSessionForm({...sessionForm, newStartTime: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Fin</label>
+                                                    <input type="time" className="w-full rounded-xl border-gray-200 p-3 font-medium text-text-main" value={sessionForm.newEndTime} onChange={e => setSessionForm({...sessionForm, newEndTime: e.target.value})} />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Instructor</label>
+                                                <input className="w-full rounded-xl border-gray-200 p-3 font-medium text-text-main" value={sessionForm.newInstructor} onChange={e => setSessionForm({...sessionForm, newInstructor: e.target.value})} placeholder="Nombre del Instructor" />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="flex gap-3 pt-2">
+                                        <button onClick={() => setSessionAction(null)} className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-text-secondary hover:bg-gray-50 transition-colors">Atrás</button>
+                                        <button onClick={() => saveSessionChanges(sessionAction)} className="flex-1 py-3 rounded-xl bg-black text-white font-bold hover:opacity-90 shadow-lg transition-colors">Guardar Cambios</button>
                                     </div>
                                 </div>
-                                <button 
-                                    onClick={() => enrollStudent(student.id, selectedClass.id)}
-                                    className="size-8 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:bg-primary-hover hover:scale-105 transition-all"
-                                    title="Inscribir"
-                                >
-                                    <span className="material-symbols-outlined text-lg">add</span>
-                                </button>
-                            </div>
-                        ))}
-                        {availableStudents.length === 0 && (
-                            <div className="p-4 text-center text-text-secondary text-xs">
-                                {enrollSearch ? 'No se encontraron alumnos.' : 'Todos los alumnos activos están inscritos.'}
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
+                )}
+            </div>
+        )}
+
+        {/* --- GLOBAL EDIT CLASS MODAL --- */}
+        {showCreateModal && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
+                <div className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl">
+                    <h2 className="text-2xl font-bold mb-6 text-text-main">
+                        {editingClassId ? 'Configuración General de Clase' : 'Crear Nueva Clase'}
+                    </h2>
+                    <form onSubmit={handleSaveClass} className="flex flex-col gap-5">
+                        <input required value={classForm.name} onChange={e => setClassForm({...classForm, name: e.target.value})} className="w-full rounded-xl border-gray-300 p-3 text-sm" placeholder="Nombre de la Clase" />
+                        
+                        <div>
+                            <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Días Recurrentes</label>
+                            <div className="flex flex-wrap gap-2">
+                                {daysOptions.map(day => (
+                                    <button
+                                        key={day.key}
+                                        type="button"
+                                        onClick={() => toggleDay(day.key)}
+                                        className={`px-3 py-2 rounded-lg text-xs font-bold transition-all border ${
+                                            classForm.selectedDays.includes(day.key)
+                                            ? 'bg-primary text-white border-primary shadow-md'
+                                            : 'bg-white text-text-secondary border-gray-200 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {day.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <input required type="time" value={classForm.startTime} onChange={e => setClassForm({...classForm, startTime: e.target.value})} className="w-full rounded-xl border-gray-300 p-3 text-sm" />
+                            <input required type="time" value={classForm.endTime} onChange={e => setClassForm({...classForm, endTime: e.target.value})} className="w-full rounded-xl border-gray-300 p-3 text-sm" />
+                        </div>
+
+                        <input required value={classForm.instructor} onChange={e => setClassForm({...classForm, instructor: e.target.value})} className="w-full rounded-xl border-gray-300 p-3 text-sm" placeholder="Instructor por Defecto" />
+
+                        <div className="flex gap-3 mt-4">
+                            <button type="button" onClick={() => { setShowCreateModal(false); resetClassForm(); }} className="flex-1 py-3 rounded-xl border border-gray-300 font-bold text-text-secondary">Cancelar</button>
+                            <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold hover:shadow-lg transition-all">Guardar</button>
+                        </div>
+                    </form>
                 </div>
             </div>
-        </div>
-      );
-  }
-
-  // --- MAIN GRID VIEW ---
-  return (
-    <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-            <h1 className="text-3xl font-bold tracking-tight text-text-main">Gestión de Clases</h1>
-            <p className="text-text-secondary mt-1">Organiza tus horarios y grupos de entrenamiento.</p>
-        </div>
-        <button 
-            onClick={() => setShowModal(true)}
-            className="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-xl font-medium shadow-sm flex items-center gap-2 transition-all active:scale-95"
-        >
-            <span className="material-symbols-outlined text-[20px]">add</span>
-            Nueva Clase
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {classes.map(cls => (
-              <div key={cls.id} className="bg-white p-6 rounded-3xl shadow-soft border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all group relative flex flex-col">
-                   <button onClick={() => deleteClass(cls.id)} className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors z-10 p-2">
-                        <span className="material-symbols-outlined">delete</span>
-                   </button>
-                  
-                  <div className="mb-4">
-                      <div className="size-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 text-primary flex items-center justify-center shadow-sm mb-4">
-                          <span className="material-symbols-outlined text-3xl">sports_martial_arts</span>
-                      </div>
-                      <h3 className="text-xl font-bold text-text-main mb-1 truncate">{cls.name}</h3>
-                      <p className="text-sm text-text-secondary font-medium">{cls.instructor}</p>
-                  </div>
-                  
-                  <div className="space-y-3 mb-6">
-                      <div className="flex items-center gap-2 text-sm text-text-secondary">
-                          <span className="material-symbols-outlined text-[18px]">schedule</span>
-                          <span>{cls.schedule}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-text-secondary">
-                          <span className="material-symbols-outlined text-[18px] text-primary">groups</span>
-                          <span className="font-semibold text-text-main">{cls.studentIds?.length || 0} Alumnos</span>
-                      </div>
-                  </div>
-                  
-                  <button 
-                    onClick={() => setSelectedClassId(cls.id)}
-                    className="mt-auto w-full py-3 rounded-xl border border-gray-200 text-text-main font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm flex items-center justify-center gap-2"
-                  >
-                      <span>Gestionar Lista</span>
-                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                  </button>
-              </div>
-          ))}
-      </div>
-
-      {/* Creation Modal */}
-      {showModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                  <h2 className="text-2xl font-bold mb-6 text-text-main">Crear Nueva Clase</h2>
-                  <form onSubmit={handleCreateClass} className="flex flex-col gap-5">
-                      <div>
-                          <label className="block text-sm font-semibold text-text-main mb-1.5">Nombre de la Clase</label>
-                          <input required value={className} onChange={e => setClassName(e.target.value)} className="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary/20 p-3 text-sm" placeholder="Ej. Niños Principiantes" />
-                      </div>
-                      
-                      <div>
-                          <label className="block text-sm font-semibold text-text-main mb-2">Días de Clase</label>
-                          <div className="flex flex-wrap gap-2">
-                              {daysOptions.map(day => (
-                                  <button
-                                    key={day.key}
-                                    type="button"
-                                    onClick={() => toggleDay(day.key)}
-                                    className={`px-3 py-2 rounded-lg text-xs font-bold transition-all border ${
-                                        selectedDays.includes(day.key)
-                                        ? 'bg-primary text-white border-primary shadow-md'
-                                        : 'bg-white text-text-secondary border-gray-200 hover:bg-gray-50'
-                                    }`}
-                                  >
-                                      {day.label}
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-
-                      <div>
-                          <label className="block text-sm font-semibold text-text-main mb-1.5">Horario</label>
-                          <input 
-                            required 
-                            type="time" 
-                            value={classTime} 
-                            onChange={e => setClassTime(e.target.value)} 
-                            className="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary/20 p-3 text-sm" 
-                          />
-                      </div>
-
-                      <div>
-                          <label className="block text-sm font-semibold text-text-main mb-1.5">Instructor</label>
-                          <input required value={instructor} onChange={e => setInstructor(e.target.value)} className="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary/20 p-3 text-sm" placeholder="Ej. Sensei Miguel" />
-                      </div>
-
-                      <div className="flex gap-3 mt-4 pt-2">
-                          <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-xl border border-gray-300 font-bold hover:bg-gray-50 text-text-secondary">Cancelar</button>
-                          <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover shadow-lg shadow-primary/20">Guardar</button>
-                      </div>
-                  </form>
-              </div>
-          </div>
-      )}
+        )}
     </div>
   );
 };

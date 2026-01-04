@@ -1,3 +1,4 @@
+
 import { Student, ClassCategory, Payment, UserProfile, LibraryResource, Event, AcademySettings } from '../types';
 import { mockStudents, mockLibraryResources, defaultAcademySettings } from '../mockData';
 
@@ -219,10 +220,12 @@ export const PulseService = {
                     name: 'Kids Fundamentals', 
                     schedule: 'Lun/Mie 16:00', 
                     days: ['Monday', 'Wednesday'], 
-                    time: '16:00', 
+                    startTime: '16:00', 
+                    endTime: '17:00',
                     instructor: 'Sensei Miguel', 
                     studentCount: 12, 
-                    studentIds: [] 
+                    studentIds: [],
+                    modifications: []
                 },
                 { 
                     id: 'c2', 
@@ -230,14 +233,16 @@ export const PulseService = {
                     name: 'Adults Advanced', 
                     schedule: 'Mar/Jue 19:00', 
                     days: ['Tuesday', 'Thursday'], 
-                    time: '19:00', 
+                    startTime: '19:00', 
+                    endTime: '20:30', 
                     instructor: 'Master Kenji', 
                     studentCount: 8, 
-                    studentIds: [] 
+                    studentIds: [],
+                    modifications: []
                 }
             ];
         }
-        classes = classes.map(c => ({...c, studentIds: c.studentIds || [], academyId: c.academyId || 'acad-1'}));
+        classes = classes.map(c => ({...c, studentIds: c.studentIds || [], academyId: c.academyId || 'acad-1', modifications: c.modifications || []}));
         if (academyId) return classes.filter(c => c.academyId === academyId);
         return classes;
     },
