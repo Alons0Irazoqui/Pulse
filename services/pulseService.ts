@@ -127,6 +127,7 @@ export const PulseService = {
                 amount: initialAmount,
                 date: new Date().toISOString().split('T')[0],
                 status: 'pending',
+                type: 'charge', // Added type
                 description: 'Mensualidad (Inscripción)',
                 category: 'Mensualidad',
                 method: 'System'

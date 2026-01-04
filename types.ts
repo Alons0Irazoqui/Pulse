@@ -69,7 +69,7 @@ export interface Student {
     attendanceHistory: AttendanceRecord[]; // The array of objects
     joinDate: string;
     avatarUrl?: string;
-    balance: number;
+    balance: number; // Positive means DEBT
     classesId: string[];
     promotionHistory?: PromotionHistoryItem[];
     notes?: Note[];
@@ -136,6 +136,7 @@ export interface Payment {
     amount: number;
     date: string;
     status: 'paid' | 'pending_approval' | 'pending' | 'failed'; 
+    type: 'charge' | 'payment'; // CHARGE = Deuda (+Balance), PAYMENT = Abono (-Balance)
     description: string;
     category: PaymentCategory;
     method?: string;
