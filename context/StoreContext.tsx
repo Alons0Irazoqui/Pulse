@@ -26,10 +26,10 @@ interface StoreContextType {
   updateStudent: (student: Student) => void;
   deleteStudent: (id: string) => void;
   updateStudentStatus: (id: string, status: Student['status']) => void;
-  markAttendance: (studentId: string) => void;
+  markAttendance: (studentId: string, date: string, status: 'present' | 'late' | 'excused' | 'absent' | undefined) => void;
   promoteStudent: (studentId: string) => void;
   recordPayment: (payment: Payment) => void;
-  approvePayment: (paymentId: string) => void; // New Action
+  approvePayment: (paymentId: string) => void; 
   generateMonthlyBilling: () => void; 
   applyLateFees: () => void;
   addClass: (newClass: ClassCategory) => void;
@@ -199,26 +199,53 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setStudents(prev => prev.map(s => s.id === id ? { ...s, status } : s));
   };
 
-  const markAttendance = (studentId: string) => {
+  const markAttendance = (studentId: string, date: string, status: 'present' | 'late' | 'excused' | 'absent' | undefined) => {
     setStudents(prev => prev.map(s => {
       if (s.id === studentId) {
-        const today = new Date().toISOString().split('T')[0];
-        const history = s.attendanceHistory || [];
-        // Prevent double marking
-        if (history.some(record => record.date === today)) return s;
+        let history = [...(s.attendanceHistory || [])];
+        const existingIndex = history.findIndex(r => r.date === date);
+
+        if (status === undefined) {
+            // Remove record if toggled to undefined
+            if (existingIndex >= 0) history.splice(existingIndex, 1);
+        } else {
+            // Upsert record
+            if (existingIndex >= 0) {
+                history[existingIndex] = { ...history[existingIndex], status, timestamp: new Date().toISOString() };
+            } else {
+                history.push({ date, status, timestamp: new Date().toISOString() });
+            }
+        }
+
+        // Sort history descending by date
+        history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        // Recalculate Totals (Only Present and Late count towards stripes/rank)
+        const newAttendanceCount = history.filter(r => r.status === 'present' || r.status === 'late').length;
         
-        const newRecord: AttendanceRecord = { 
-            date: today, 
-            status: 'present', 
-            timestamp: new Date().toISOString() 
-        };
-        const newAttendance = s.attendance + 1;
-        const totalAttendance = (s.totalAttendance || s.attendance) + 1;
-        
+        // Find most recent attendance for lastAttendance field
+        const lastPresentRecord = history.find(r => r.status === 'present' || r.status === 'late');
+        const lastAttendanceDate = lastPresentRecord ? lastPresentRecord.date : s.lastAttendance;
+
+        // Check Rank status
         const currentRank = academySettings.ranks.find(r => r.id === s.rankId);
-        let status = s.status;
-        if (currentRank && newAttendance >= currentRank.requiredAttendance && status === 'active') status = 'exam_ready';
-        return { ...s, attendance: newAttendance, totalAttendance, lastAttendance: today, status, attendanceHistory: [newRecord, ...history] };
+        let newStatus = s.status;
+        
+        // Auto-upgrade status if requirements met
+        if (currentRank && newAttendanceCount >= currentRank.requiredAttendance && (s.status === 'active' || s.status === 'exam_ready')) {
+            newStatus = 'exam_ready';
+        } else if (newStatus === 'exam_ready' && currentRank && newAttendanceCount < currentRank.requiredAttendance) {
+            // Revert if count drops (e.g. marking something as absent later)
+            newStatus = 'active';
+        }
+
+        return { 
+            ...s, 
+            attendance: newAttendanceCount, 
+            attendanceHistory: history,
+            lastAttendance: lastAttendanceDate,
+            status: newStatus
+        };
       }
       return s;
     }));
@@ -232,7 +259,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const nextRank = academySettings.ranks[currentRankIndex + 1];
           if (!nextRank) return s;
           const historyItem: PromotionHistoryItem = { rank: s.rank, date: new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' }), notes: `Promovido a ${nextRank.name}` };
-          return { ...s, rank: nextRank.name, rankId: nextRank.id, rankColor: nextRank.color, attendance: 0, status: 'active', promotionHistory: [historyItem, ...(s.promotionHistory || [])] };
+          
+          return { 
+              ...s, 
+              rank: nextRank.name, 
+              rankId: nextRank.id, 
+              rankColor: nextRank.color, 
+              attendance: 0, // Reset counter for next rank
+              attendanceHistory: [], // Clear history for new rank cycle
+              status: 'active', 
+              promotionHistory: [historyItem, ...(s.promotionHistory || [])] 
+          };
       }));
   };
 
@@ -474,10 +511,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
           const user = PulseService.registerStudent(data);
           
-          // Re-fetch to ensure we get the updated student logic with debt
-          // In a real app, API returns user + student data.
-          // Here, we manually trigger a reload or rely on PulseService internals.
-          // For immediate UI update, we construct the student and add it.
           const academy = PulseService.getAcademiesDB().find(a => a.id === user.academyId);
           const initialDebt = academy?.paymentSettings?.monthlyTuition || 0;
 

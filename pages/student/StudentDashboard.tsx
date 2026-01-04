@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
@@ -8,6 +8,7 @@ const StudentDashboard: React.FC = () => {
   const { currentUser, students, academySettings, events, classes, payments, registerForEvent } = useStore();
   const { addToast } = useToast();
   const student = students.find(s => s.id === currentUser?.studentId);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   
   // Find current rank configuration
   const currentRankConfig = academySettings.ranks.find(r => r.id === student?.rankId) || academySettings.ranks[0];
@@ -154,14 +155,21 @@ const StudentDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 pt-4 border-t border-gray-50">
-                    <div className="h-12 w-20 rounded-lg shadow-sm ring-1 ring-black/5 flex items-center justify-center bg-gray-900">
-                         <div className="h-2 w-12 rounded" style={{ backgroundColor: currentRankConfig.color }}></div>
+                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
+                    <div className="flex items-center gap-3">
+                        <div className="h-12 w-20 rounded-lg shadow-sm ring-1 ring-black/5 flex items-center justify-center bg-gray-900">
+                             <div className="h-2 w-12 rounded" style={{ backgroundColor: currentRankConfig.color }}></div>
+                        </div>
+                        <div>
+                            <p className="text-xs text-text-secondary font-semibold uppercase">Cinturón Actual</p>
+                            <p className="text-sm font-bold text-text-main">{currentRankConfig.name}</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-xs text-text-secondary font-semibold uppercase">Cinturón Actual</p>
-                        <p className="text-sm font-bold text-text-main">{currentRankConfig.name}</p>
-                    </div>
+                    
+                    <button onClick={() => setShowHistoryModal(true)} className="text-primary hover:text-blue-700 text-xs font-bold flex items-center gap-1 transition-colors">
+                        Ver Historial
+                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
                 </div>
              </div>
         </div>
@@ -271,6 +279,69 @@ const StudentDashboard: React.FC = () => {
             </div>
         </div>
       </div>
+
+      {/* --- ATTENDANCE HISTORY MODAL --- */}
+      {showHistoryModal && student && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+                  <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-[2rem]">
+                      <div>
+                          <h3 className="text-xl font-bold text-text-main">Historial de Asistencia</h3>
+                          <p className="text-sm text-text-secondary">Registro completo de clases.</p>
+                      </div>
+                      <button onClick={() => setShowHistoryModal(false)} className="size-9 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 flex items-center justify-center transition-colors">
+                          <span className="material-symbols-outlined text-sm">close</span>
+                      </button>
+                  </div>
+                  
+                  <div className="p-0 overflow-y-auto">
+                      {(!student.attendanceHistory || student.attendanceHistory.length === 0) ? (
+                          <div className="p-12 text-center text-gray-400">
+                              <span className="material-symbols-outlined text-4xl mb-2 opacity-50">history</span>
+                              <p>No tienes registros de asistencia aún.</p>
+                          </div>
+                      ) : (
+                          <table className="w-full text-left">
+                              <thead className="bg-gray-50 text-xs uppercase text-gray-400 font-bold sticky top-0">
+                                  <tr>
+                                      <th className="px-6 py-3">Fecha</th>
+                                      <th className="px-6 py-3 text-right">Estado</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-50">
+                                  {[...student.attendanceHistory]
+                                    .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                    .map((record, idx) => (
+                                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                          <td className="px-6 py-4">
+                                              <span className="block font-bold text-text-main text-sm">
+                                                  {new Date(record.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                              </span>
+                                              <span className="text-xs text-gray-400">
+                                                  {new Date(record.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                              </span>
+                                          </td>
+                                          <td className="px-6 py-4 text-right">
+                                              <span className={`text-[10px] font-bold uppercase px-3 py-1 rounded-full border ${
+                                                  record.status === 'present' ? 'bg-green-50 text-green-600 border-green-200' :
+                                                  record.status === 'late' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
+                                                  record.status === 'excused' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                                  'bg-red-50 text-red-600 border-red-200'
+                                              }`}>
+                                                  {record.status === 'present' ? 'Presente' :
+                                                   record.status === 'late' ? 'Retardo' :
+                                                   record.status === 'excused' ? 'Justificado' : 'Falta'}
+                                              </span>
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

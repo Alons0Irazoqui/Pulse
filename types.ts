@@ -46,7 +46,7 @@ export interface PromotionHistoryItem {
 // Detailed attendance record
 export interface AttendanceRecord {
     date: string; // ISO Date "YYYY-MM-DD"
-    status: 'present' | 'late' | 'excused';
+    status: 'present' | 'late' | 'excused' | 'absent';
     timestamp: string; // ISO Full Timestamp
 }
 

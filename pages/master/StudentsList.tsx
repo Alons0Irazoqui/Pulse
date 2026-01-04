@@ -13,7 +13,8 @@ const StudentsList: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid'); // NEW: View Mode State
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'finance'>('info'); // NEW: Detail Modal Tab State
   
   // Modal States
   const [showModal, setShowModal] = useState(false); // Create/Edit Modal
@@ -103,6 +104,7 @@ const StudentsList: React.FC = () => {
   const handleViewDetails = (student: Student, e?: React.MouseEvent) => {
       e?.stopPropagation();
       setViewingStudent(student);
+      setActiveTab('info'); // Reset tab
   };
 
   const handleCreate = () => {
@@ -406,90 +408,196 @@ const StudentsList: React.FC = () => {
           </div>
       )}
 
-      {/* STUDENT DETAIL & DEBT INFO MODAL */}
+      {/* STUDENT DETAIL MODAL WITH TABS */}
       {viewingStudent && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-[2rem] w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
                   {/* Header */}
-                  <div className="relative h-32 bg-gradient-to-r from-gray-900 to-gray-800">
-                      <button onClick={() => setViewingStudent(null)} className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full backdrop-blur-md transition-colors">
+                  <div className="relative h-32 bg-gradient-to-r from-gray-900 to-gray-800 shrink-0">
+                      <button onClick={() => setViewingStudent(null)} className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full backdrop-blur-md transition-colors z-10">
                           <span className="material-symbols-outlined">close</span>
                       </button>
-                      <div className="absolute -bottom-12 left-8">
-                          <img src={viewingStudent.avatarUrl} className="size-24 rounded-full border-4 border-white shadow-lg object-cover bg-white" />
-                      </div>
-                  </div>
-                  
-                  <div className="pt-16 px-8 pb-8 overflow-y-auto">
-                      <div className="flex justify-between items-start mb-6">
-                          <div>
-                              <h2 className="text-3xl font-bold text-text-main">{viewingStudent.name}</h2>
-                              <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-primary font-semibold">{viewingStudent.rank}</span>
-                                  <span className="text-gray-300">•</span>
-                                  <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase ${getStatusColor(viewingStudent.status)}`}>
+                      
+                      <div className="absolute -bottom-10 left-8 flex items-end gap-6">
+                          <img src={viewingStudent.avatarUrl} className="size-28 rounded-full border-4 border-white shadow-xl object-cover bg-white" />
+                          <div className="pb-10"> {/* Adjusted padding to sit above bottom edge */}
+                              <h2 className="text-3xl font-bold text-white drop-shadow-md leading-none">{viewingStudent.name}</h2>
+                              <div className="flex items-center gap-2 mt-2">
+                                  <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-white text-xs font-bold">{viewingStudent.rank}</span>
+                                  <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase border border-white/20 ${viewingStudent.status === 'active' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
                                       {getStatusLabel(viewingStudent.status)}
                                   </span>
                               </div>
                           </div>
-                          <div className="flex gap-2">
-                              <button onClick={() => { navigate('/master/communication', { state: { recipientId: viewingStudent.id } }) }} className="p-2.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
-                                  <span className="material-symbols-outlined">mail</span>
-                              </button>
-                              <button onClick={handlePromote} className="p-2.5 rounded-xl bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors" title="Promover">
-                                  <span className="material-symbols-outlined">workspace_premium</span>
-                              </button>
-                          </div>
                       </div>
+                  </div>
+                  
+                  {/* Tabs Navigation */}
+                  <div className="pt-14 px-8 border-b border-gray-100 flex gap-6 shrink-0">
+                      <button onClick={() => setActiveTab('info')} className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'info' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>General</button>
+                      <button onClick={() => setActiveTab('attendance')} className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'attendance' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Historial Asistencia</button>
+                      <button onClick={() => setActiveTab('finance')} className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'finance' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Finanzas ({studentDebts.length})</button>
+                  </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                          <div className="space-y-4">
-                              <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Información de Contacto</h4>
-                              <div className="space-y-3">
-                                  <div className="flex items-center gap-3 text-sm">
-                                      <div className="size-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400"><span className="material-symbols-outlined text-[18px]">email</span></div>
-                                      <span className="text-text-main">{viewingStudent.email}</span>
+                  <div className="p-8 overflow-y-auto">
+                      {/* --- TAB: INFO --- */}
+                      {activeTab === 'info' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                              <div className="space-y-6">
+                                  <div>
+                                      <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-4">Información de Contacto</h4>
+                                      <div className="space-y-4">
+                                          <div className="flex items-center gap-4 text-sm bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                              <div className="size-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm"><span className="material-symbols-outlined text-[20px]">email</span></div>
+                                              <div>
+                                                  <p className="text-xs text-text-secondary">Correo Electrónico</p>
+                                                  <p className="font-semibold text-text-main">{viewingStudent.email}</p>
+                                              </div>
+                                          </div>
+                                          <div className="flex items-center gap-4 text-sm bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                              <div className="size-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm"><span className="material-symbols-outlined text-[20px]">phone</span></div>
+                                              <div>
+                                                  <p className="text-xs text-text-secondary">Teléfono</p>
+                                                  <p className="font-semibold text-text-main">{viewingStudent.phone || 'No registrado'}</p>
+                                              </div>
+                                          </div>
+                                          <div className="flex items-center gap-4 text-sm bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                              <div className="size-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm"><span className="material-symbols-outlined text-[20px]">calendar_month</span></div>
+                                              <div>
+                                                  <p className="text-xs text-text-secondary">Miembro Desde</p>
+                                                  <p className="font-semibold text-text-main">{viewingStudent.joinDate}</p>
+                                              </div>
+                                          </div>
+                                      </div>
                                   </div>
-                                  <div className="flex items-center gap-3 text-sm">
-                                      <div className="size-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400"><span className="material-symbols-outlined text-[18px]">phone</span></div>
-                                      <span className="text-text-main">{viewingStudent.phone || 'Sin teléfono'}</span>
-                                  </div>
-                                  <div className="flex items-center gap-3 text-sm">
-                                      <div className="size-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400"><span className="material-symbols-outlined text-[18px]">calendar_month</span></div>
-                                      <span className="text-text-main">Miembro desde {viewingStudent.joinDate}</span>
+                              </div>
+
+                              <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 border border-gray-100">
+                                  <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-4">Acciones Rápidas</h4>
+                                  <div className="flex flex-col gap-3">
+                                      <button onClick={() => { navigate('/master/communication', { state: { recipientId: viewingStudent.id } }) }} className="w-full py-3 px-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all flex items-center justify-between group">
+                                          <span className="font-semibold text-sm">Enviar Mensaje</span>
+                                          <span className="material-symbols-outlined text-gray-400 group-hover:text-blue-500">mail</span>
+                                      </button>
+                                      <button onClick={handlePromote} className="w-full py-3 px-4 rounded-xl border border-gray-200 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-all flex items-center justify-between group">
+                                          <span className="font-semibold text-sm">Promover de Rango</span>
+                                          <span className="material-symbols-outlined text-gray-400 group-hover:text-purple-500">workspace_premium</span>
+                                      </button>
                                   </div>
                               </div>
                           </div>
+                      )}
 
-                          <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Estado Financiero</h4>
-                              {totalDebt > 0 ? (
+                      {/* --- TAB: ATTENDANCE HISTORY --- */}
+                      {activeTab === 'attendance' && (
+                          <div className="space-y-6">
+                              <div className="flex justify-between items-center bg-gray-50 p-4 rounded-xl">
                                   <div>
-                                      <div className="flex items-baseline gap-2 mb-4">
-                                          <span className="text-3xl font-black text-red-600">${totalDebt.toFixed(2)}</span>
-                                          <span className="text-xs font-bold text-red-400 uppercase">Pendiente</span>
+                                      <p className="text-xs font-bold text-text-secondary uppercase">Total Asistencias</p>
+                                      <p className="text-3xl font-black text-text-main">{viewingStudent.attendance}</p>
+                                  </div>
+                                  <div className="w-48">
+                                      <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                                          <div className="bg-primary h-full rounded-full" style={{width: '75%'}}></div>
                                       </div>
-                                      <div className="space-y-2">
-                                          <p className="text-xs font-semibold text-gray-600 mb-1">Conceptos por pagar:</p>
-                                          {studentDebts.map(debt => (
-                                              <div key={debt.id} className="flex justify-between items-center text-sm bg-white p-2 rounded border border-gray-100 shadow-sm">
-                                                  <span className="text-text-main">{debt.category}</span>
-                                                  <span className="font-bold text-gray-800">${debt.amount}</span>
-                                              </div>
-                                          ))}
+                                      <p className="text-xs text-right mt-1 text-text-secondary">Progreso de rango</p>
+                                  </div>
+                              </div>
+
+                              <div className="border rounded-2xl overflow-hidden">
+                                  <table className="w-full text-left">
+                                      <thead className="bg-gray-50 border-b border-gray-100">
+                                          <tr>
+                                              <th className="px-6 py-3 text-xs font-bold text-gray-400 uppercase">Fecha</th>
+                                              <th className="px-6 py-3 text-xs font-bold text-gray-400 uppercase">Estado</th>
+                                              <th className="px-6 py-3 text-xs font-bold text-gray-400 uppercase">Hora Registro</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-50">
+                                          {viewingStudent.attendanceHistory && viewingStudent.attendanceHistory.length > 0 ? (
+                                              [...viewingStudent.attendanceHistory]
+                                              .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                              .map((record, idx) => (
+                                                  <tr key={idx} className="hover:bg-gray-50">
+                                                      <td className="px-6 py-3 text-sm font-semibold text-text-main">
+                                                          {new Date(record.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+                                                      </td>
+                                                      <td className="px-6 py-3">
+                                                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full border ${
+                                                              record.status === 'present' ? 'bg-green-50 text-green-600 border-green-200' :
+                                                              record.status === 'late' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
+                                                              record.status === 'excused' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                                              'bg-red-50 text-red-600 border-red-200'
+                                                          }`}>
+                                                              {record.status === 'present' ? 'Presente' :
+                                                               record.status === 'late' ? 'Retardo' :
+                                                               record.status === 'excused' ? 'Justificado' : 'Falta'}
+                                                          </span>
+                                                      </td>
+                                                      <td className="px-6 py-3 text-xs text-text-secondary font-mono">
+                                                          {new Date(record.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                      </td>
+                                                  </tr>
+                                              ))
+                                          ) : (
+                                              <tr>
+                                                  <td colSpan={3} className="px-6 py-8 text-center text-text-secondary">
+                                                      No hay registros de asistencia aún.
+                                                  </td>
+                                              </tr>
+                                          )}
+                                      </tbody>
+                                  </table>
+                              </div>
+                          </div>
+                      )}
+
+                      {/* --- TAB: FINANCE --- */}
+                      {activeTab === 'finance' && (
+                          <div className="space-y-6">
+                              {totalDebt > 0 ? (
+                                  <div className="bg-red-50 p-6 rounded-2xl border border-red-100 flex justify-between items-center">
+                                      <div className="flex items-center gap-4">
+                                          <div className="size-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
+                                              <span className="material-symbols-outlined text-2xl">warning</span>
+                                          </div>
+                                          <div>
+                                              <p className="text-red-800 font-bold text-lg">Saldo Pendiente</p>
+                                              <p className="text-red-600 text-sm">El alumno tiene pagos atrasados.</p>
+                                          </div>
                                       </div>
+                                      <p className="text-4xl font-black text-red-600">${totalDebt.toFixed(2)}</p>
                                   </div>
                               ) : (
-                                  <div className="h-full flex flex-col items-center justify-center text-center py-4">
-                                      <div className="size-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2">
-                                          <span className="material-symbols-outlined">check</span>
+                                  <div className="bg-green-50 p-6 rounded-2xl border border-green-100 flex items-center gap-4">
+                                      <div className="size-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
+                                          <span className="material-symbols-outlined text-2xl">check_circle</span>
                                       </div>
-                                      <p className="text-sm font-bold text-green-700">Al Corriente</p>
-                                      <p className="text-xs text-green-600">No hay deudas pendientes.</p>
+                                      <div>
+                                          <p className="text-green-800 font-bold text-lg">Al Corriente</p>
+                                          <p className="text-green-600 text-sm">No existen deudas registradas.</p>
+                                      </div>
                                   </div>
                               )}
+
+                              <div>
+                                  <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-3">Detalle de Cargos</h4>
+                                  <div className="space-y-2">
+                                      {studentDebts.length > 0 ? studentDebts.map(debt => (
+                                          <div key={debt.id} className="flex justify-between items-center p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                                              <div>
+                                                  <p className="font-bold text-text-main text-sm">{debt.category}</p>
+                                                  <p className="text-xs text-text-secondary">{debt.description} • {new Date(debt.date).toLocaleDateString()}</p>
+                                              </div>
+                                              <p className="font-bold text-red-500">${debt.amount.toFixed(2)}</p>
+                                          </div>
+                                      )) : (
+                                          <p className="text-center py-8 text-gray-400 text-sm">No hay cargos pendientes.</p>
+                                      )}
+                                  </div>
+                              </div>
                           </div>
-                      </div>
+                      )}
                   </div>
               </div>
           </div>
