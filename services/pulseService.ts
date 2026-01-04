@@ -1,5 +1,5 @@
 
-import { Student, ClassCategory, Payment, UserProfile, LibraryResource, Event, AcademySettings } from '../types';
+import { Student, ClassCategory, FinancialRecord, UserProfile, LibraryResource, Event, AcademySettings } from '../types';
 import { mockStudents, mockLibraryResources, defaultAcademySettings } from '../mockData';
 
 const STORAGE_KEYS = {
@@ -69,7 +69,7 @@ export const PulseService = {
         const users = PulseService.getUsersDB();
         const academies = PulseService.getAcademiesDB();
         const students = PulseService.getStudents();
-        const payments = PulseService.getPayments(); // Fetch existing payments
+        const payments = PulseService.getPayments(); // Fetch existing records
 
         if (users.find(u => u.email === data.email)) {
             throw new Error("El correo electrónico ya está registrado.");
@@ -106,33 +106,33 @@ export const PulseService = {
             rankColor: 'white',
             rankId: academy.ranks[0].id,
             stripes: 0,
-            status: initialAmount > 0 ? 'debtor' : 'active', // Set to debtor immediately
+            status: initialAmount > 0 ? 'debtor' : 'active', 
             program: 'Adults',
             attendance: 0,
             totalAttendance: 0,
             joinDate: new Date().toLocaleDateString(),
-            balance: initialAmount, // Set initial balance
+            balance: initialAmount, // Set initial balance reference (will be recalculated by Store)
             classesId: [],
             attendanceHistory: [],
             avatarUrl: newUser.avatarUrl
         };
 
-        // Create the pending payment record
+        // Create the initial CHARGE record
         if (initialAmount > 0) {
-            const initialPayment: Payment = {
+            const initialCharge: FinancialRecord = {
                 id: uuid(),
                 academyId: academy.id,
                 studentId: userId,
                 studentName: data.name,
                 amount: initialAmount,
                 date: new Date().toISOString().split('T')[0],
-                status: 'charge', // Corrected to 'charge' to match types
-                type: 'charge', // Added type
+                status: 'charged', // STRICT STATUS
+                type: 'charge', 
                 description: 'Mensualidad (Inscripción)',
                 category: 'Mensualidad',
                 method: 'System'
             };
-            payments.push(initialPayment);
+            payments.push(initialCharge);
             localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
         }
 
@@ -357,15 +357,15 @@ export const PulseService = {
         localStorage.setItem(STORAGE_KEYS.LIBRARY, JSON.stringify(resources));
     },
 
-    getPayments: (academyId?: string): Payment[] => {
+    getPayments: (academyId?: string): FinancialRecord[] => {
         const data = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
-        let payments: Payment[] = data ? JSON.parse(data) : [];
+        let payments: FinancialRecord[] = data ? JSON.parse(data) : [];
         payments = payments.map(p => ({...p, academyId: p.academyId || 'acad-1'}));
         if (academyId) return payments.filter(p => p.academyId === academyId);
         return payments;
     },
 
-    savePayments: (payments: Payment[]) => {
+    savePayments: (payments: FinancialRecord[]) => {
         localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
     },
     

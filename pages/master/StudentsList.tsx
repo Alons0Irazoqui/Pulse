@@ -2,25 +2,30 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
-import { Student, StudentStatus } from '../../types';
+import { Student, StudentStatus, PaymentCategory, FinancialRecord } from '../../types';
 import { exportToCSV } from '../../utils/csvExport';
 import { useNavigate } from 'react-router-dom';
 import ConfirmationModal from '../../components/ConfirmationModal';
+import { getLocalDate } from '../../utils/dateUtils';
 
 const StudentsList: React.FC = () => {
-  const { students, updateStudent, deleteStudent, addStudent, academySettings, markAttendance, promoteStudent, payments } = useStore();
+  const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, payments, recordPayment } = useStore();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-  const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'finance'>('info'); // NEW: Detail Modal Tab State
+  const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'finance'>('info');
   
   // Modal States
-  const [showModal, setShowModal] = useState(false); // Create/Edit Modal
-  const [viewingStudent, setViewingStudent] = useState<Student | null>(null); // Detail Modal
+  const [showModal, setShowModal] = useState(false); 
+  const [viewingStudent, setViewingStudent] = useState<Student | null>(null); 
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   
+  // Quick Cash Modal State
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [cashForm, setCashForm] = useState({ amount: '', concept: 'Mensualidad' });
+
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void, type?: 'danger'|'info'}>({
       isOpen: false, title: '', message: '', action: () => {}
   });
@@ -30,20 +35,29 @@ const StudentsList: React.FC = () => {
   };
   const [formData, setFormData] = useState(initialFormState);
 
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          student.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || student.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
+  // Filter Students
+  const filteredStudents = useMemo(() => {
+      return students.filter(student => {
+        const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              student.email.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = filterStatus === 'all' || student.status === filterStatus;
+        return matchesSearch && matchesStatus;
+      });
+  }, [students, searchTerm, filterStatus]);
 
-  // Calculate debts for viewing student
+  // Derived Financial Data for Viewing Student (Reactive)
   const studentDebts = useMemo(() => {
       if (!viewingStudent) return [];
-      return payments.filter(p => p.studentId === viewingStudent.id && p.status !== 'paid');
+      return payments
+        .filter(p => p.studentId === viewingStudent.id && p.type === 'charge' && p.status === 'charged')
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [viewingStudent, payments]);
 
-  const totalDebt = studentDebts.reduce((acc, curr) => acc + curr.amount, 0);
+  // We find the CURRENT version of the viewing student from the global store to ensure balance is reactive
+  const reactiveViewingStudent = useMemo(() => {
+      if (!viewingStudent) return null;
+      return students.find(s => s.id === viewingStudent.id) || viewingStudent;
+  }, [students, viewingStudent]);
 
   const handleExport = () => {
       const dataToExport = filteredStudents.map(({ classesId, promotionHistory, ...rest }) => rest);
@@ -104,7 +118,7 @@ const StudentsList: React.FC = () => {
   const handleViewDetails = (student: Student, e?: React.MouseEvent) => {
       e?.stopPropagation();
       setViewingStudent(student);
-      setActiveTab('info'); // Reset tab
+      setActiveTab('info'); 
   };
 
   const handleCreate = () => {
@@ -154,9 +168,56 @@ const StudentsList: React.FC = () => {
               promoteStudent(viewingStudent.id);
               addToast(`${viewingStudent.name} ha sido promovido`, 'success');
               setConfirmModal(prev => ({...prev, isOpen: false}));
-              setViewingStudent(null);
+              setViewingStudent(null); // Close modal to refresh or keep open but logic is handled
           }
       });
+  };
+
+  const handleManualCharge = () => {
+      if (!reactiveViewingStudent) return;
+      
+      const charge: FinancialRecord = {
+          id: '', // Will be generated
+          academyId: reactiveViewingStudent.academyId,
+          studentId: reactiveViewingStudent.id,
+          studentName: reactiveViewingStudent.name,
+          amount: academySettings.paymentSettings.monthlyTuition || 0,
+          date: getLocalDate(),
+          type: 'charge',
+          status: 'charged',
+          category: 'Mensualidad',
+          description: `Mensualidad Manual - ${new Date().toLocaleString('es-ES', { month: 'long' })}`,
+          method: 'System'
+      };
+
+      recordPayment(charge);
+      addToast('Cargo generado exitosamente. El saldo se ha actualizado.', 'success');
+  };
+
+  const handleRegisterCashPayment = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!reactiveViewingStudent || !cashForm.amount) return;
+
+      const payment: FinancialRecord = {
+          id: '',
+          academyId: reactiveViewingStudent.academyId,
+          studentId: reactiveViewingStudent.id,
+          studentName: reactiveViewingStudent.name,
+          amount: parseFloat(cashForm.amount),
+          date: getLocalDate(),
+          type: 'payment',
+          status: 'paid', // Instant approval for cash
+          category: 'Mensualidad', // Default, could be selectable
+          description: cashForm.concept || 'Pago en Efectivo',
+          method: 'Efectivo',
+          processedBy: 'Maestro',
+          processedAt: new Date().toISOString()
+      };
+
+      recordPayment(payment);
+      addToast('Pago registrado. Saldo actualizado al instante.', 'success');
+      setShowCashModal(false);
+      setCashForm({ amount: '', concept: 'Mensualidad' });
   };
 
   return (
@@ -408,8 +469,45 @@ const StudentsList: React.FC = () => {
           </div>
       )}
 
+      {/* QUICK CASH MODAL */}
+      {showCashModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+                  <h3 className="text-xl font-bold text-text-main mb-4">Registrar Cobro en Efectivo</h3>
+                  <form onSubmit={handleRegisterCashPayment} className="flex flex-col gap-4">
+                      <div>
+                          <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Concepto</label>
+                          <input 
+                              required 
+                              value={cashForm.concept} 
+                              onChange={e => setCashForm({...cashForm, concept: e.target.value})} 
+                              className="w-full rounded-xl border-gray-300 p-3 text-sm focus:border-green-500 focus:ring-green-500" 
+                              placeholder="Ej. Mensualidad" 
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Monto ($)</label>
+                          <input 
+                              required 
+                              type="number" 
+                              value={cashForm.amount} 
+                              onChange={e => setCashForm({...cashForm, amount: e.target.value})} 
+                              className="w-full rounded-xl border-gray-300 p-3 text-2xl font-bold text-green-600 focus:border-green-500 focus:ring-green-500" 
+                              placeholder="0.00" 
+                              autoFocus
+                          />
+                      </div>
+                      <div className="flex gap-3 mt-2">
+                          <button type="button" onClick={() => setShowCashModal(false)} className="flex-1 py-3 rounded-xl border border-gray-300 font-bold text-gray-500">Cancelar</button>
+                          <button type="submit" className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold shadow-lg hover:bg-green-700">Cobrar</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
       {/* STUDENT DETAIL MODAL WITH TABS */}
-      {viewingStudent && (
+      {reactiveViewingStudent && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
                   {/* Header */}
@@ -419,13 +517,13 @@ const StudentsList: React.FC = () => {
                       </button>
                       
                       <div className="absolute -bottom-10 left-8 flex items-end gap-6">
-                          <img src={viewingStudent.avatarUrl} className="size-28 rounded-full border-4 border-white shadow-xl object-cover bg-white" />
-                          <div className="pb-10"> {/* Adjusted padding to sit above bottom edge */}
-                              <h2 className="text-3xl font-bold text-white drop-shadow-md leading-none">{viewingStudent.name}</h2>
+                          <img src={reactiveViewingStudent.avatarUrl} className="size-28 rounded-full border-4 border-white shadow-xl object-cover bg-white" />
+                          <div className="pb-10">
+                              <h2 className="text-3xl font-bold text-white drop-shadow-md leading-none">{reactiveViewingStudent.name}</h2>
                               <div className="flex items-center gap-2 mt-2">
-                                  <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-white text-xs font-bold">{viewingStudent.rank}</span>
-                                  <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase border border-white/20 ${viewingStudent.status === 'active' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                                      {getStatusLabel(viewingStudent.status)}
+                                  <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-white text-xs font-bold">{reactiveViewingStudent.rank}</span>
+                                  <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase border border-white/20 ${reactiveViewingStudent.status === 'active' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                      {getStatusLabel(reactiveViewingStudent.status)}
                                   </span>
                               </div>
                           </div>
@@ -451,21 +549,21 @@ const StudentsList: React.FC = () => {
                                               <div className="size-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm"><span className="material-symbols-outlined text-[20px]">email</span></div>
                                               <div>
                                                   <p className="text-xs text-text-secondary">Correo Electrónico</p>
-                                                  <p className="font-semibold text-text-main">{viewingStudent.email}</p>
+                                                  <p className="font-semibold text-text-main">{reactiveViewingStudent.email}</p>
                                               </div>
                                           </div>
                                           <div className="flex items-center gap-4 text-sm bg-gray-50 p-3 rounded-xl border border-gray-100">
                                               <div className="size-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm"><span className="material-symbols-outlined text-[20px]">phone</span></div>
                                               <div>
                                                   <p className="text-xs text-text-secondary">Teléfono</p>
-                                                  <p className="font-semibold text-text-main">{viewingStudent.phone || 'No registrado'}</p>
+                                                  <p className="font-semibold text-text-main">{reactiveViewingStudent.phone || 'No registrado'}</p>
                                               </div>
                                           </div>
                                           <div className="flex items-center gap-4 text-sm bg-gray-50 p-3 rounded-xl border border-gray-100">
                                               <div className="size-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm"><span className="material-symbols-outlined text-[20px]">calendar_month</span></div>
                                               <div>
                                                   <p className="text-xs text-text-secondary">Miembro Desde</p>
-                                                  <p className="font-semibold text-text-main">{viewingStudent.joinDate}</p>
+                                                  <p className="font-semibold text-text-main">{reactiveViewingStudent.joinDate}</p>
                                               </div>
                                           </div>
                                       </div>
@@ -475,7 +573,7 @@ const StudentsList: React.FC = () => {
                               <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 border border-gray-100">
                                   <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-4">Acciones Rápidas</h4>
                                   <div className="flex flex-col gap-3">
-                                      <button onClick={() => { navigate('/master/communication', { state: { recipientId: viewingStudent.id } }) }} className="w-full py-3 px-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all flex items-center justify-between group">
+                                      <button onClick={() => { navigate('/master/communication', { state: { recipientId: reactiveViewingStudent.id } }) }} className="w-full py-3 px-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all flex items-center justify-between group">
                                           <span className="font-semibold text-sm">Enviar Mensaje</span>
                                           <span className="material-symbols-outlined text-gray-400 group-hover:text-blue-500">mail</span>
                                       </button>
@@ -494,7 +592,7 @@ const StudentsList: React.FC = () => {
                               <div className="flex justify-between items-center bg-gray-50 p-4 rounded-xl">
                                   <div>
                                       <p className="text-xs font-bold text-text-secondary uppercase">Total Asistencias</p>
-                                      <p className="text-3xl font-black text-text-main">{viewingStudent.attendance}</p>
+                                      <p className="text-3xl font-black text-text-main">{reactiveViewingStudent.attendance}</p>
                                   </div>
                                   <div className="w-48">
                                       <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
@@ -514,8 +612,8 @@ const StudentsList: React.FC = () => {
                                           </tr>
                                       </thead>
                                       <tbody className="divide-y divide-gray-50">
-                                          {viewingStudent.attendanceHistory && viewingStudent.attendanceHistory.length > 0 ? (
-                                              [...viewingStudent.attendanceHistory]
+                                          {reactiveViewingStudent.attendanceHistory && reactiveViewingStudent.attendanceHistory.length > 0 ? (
+                                              [...reactiveViewingStudent.attendanceHistory]
                                               .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                                               .map((record, idx) => (
                                                   <tr key={idx} className="hover:bg-gray-50">
@@ -555,7 +653,7 @@ const StudentsList: React.FC = () => {
                       {/* --- TAB: FINANCE --- */}
                       {activeTab === 'finance' && (
                           <div className="space-y-6">
-                              {totalDebt > 0 ? (
+                              {reactiveViewingStudent.balance > 0 ? (
                                   <div className="bg-red-50 p-6 rounded-2xl border border-red-100 flex justify-between items-center">
                                       <div className="flex items-center gap-4">
                                           <div className="size-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
@@ -566,7 +664,7 @@ const StudentsList: React.FC = () => {
                                               <p className="text-red-600 text-sm">El alumno tiene pagos atrasados.</p>
                                           </div>
                                       </div>
-                                      <p className="text-4xl font-black text-red-600">${totalDebt.toFixed(2)}</p>
+                                      <p className="text-4xl font-black text-red-600">${reactiveViewingStudent.balance.toFixed(2)}</p>
                                   </div>
                               ) : (
                                   <div className="bg-green-50 p-6 rounded-2xl border border-green-100 flex items-center gap-4">
@@ -581,7 +679,25 @@ const StudentsList: React.FC = () => {
                               )}
 
                               <div>
-                                  <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-3">Detalle de Cargos</h4>
+                                  <div className="flex justify-between items-end mb-3">
+                                      <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Detalle de Cargos (Deuda Activa)</h4>
+                                      <div className="flex gap-2">
+                                          <button 
+                                              onClick={handleManualCharge}
+                                              className="text-xs font-bold bg-white border border-gray-200 text-text-main px-3 py-1.5 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-1"
+                                          >
+                                              <span className="material-symbols-outlined text-[14px]">add</span>
+                                              Generar Cargo
+                                          </button>
+                                          <button 
+                                              onClick={() => setShowCashModal(true)}
+                                              className="text-xs font-bold bg-green-600 text-white px-3 py-1.5 rounded-lg shadow-sm hover:bg-green-700 transition-colors flex items-center gap-1 shadow-green-500/20"
+                                          >
+                                              <span className="material-symbols-outlined text-[14px]">payments</span>
+                                              Registrar Pago (Efectivo)
+                                          </button>
+                                      </div>
+                                  </div>
                                   <div className="space-y-2">
                                       {studentDebts.length > 0 ? studentDebts.map(debt => (
                                           <div key={debt.id} className="flex justify-between items-center p-4 bg-white border border-gray-100 rounded-xl shadow-sm">

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
-import { PaymentCategory } from '../../types';
+import { PaymentCategory, FinancialRecord } from '../../types';
 import { generateReceipt } from '../../utils/pdfGenerator';
 
 const StudentPayments: React.FC = () => {
@@ -59,7 +59,7 @@ const StudentPayments: React.FC = () => {
               amount: parseFloat(paymentForm.amount),
               date: new Date().toISOString().split('T')[0],
               status: 'pending_approval', 
-              type: 'payment', // Important: This is a PAYMENT, not a charge
+              type: 'payment', // Strict Type
               description: finalDescription,
               category: paymentForm.category,
               method: 'Transferencia',
@@ -78,10 +78,10 @@ const StudentPayments: React.FC = () => {
               amount: parseFloat(paymentForm.amount),
               date: new Date().toISOString().split('T')[0],
               status: 'pending_approval',
-              type: 'payment', // Payment Notification
+              type: 'payment',
               description: finalDescription,
               category: paymentForm.category,
-              method: 'Efectivo en Academia',
+              method: 'Efectivo',
           });
           addToast('Aviso de pago creado. Paga en recepción.', 'info');
       }
@@ -319,22 +319,23 @@ const StudentPayments: React.FC = () => {
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
                                         tx.status === 'paid' ? 'bg-gray-100 text-gray-600' :
-                                        tx.status === 'charge' || tx.status === 'unpaid' ? 'bg-red-50 text-red-500' :
-                                        'bg-orange-50 text-orange-600'
+                                        tx.status === 'charged' ? 'bg-red-50 text-red-500' :
+                                        tx.status === 'rejected' ? 'bg-gray-200 text-gray-500 line-through' :
+                                        'bg-blue-50 text-blue-600'
                                     }`}>
-                                        {(tx.status === 'charge' || tx.status === 'unpaid') ? 'Por Pagar' :
+                                        {tx.status === 'charged' ? 'Por Pagar' :
                                          tx.status === 'pending_approval' ? 'En Revisión' : 
-                                         tx.status === 'paid' ? 'Aplicado' : 'Pendiente'}
+                                         tx.status === 'paid' ? 'Aplicado' : 'Rechazado'}
                                     </span>
                                     
                                     {/* DOWNLOAD BUTTON FOR PAID */}
-                                    {tx.status === 'paid' && (
+                                    {tx.status === 'paid' && tx.type === 'payment' && (
                                         <button 
                                             onClick={() => handleDownloadReceipt(tx)} 
-                                            className="size-6 bg-gray-100 hover:bg-primary hover:text-white text-gray-500 rounded-full flex items-center justify-center transition-colors shadow-sm"
-                                            title="Descargar Recibo"
+                                            className="size-7 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 rounded-lg flex items-center justify-center transition-all shadow-sm"
+                                            title="Descargar Comprobante"
                                         >
-                                            <span className="material-symbols-outlined text-[14px]">download</span>
+                                            <span className="material-symbols-outlined text-[16px]">receipt_long</span>
                                         </button>
                                     )}
                                 </div>

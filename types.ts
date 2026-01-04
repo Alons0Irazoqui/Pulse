@@ -19,9 +19,9 @@ export interface BankDetails {
 }
 
 export interface AcademySettings {
-    id: string; // UUID
+    id: string;
     name: string;
-    code: string; // Shareable Code
+    code: string;
     modules: {
         library: boolean;
         payments: boolean;
@@ -29,10 +29,10 @@ export interface AcademySettings {
     };
     paymentSettings: {
         lateFeeAmount: number;
-        lateFeeGracePeriod: number; // Deprecated in favor of fixed days, kept for legacy
-        monthlyTuition: number; // Automated billing amount
-        billingDay: number; // Day of month to generate charges (e.g., 1)
-        lateFeeDay: number; // Day of month to apply fees (e.g., 10)
+        lateFeeGracePeriod: number;
+        monthlyTuition: number;
+        billingDay: number;
+        lateFeeDay: number;
     };
     bankDetails?: BankDetails;
     ranks: Rank[];
@@ -45,19 +45,18 @@ export interface PromotionHistoryItem {
     notes?: string;
 }
 
-// Detailed attendance record
 export interface AttendanceRecord {
-    date: string; // ISO Date "YYYY-MM-DD"
-    classId: string; // Specific class context
+    date: string;
+    classId: string;
     status: 'present' | 'late' | 'excused' | 'absent';
-    timestamp: string; // ISO Full Timestamp
-    reason?: string; // Optional justification or note
+    timestamp: string;
+    reason?: string;
 }
 
 export interface Student {
-    id: string; // Linked to UserProfile ID
-    userId: string; // Foreign Key to User
-    academyId: string; // Foreign Key to Academy
+    id: string;
+    userId: string;
+    academyId: string;
     name: string;
     email: string;
     phone?: string;
@@ -67,13 +66,13 @@ export interface Student {
     stripes: number;
     status: StudentStatus;
     program: string;
-    attendance: number; // Total count for quick access
-    totalAttendance: number; // Historical total
+    attendance: number;
+    totalAttendance: number;
     lastAttendance?: string;
-    attendanceHistory: AttendanceRecord[]; // The array of objects
+    attendanceHistory: AttendanceRecord[];
     joinDate: string;
     avatarUrl?: string;
-    balance: number; // Positive means DEBT
+    balance: number; // Derived state (Charges - Paid Payments)
     classesId: string[];
     promotionHistory?: PromotionHistoryItem[];
     notes?: Note[];
@@ -86,17 +85,15 @@ export interface Note {
     author: string;
 }
 
-// --- SESSION EXCEPTION LOGIC ---
 export interface SessionModification {
-    date: string; // The original date of the class (YYYY-MM-DD)
+    date: string;
     type: 'cancel' | 'move' | 'instructor' | 'time';
-    newDate?: string; // If moved
-    newStartTime?: string; // Overrides default start time
-    newEndTime?: string;   // Overrides default end time
-    newInstructor?: string; // Overrides default instructor
+    newDate?: string;
+    newStartTime?: string;
+    newEndTime?: string;
+    newInstructor?: string;
 }
 
-// Alias for the requested type name, extending SessionModification for compatibility
 export interface ClassException extends SessionModification {
     id?: string;
     reason?: string;
@@ -106,14 +103,14 @@ export interface ClassCategory {
     id: string;
     academyId: string;
     name: string;
-    schedule: string; // Display string (e.g. "Lun/Mie 17:00")
-    days: string[]; // Structured data: ['Monday', 'Wednesday']
-    startTime: string; // "17:00" - Mandatory
-    endTime: string;   // "18:15" - Mandatory
-    instructor: string; // Default instructor
+    schedule: string;
+    days: string[];
+    startTime: string;
+    endTime: string;
+    instructor: string;
     studentCount: number;
     studentIds: string[];
-    modifications: ClassException[]; // Array of exceptions to the rule
+    modifications: ClassException[];
 }
 
 export interface Event {
@@ -132,21 +129,39 @@ export interface Event {
 
 export type PaymentCategory = 'Mensualidad' | 'Torneo' | 'Examen/Promoción' | 'Equipo/Uniforme' | 'Otro' | 'Late Fee';
 
-export interface Payment {
+// --- FINANCIAL CORE ---
+export type TransactionType = 'charge' | 'payment';
+// Charge: A debt created by the system/master. Always 'charged'.
+// Payment: A money transfer attempt by student. Can be pending, paid, or rejected.
+export type TransactionStatus = 'charged' | 'pending_approval' | 'paid' | 'rejected';
+
+export interface FinancialRecord {
     id: string;
     academyId: string;
     studentId: string;
     studentName?: string;
     amount: number;
-    date: string;
-    status: 'paid' | 'pending_approval' | 'unpaid' | 'charge' | 'failed'; 
-    type: 'charge' | 'payment'; // CHARGE = Deuda (+Balance), PAYMENT = Abono (-Balance)
+    date: string; // ISO YYYY-MM-DD
+    
+    // Strict typing based on architecture requirements
+    type: TransactionType;
+    status: TransactionStatus;
+    
     description: string;
     category: PaymentCategory;
-    method?: string;
+    method?: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'System';
+    
+    // Proof for payments
     proofUrl?: string; 
     proofType?: string; 
+    
+    // Audit
+    processedBy?: string;
+    processedAt?: string;
 }
+
+// Alias for backward compatibility during refactor if needed, ensuring new code uses FinancialRecord
+export type Payment = FinancialRecord; 
 
 export interface UserProfile {
     id: string;

@@ -8,7 +8,7 @@ import { generateReceipt } from '../../utils/pdfGenerator';
 import ConfirmationModal from '../../components/ConfirmationModal';
 
 const Finance: React.FC = () => {
-  const { payments, recordPayment, approvePayment, students, academySettings, currentUser, generateMonthlyBilling } = useStore();
+  const { payments, recordPayment, approvePayment, rejectPayment, students, academySettings, currentUser, generateMonthlyBilling } = useStore();
   const { addToast } = useToast();
   
   // Filtering States
@@ -21,8 +21,8 @@ const Finance: React.FC = () => {
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   
   // Confirmation Modal State
-  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void}>({
-      isOpen: false, title: '', message: '', action: () => {}
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void, type?: 'info' | 'danger'}>({
+      isOpen: false, title: '', message: '', action: () => {}, type: 'info'
   });
 
   // Manual Entry State
@@ -32,7 +32,7 @@ const Finance: React.FC = () => {
       concept: '',
       category: 'Mensualidad' as PaymentCategory,
       type: 'charge' as 'charge' | 'payment',
-      method: 'Efectivo',
+      method: 'Efectivo' as 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'System',
       date: new Date().toISOString().split('T')[0]
   };
   const [newEntry, setNewEntry] = useState(initialEntryState);
@@ -45,7 +45,7 @@ const Finance: React.FC = () => {
           const matchesSearch = studentName.toLowerCase().includes(searchQuery.toLowerCase()) || 
                                 p.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-          // Filter by Type (Charge vs Payment)
+          // Filter by Type
           const matchesType = filterType === 'all' || p.type === filterType;
 
           // Time (Simple logic)
@@ -66,14 +66,13 @@ const Finance: React.FC = () => {
 
   // --- REAL-TIME STATS ---
   const stats = useMemo(() => {
-      // Income = Completed PAYMENTS
+      // Income = PAYMENTS that are PAID
       const totalIncome = payments.filter(p => p.type === 'payment' && p.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0);
       
-      // Pending Approvals = Payments with 'pending_approval' (Specific status check)
+      // Pending Approvals = Payments with 'pending_approval'
       const pendingApproval = payments.filter(p => p.type === 'payment' && p.status === 'pending_approval').length;
       
-      // Pending Debt = Sum of all student balances (Real-time net debt)
-      // We use the calculated balance from the students array instead of summing raw charges
+      // Pending Debt = Sum of all derived student balances (Reactive)
       const totalDebt = students.reduce((acc, s) => acc + (s.balance > 0 ? s.balance : 0), 0);
       
       return { totalIncome, pendingApproval, totalDebt };
@@ -89,6 +88,7 @@ const Finance: React.FC = () => {
           isOpen: true,
           title: 'Generar Cargos Mensuales',
           message: '¿Generar deuda de mensualidad a todos los alumnos activos? Esto aumentará el saldo deudor de cada alumno.',
+          type: 'info',
           action: () => {
               if (generateMonthlyBilling) {
                   generateMonthlyBilling();
@@ -111,11 +111,8 @@ const Finance: React.FC = () => {
           studentName: student?.name || 'Unknown',
           amount: parseFloat(newEntry.amount),
           date: newEntry.date,
-          // Logic: 
-          // If 'charge', status is 'charge' (active debt). 
-          // If 'payment' (manual), assume 'paid' because master is entering it.
-          status: newEntry.type === 'charge' ? 'charge' : 'paid',
           type: newEntry.type,
+          status: newEntry.type === 'charge' ? 'charged' : 'paid',
           description: newEntry.concept,
           category: newEntry.category,
           method: newEntry.type === 'payment' ? newEntry.method : 'System'
@@ -132,6 +129,7 @@ const Finance: React.FC = () => {
           isOpen: true,
           title: 'Aprobar Pago',
           message: `¿Confirmas haber recibido $${payment.amount}? Esto reducirá el saldo del alumno.`,
+          type: 'info',
           action: () => {
               approvePayment(payment.id);
               setSelectedTransactionId(null);
@@ -141,8 +139,15 @@ const Finance: React.FC = () => {
       });
   };
 
+  const handleRejectPayment = (payment: Payment) => {
+      if(confirm('¿Rechazar este pago? No afectará el saldo del alumno.')) {
+          rejectPayment(payment.id);
+          setSelectedTransactionId(null);
+          addToast('Pago rechazado.', 'info');
+      }
+  };
+
   const selectedTransaction = payments.find(t => t.id === selectedTransactionId);
-  const selectedTxStudent = students.find(s => s.id === selectedTransaction?.studentId);
 
   return (
     <div className="max-w-[1600px] w-full mx-auto p-6 md:p-10 flex flex-col gap-8 h-full z-10">
@@ -153,7 +158,7 @@ const Finance: React.FC = () => {
             message={confirmModal.message}
             onConfirm={confirmModal.action}
             onCancel={() => setConfirmModal(prev => ({...prev, isOpen: false}))}
-            type="info"
+            type={confirmModal.type}
         />
 
         {/* Header */}
@@ -175,7 +180,7 @@ const Finance: React.FC = () => {
         {/* Stats */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col">
-                <span className="text-sm font-bold text-gray-400 uppercase">Ingresos Totales (Pagados)</span>
+                <span className="text-sm font-bold text-gray-400 uppercase">Ingresos Totales (Cobrado)</span>
                 <span className="text-3xl font-black text-green-600">${stats.totalIncome.toLocaleString()}</span>
             </div>
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col relative overflow-hidden">
@@ -184,7 +189,7 @@ const Finance: React.FC = () => {
                 <span className="text-3xl font-black text-blue-600">{stats.pendingApproval}</span>
             </div>
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col">
-                <span className="text-sm font-bold text-gray-400 uppercase">Deuda Total (Saldos Alumnos)</span>
+                <span className="text-sm font-bold text-gray-400 uppercase">Deuda Total (Por Cobrar)</span>
                 <span className="text-3xl font-black text-red-500">${stats.totalDebt.toLocaleString()}</span>
             </div>
         </section>
@@ -193,9 +198,9 @@ const Finance: React.FC = () => {
         <section className="flex gap-4 items-center bg-white p-2 rounded-2xl shadow-sm border border-gray-100 w-full md:w-fit">
             <span className="material-symbols-outlined text-gray-400 ml-2">filter_list</span>
             <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="border-none text-sm font-bold text-gray-600 focus:ring-0 cursor-pointer bg-transparent">
-                <option value="all">Todo (Cargos y Pagos)</option>
-                <option value="charge">Solo Cargos (Deuda)</option>
-                <option value="payment">Solo Pagos (Abonos)</option>
+                <option value="all">Todo</option>
+                <option value="charge">Cargos</option>
+                <option value="payment">Pagos</option>
             </select>
             <div className="w-px h-6 bg-gray-200"></div>
             <select value={filterTime} onChange={e => setFilterTime(e.target.value as any)} className="border-none text-sm font-bold text-gray-600 focus:ring-0 cursor-pointer bg-transparent">
@@ -238,7 +243,7 @@ const Finance: React.FC = () => {
                                     </td>
                                     <td className="p-5">
                                         <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded border ${tx.type === 'charge' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
-                                            {tx.type === 'charge' ? 'Cargo' : 'Abono'}
+                                            {tx.type === 'charge' ? 'Cargo' : 'Pago'}
                                         </span>
                                     </td>
                                     <td className="p-5 text-sm text-gray-600">{tx.description}</td>
@@ -249,8 +254,10 @@ const Finance: React.FC = () => {
                                             </span>
                                         ) : tx.status === 'paid' ? ( 
                                              <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded w-fit">Aplicado</span>
+                                        ) : tx.status === 'charged' ? (
+                                            <span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded w-fit uppercase">Deuda</span>
                                         ) : (
-                                            <span className="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded w-fit uppercase">{tx.status === 'charge' ? 'Por Pagar' : tx.status}</span>
+                                            <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded w-fit uppercase">{tx.status}</span>
                                         )}
                                     </td>
                                     <td className={`p-5 text-right font-bold ${tx.type === 'charge' ? 'text-red-500' : 'text-green-600'}`}>
@@ -288,7 +295,7 @@ const Finance: React.FC = () => {
                         <input required value={newEntry.concept} onChange={e => setNewEntry({...newEntry, concept: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm" placeholder="Descripción (ej. Uniforme)" />
 
                         {newEntry.type === 'payment' && (
-                            <select value={newEntry.method} onChange={e => setNewEntry({...newEntry, method: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm">
+                            <select value={newEntry.method} onChange={e => setNewEntry({...newEntry, method: e.target.value as any})} className="w-full rounded-xl border-gray-200 p-3 text-sm">
                                 <option value="Efectivo">Efectivo</option>
                                 <option value="Transferencia">Transferencia</option>
                                 <option value="Tarjeta">Tarjeta</option>
@@ -335,9 +342,14 @@ const Finance: React.FC = () => {
                         </div>
 
                         {selectedTransaction.status === 'pending_approval' && selectedTransaction.type === 'payment' && (
-                             <button onClick={() => handleApprovePayment(selectedTransaction)} className="mt-8 w-full py-3 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-lg shadow-green-500/30">
-                                 Aprobar Pago
-                             </button>
+                             <div className="flex gap-2 mt-8">
+                                <button onClick={() => handleRejectPayment(selectedTransaction)} className="w-1/3 py-3 rounded-xl border border-red-200 text-red-600 font-bold hover:bg-red-50">
+                                    Rechazar
+                                </button>
+                                <button onClick={() => handleApprovePayment(selectedTransaction)} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-lg shadow-green-500/30">
+                                    Aprobar Pago
+                                </button>
+                             </div>
                         )}
                         {selectedTransaction.status === 'paid' && selectedTransaction.type === 'payment' && (
                              <button onClick={() => generateReceipt(selectedTransaction, academySettings, currentUser)} className="mt-8 w-full py-3 rounded-xl border border-gray-200 text-text-main font-bold hover:bg-gray-50">

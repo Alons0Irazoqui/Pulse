@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext';
 const StudentDashboard: React.FC = () => {
   const { currentUser, students, academySettings, events, classes, payments, registerForEvent } = useStore();
   const { addToast } = useToast();
+  // Using find guarantees getting the latest reactive object from the context array
   const student = students.find(s => s.id === currentUser?.studentId);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   
@@ -26,17 +27,17 @@ const StudentDashboard: React.FC = () => {
     .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // --- FINANCIAL LOGIC ---
-  // Use 'student.balance' directly for reactivity. It comes pre-calculated from StoreContext useEffect.
   const totalDebt = student?.balance || 0;
   
   // Check for Pending Payments to show alert
   const hasPendingPayment = payments.some(p => p.studentId === student?.id && p.status === 'pending_approval');
 
   // Pending Charges List (for display details)
+  // Reactive list based on payments context
   const pendingCharges = payments.filter(p => 
       p.studentId === student?.id && 
       p.type === 'charge' && 
-      (p.status === 'charge' || p.status === 'unpaid')
+      p.status === 'charged'
   ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   // --- NEXT CLASS LOGIC (SMART) ---
