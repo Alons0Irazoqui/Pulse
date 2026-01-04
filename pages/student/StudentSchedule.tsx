@@ -6,13 +6,14 @@ const StudentSchedule: React.FC = () => {
   const { classes, currentUser } = useStore();
   const [selectedDay, setSelectedDay] = useState('Monday');
   
+  // Normalized keys for matching
   const days = [
-      { key: 'Monday', label: 'Monday' },
-      { key: 'Tuesday', label: 'Tuesday' },
-      { key: 'Wednesday', label: 'Wednesday' },
-      { key: 'Thursday', label: 'Thursday' },
-      { key: 'Friday', label: 'Friday' },
-      { key: 'Saturday', label: 'Saturday' }
+      { key: 'Monday', label: 'Lunes' },
+      { key: 'Tuesday', label: 'Martes' },
+      { key: 'Wednesday', label: 'Miércoles' },
+      { key: 'Thursday', label: 'Jueves' },
+      { key: 'Friday', label: 'Viernes' },
+      { key: 'Saturday', label: 'Sábado' }
   ];
 
   // Helper to get the next date occurrence for a day name
@@ -20,46 +21,37 @@ const StudentSchedule: React.FC = () => {
       const dayIndex = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].indexOf(dayName);
       const today = new Date();
       const resultDate = new Date();
-      
-      // Calculate diff to next occurrence
       let diff = dayIndex - today.getDay();
-      if (diff < 0) diff += 7; // If today is Wednesday (3) and we want Monday (1), diff is -2 -> 5 (next monday)
-      if (diff === 0) diff = 0; // Today
-
+      if (diff < 0) diff += 7; 
+      if (diff === 0) diff = 0; 
       resultDate.setDate(today.getDate() + diff);
       return resultDate.toISOString().split('T')[0];
   };
 
   const selectedDateStr = getNextDateForDay(selectedDay);
 
-  // Filter Classes with Exception Logic
+  // Filter Classes
   const filteredClasses = classes.filter(c => {
+      // 1. Enrollment Check (Critical: Context must be updated)
       const isEnrolled = currentUser?.studentId && c.studentIds.includes(currentUser.studentId);
       if (!isEnrolled) return false;
 
-      // 1. Check Modifications for this specific date
-      const modification = c.modifications.find(m => m.date === selectedDateStr);
-      
-      // If cancelled, hide it
-      if (modification?.type === 'cancel') return false;
-
-      // If moved *away* from today, hide it
-      if (modification?.type === 'move') return false;
-
-      // 2. Check if this is a regular class day
+      // 2. Day Check (Robust)
+      // The `days` array in class object contains keys like 'Monday', 'Tuesday'.
       const isRegularDay = c.days.includes(selectedDay);
 
-      // 3. Check if a class was moved *TO* today
-      const isMovedHere = c.modifications.find(m => m.newDate === selectedDateStr && m.type === 'move');
-
-      // Show if it's a regular day (not moved away/cancelled) OR if it was moved here
-      return isRegularDay || isMovedHere;
-  }).map(c => {
-      // Apply Overrides (Instructor, Time)
+      // 3. Exception Checks
       const modification = c.modifications.find(m => m.date === selectedDateStr);
       const isMovedHere = c.modifications.find(m => m.newDate === selectedDateStr && m.type === 'move');
-      
-      // If it was moved here, the modification data comes from the `isMovedHere` object
+
+      if (modification?.type === 'cancel') return false;
+      if (modification?.type === 'move') return false;
+
+      return isRegularDay || isMovedHere;
+  }).map(c => {
+      // Apply Overrides
+      const modification = c.modifications.find(m => m.date === selectedDateStr);
+      const isMovedHere = c.modifications.find(m => m.newDate === selectedDateStr && m.type === 'move');
       const activeMod = isMovedHere || modification;
 
       let displayInstructor = activeMod?.newInstructor || c.instructor;
@@ -71,13 +63,7 @@ const StudentSchedule: React.FC = () => {
       if (activeMod?.type === 'time') status = 'time_changed';
       if (isMovedHere) status = 'rescheduled';
 
-      return { 
-          ...c, 
-          displayInstructor, 
-          startTime: displayStartTime, 
-          endTime: displayEndTime,
-          status 
-      };
+      return { ...c, displayInstructor, startTime: displayStartTime, endTime: displayEndTime, status };
   });
 
   return (
@@ -96,7 +82,6 @@ const StudentSchedule: React.FC = () => {
           </div>
        </header>
 
-       {/* Day Selector */}
        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {days.map(day => (
               <button
@@ -113,7 +98,6 @@ const StudentSchedule: React.FC = () => {
           ))}
        </div>
 
-       {/* Class List */}
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredClasses.map((cls) => {
               return (
@@ -129,9 +113,7 @@ const StudentSchedule: React.FC = () => {
                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-blue-50 text-blue-600">
                                 {cls.name.includes('Gi') ? 'BJJ' : 'Clase'}
                             </span>
-                            {cls.status === 'rescheduled' && <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-purple-50 text-purple-600">Reprogramada</span>}
-                            {cls.status === 'instructor_changed' && <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-orange-50 text-orange-600">Instructor Suplente</span>}
-                            {cls.status === 'time_changed' && <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-blue-50 text-blue-600">Horario Modificado</span>}
+                            {cls.status !== 'active' && <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-yellow-50 text-yellow-600">Modificado</span>}
                         </div>
                         <span className="flex items-center gap-1 text-green-600 text-xs font-bold"><span className="material-symbols-outlined text-[16px]">check_circle</span> Inscrito</span>
                     </div>
@@ -152,10 +134,7 @@ const StudentSchedule: React.FC = () => {
                         </div>
                     </div>
 
-                    <button 
-                        disabled
-                        className="w-full py-3 rounded-xl font-semibold text-sm transition-all bg-gray-50 text-gray-400 cursor-default"
-                    >
+                    <button disabled className="w-full py-3 rounded-xl font-semibold text-sm transition-all bg-gray-50 text-gray-400 cursor-default">
                         Ya estás en la lista
                     </button>
                 </div>
@@ -164,8 +143,11 @@ const StudentSchedule: React.FC = () => {
           
           {filteredClasses.length === 0 && (
               <div className="col-span-full py-16 flex flex-col items-center justify-center text-center text-text-secondary">
-                  <span className="material-symbols-outlined text-4xl mb-2 opacity-30">event_busy</span>
-                  <p>No tienes clases activas para este día.</p>
+                  <div className="size-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                      <span className="material-symbols-outlined text-4xl opacity-30">event_busy</span>
+                  </div>
+                  <h3 className="font-bold text-lg text-text-main">Día Libre</h3>
+                  <p className="max-w-xs mx-auto mt-1">No tienes clases inscritas para este día. ¡Buen momento para descansar o entrenar por tu cuenta!</p>
               </div>
           )}
        </div>

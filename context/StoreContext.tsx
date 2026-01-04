@@ -32,8 +32,8 @@ interface StoreContextType {
   generateMonthlyCharges: () => void;
   applyLateFees: () => void;
   addClass: (newClass: ClassCategory) => void;
-  updateClass: (updatedClass: ClassCategory) => void; // New: Edit General Rule
-  modifyClassSession: (classId: string, modification: SessionModification) => void; // New: Exception
+  updateClass: (updatedClass: ClassCategory) => void; 
+  modifyClassSession: (classId: string, modification: SessionModification) => void; 
   deleteClass: (id: string) => void;
   enrollStudent: (studentId: string, classId: string) => void;
   unenrollStudent: (studentId: string, classId: string) => void;
@@ -47,6 +47,7 @@ interface StoreContextType {
   sendMessage: (msg: Omit<Message, 'id' | 'read' | 'date'>) => void;
   markMessageRead: (id: string) => void;
   updateUserProfile: (profile: Partial<UserProfile>) => void;
+  changePassword: (newPassword: string) => void; // NEW
   // Auth
   login: (email: string, pass: string) => Promise<boolean>;
   registerStudent: (data: any) => Promise<boolean>;
@@ -92,36 +93,30 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       loadData();
   }, [currentUser]);
 
-  // --- Dynamic Stats Calculation ---
+  // --- Stats Calculation ---
   const activeStudentsCount = students.filter(s => s.status === 'active' || s.status === 'exam_ready' || s.status === 'debtor').length;
   const inactiveStudentsCount = students.filter(s => s.status === 'inactive').length;
   const totalStudentsCount = students.length;
   const churnRate = totalStudentsCount > 0 ? (inactiveStudentsCount / totalStudentsCount) * 100 : 0;
 
-  // Calculate Monthly Revenue for Chart
   const calculateMonthlyRevenue = () => {
       const revenueByMonth: Record<string, number> = {};
       const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      
       const today = new Date();
       for(let i=5; i>=0; i--) {
           const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
           const key = months[d.getMonth()];
           revenueByMonth[key] = 0;
       }
-
       payments.forEach(p => {
           if (p.status === 'paid') {
               const date = new Date(p.date);
               if (!isNaN(date.getTime())) {
                   const key = months[date.getMonth()];
-                  if (revenueByMonth[key] !== undefined) {
-                      revenueByMonth[key] += p.amount;
-                  }
+                  if (revenueByMonth[key] !== undefined) revenueByMonth[key] += p.amount;
               }
           }
       });
-
       return Object.entries(revenueByMonth).map(([name, value]) => ({ name, value }));
   };
 
@@ -147,29 +142,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addStudent = (student: Student) => {
       if (currentUser?.role !== 'master') return;
-      
       const studentId = student.id || generateId('stu');
-      const finalStudent = { 
-          ...student, 
-          id: studentId, 
-          userId: studentId, 
-          academyId: currentUser.academyId,
-          attendanceHistory: [] 
-      };
-
+      const finalStudent = { ...student, id: studentId, userId: studentId, academyId: currentUser.academyId, attendanceHistory: [] };
       setStudents(prev => [...prev, finalStudent]);
-      
       try {
-          PulseService.createStudentAccountFromMaster(finalStudent);
-      } catch (e) {
-          console.error("Failed to auto-create user account", e);
-      }
+          // Password logic handled in component, passed via student object or handled separately
+          // For simplicity in this demo, assume component generated user object
+          PulseService.createStudentAccountFromMaster(finalStudent, (student as any).password);
+      } catch (e) { console.error("Failed to auto-create user account", e); }
   };
 
   const updateStudent = (updatedStudent: Student) => {
       if (currentUser?.role !== 'master') return;
       setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
-      
       const userDB = PulseService.getUsersDB();
       const updatedDB = userDB.map(u => u.id === updatedStudent.userId ? { ...u, name: updatedStudent.name, email: updatedStudent.email } : u);
       localStorage.setItem('pulse_users_db', JSON.stringify(updatedDB));
@@ -185,39 +170,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setStudents(prev => prev.map(s => s.id === id ? { ...s, status } : s));
   };
 
-  // --- ADVANCED ATTENDANCE LOGIC ---
   const markAttendance = (studentId: string) => {
     setStudents(prev => prev.map(s => {
       if (s.id === studentId) {
         const today = new Date().toISOString().split('T')[0];
-        
-        // Ensure array exists
         const history = s.attendanceHistory || [];
-        
-        // Prevent duplicate check-in for same day
-        const alreadyCheckedIn = history.some(record => record.date === today);
-        if (alreadyCheckedIn) {
-            return s; // No change
-        }
-
-        const newRecord: AttendanceRecord = { 
-            date: today, 
-            status: 'present',
-            timestamp: new Date().toISOString()
-        };
-        const newHistory = [newRecord, ...history];
-        
+        if (history.some(record => record.date === today)) return s;
+        const newRecord: AttendanceRecord = { date: today, status: 'present', timestamp: new Date().toISOString() };
         const newAttendance = s.attendance + 1;
         const totalAttendance = (s.totalAttendance || s.attendance) + 1;
-        const lastAttendance = today;
         
-        // Auto-update status if rank requirements met
         const currentRank = academySettings.ranks.find(r => r.id === s.rankId);
         let status = s.status;
-        if (currentRank && newAttendance >= currentRank.requiredAttendance && status === 'active') {
-            status = 'exam_ready';
-        }
-        return { ...s, attendance: newAttendance, totalAttendance, lastAttendance, status, attendanceHistory: newHistory };
+        if (currentRank && newAttendance >= currentRank.requiredAttendance && status === 'active') status = 'exam_ready';
+        return { ...s, attendance: newAttendance, totalAttendance, lastAttendance: today, status, attendanceHistory: [newRecord, ...history] };
       }
       return s;
     }));
@@ -230,28 +196,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const currentRankIndex = academySettings.ranks.findIndex(r => r.id === s.rankId);
           const nextRank = academySettings.ranks[currentRankIndex + 1];
           if (!nextRank) return s;
-
-          const historyItem: PromotionHistoryItem = {
-              rank: s.rank,
-              date: new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' }),
-              notes: `Promovido a ${nextRank.name}`
-          };
-
-          return {
-              ...s,
-              rank: nextRank.name,
-              rankId: nextRank.id,
-              rankColor: nextRank.color,
-              attendance: 0,
-              status: 'active', 
-              promotionHistory: [historyItem, ...(s.promotionHistory || [])]
-          };
+          const historyItem: PromotionHistoryItem = { rank: s.rank, date: new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' }), notes: `Promovido a ${nextRank.name}` };
+          return { ...s, rank: nextRank.name, rankId: nextRank.id, rankColor: nextRank.color, attendance: 0, status: 'active', promotionHistory: [historyItem, ...(s.promotionHistory || [])] };
       }));
   };
 
   const recordPayment = (payment: Payment) => {
       const existingIndex = payments.findIndex(p => p.id === payment.id);
-      
       let updatedPayment = { ...payment };
       if (!updatedPayment.id) updatedPayment.id = generateId('pay');
       if (!updatedPayment.academyId) updatedPayment.academyId = currentUser!.academyId;
@@ -266,7 +217,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setPayments(prev => [updatedPayment, ...prev]);
       }
 
-      // Update Balance Logic
       if (updatedPayment.status === 'paid') {
           setStudents(prev => prev.map(s => {
               if (s.id === updatedPayment.studentId) {
@@ -277,64 +227,34 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               return s;
           }));
       } else if (updatedPayment.status === 'pending' && existingIndex === -1) {
-          // New pending charge increases balance
           setStudents(prev => prev.map(s => {
-              if(s.id === updatedPayment.studentId) {
-                  return { ...s, balance: s.balance + updatedPayment.amount, status: 'debtor' };
-              }
+              if(s.id === updatedPayment.studentId) return { ...s, balance: s.balance + updatedPayment.amount, status: 'debtor' };
               return s;
           }));
       }
   };
 
-  // --- AUTOMATED MONTHLY BILLING LOGIC ---
   const generateMonthlyCharges = () => {
       if (currentUser?.role !== 'master') return;
-      
       const today = new Date().toISOString().split('T')[0];
       const monthlyAmount = academySettings.paymentSettings.monthlyTuition || 800;
-      const monthName = new Date().toLocaleString('es-ES', { month: 'long' });
-      const concept = `Mensualidad ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`;
-
-      let count = 0;
       const newPayments: Payment[] = [];
-
       const activeStudents = students.filter(s => s.status !== 'inactive');
       
       activeStudents.forEach(s => {
-          // Prevent duplicates for current month (Basic check)
-          const alreadyCharged = payments.some(p => 
-              p.studentId === s.id && 
-              p.category === 'Mensualidad' && 
-              p.date.substring(0, 7) === today.substring(0, 7) // Same YYYY-MM
-          );
-
+          const alreadyCharged = payments.some(p => p.studentId === s.id && p.category === 'Mensualidad' && p.date.substring(0, 7) === today.substring(0, 7));
           if (!alreadyCharged) {
               const charge: Payment = {
-                  id: generateId('inv'),
-                  academyId: currentUser.academyId,
-                  studentId: s.id,
-                  studentName: s.name,
-                  amount: monthlyAmount,
-                  date: today,
-                  status: 'pending',
-                  category: 'Mensualidad',
-                  description: concept,
-                  method: 'System'
+                  id: generateId('inv'), academyId: currentUser.academyId, studentId: s.id, studentName: s.name, amount: monthlyAmount, date: today, status: 'pending', category: 'Mensualidad', description: 'Mensualidad Automática', method: 'System'
               };
               newPayments.push(charge);
-              count++;
           }
       });
 
-      if (count > 0) {
+      if (newPayments.length > 0) {
           setPayments(prev => [...newPayments, ...prev]);
-          
-          // Update balances
           setStudents(prev => prev.map(s => {
-              if (s.status !== 'inactive' && newPayments.some(p => p.studentId === s.id)) {
-                  return { ...s, balance: s.balance + monthlyAmount, status: 'debtor' };
-              }
+              if (s.status !== 'inactive' && newPayments.some(p => p.studentId === s.id)) return { ...s, balance: s.balance + monthlyAmount, status: 'debtor' };
               return s;
           }));
       }
@@ -344,23 +264,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (currentUser?.role !== 'master') return;
       const { lateFeeAmount } = academySettings.paymentSettings;
       const today = new Date().toISOString().split('T')[0];
-      let feesApplied = 0;
-
       setStudents(prev => prev.map(s => {
           if (s.balance > 0 && s.status !== 'inactive') {
-              feesApplied++;
-              const penalty: Payment = {
-                  id: generateId('fee'),
-                  academyId: currentUser!.academyId,
-                  studentId: s.id,
-                  studentName: s.name,
-                  amount: lateFeeAmount,
-                  date: today,
-                  status: 'pending',
-                  category: 'Late Fee',
-                  description: 'Recargo por pago tardío',
-                  method: 'System'
-              };
+              const penalty: Payment = { id: generateId('fee'), academyId: currentUser!.academyId, studentId: s.id, studentName: s.name, amount: lateFeeAmount, date: today, status: 'pending', category: 'Late Fee', description: 'Recargo tardío', method: 'System' };
               setPayments(prevP => [penalty, ...prevP]);
               return { ...s, balance: s.balance + lateFeeAmount, status: 'debtor' };
           }
@@ -370,12 +276,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addClass = (newClass: ClassCategory) => {
       if (currentUser?.role !== 'master') return;
-      setClasses(prev => [...prev, { 
-          ...newClass, 
-          id: generateId('cls'), 
-          academyId: currentUser!.academyId, 
-          modifications: []
-      }]);
+      setClasses(prev => [...prev, { ...newClass, id: generateId('cls'), academyId: currentUser!.academyId, modifications: [] }]);
   };
 
   const updateClass = (updatedClass: ClassCategory) => {
@@ -386,15 +287,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const modifyClassSession = (classId: string, modification: SessionModification) => {
       setClasses(prev => prev.map(c => {
           if (c.id === classId) {
-              // Upsert logic: if modification for this date exists, update it. Else add.
               const existingIndex = c.modifications.findIndex(m => m.date === modification.date);
               let newModifications = [...c.modifications];
-              
-              if (existingIndex >= 0) {
-                  newModifications[existingIndex] = modification;
-              } else {
-                  newModifications.push(modification);
-              }
+              if (existingIndex >= 0) newModifications[existingIndex] = modification;
+              else newModifications.push(modification);
               return { ...c, modifications: newModifications };
           }
           return c;
@@ -407,15 +303,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const enrollStudent = (studentId: string, classId: string) => {
+      // Critical Fix: Update both local state and call service to ensure UI refreshes immediately
       const result = PulseService.enrollStudentInClass(studentId, classId, students, classes);
+      
+      // Update Classes State
       setClasses(result.updatedClasses);
+      
+      // Update Students State (This is vital for the Student Dashboard)
       setStudents(result.updatedStudents);
+      
+      // Sync with storage immediately
+      PulseService.saveClasses(result.updatedClasses);
+      PulseService.saveStudents(result.updatedStudents);
   };
 
   const unenrollStudent = (studentId: string, classId: string) => {
       const result = PulseService.unenrollStudentFromClass(studentId, classId, students, classes);
       setClasses(result.updatedClasses);
       setStudents(result.updatedStudents);
+      
+      PulseService.saveClasses(result.updatedClasses);
+      PulseService.saveStudents(result.updatedStudents);
   };
   
   const addEvent = (event: Event) => {
@@ -446,9 +354,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setLibraryResources(prev => prev.map(res => {
           if (res.id === resourceId) {
               const isCompleted = res.completedBy.includes(studentId);
-              let newCompletedBy = isCompleted 
-                ? res.completedBy.filter(id => id !== studentId) 
-                : [...res.completedBy, studentId];
+              let newCompletedBy = isCompleted ? res.completedBy.filter(id => id !== studentId) : [...res.completedBy, studentId];
               return { ...res, completedBy: newCompletedBy };
           }
           return res;
@@ -461,12 +367,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const sendMessage = (msg: Omit<Message, 'id' | 'read' | 'date'>) => {
-      const newMessage: Message = {
-          ...msg,
-          id: generateId('msg'),
-          read: false,
-          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      };
+      const newMessage: Message = { ...msg, id: generateId('msg'), read: false, date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
       setMessages(prev => [newMessage, ...prev]);
   };
 
@@ -478,20 +379,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!currentUser) return;
       const updatedUser = { ...currentUser, ...updates };
       setCurrentUser(updatedUser);
-      
       const users = PulseService.getUsersDB();
       const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, ...updates } : u);
       localStorage.setItem('pulse_users_db', JSON.stringify(updatedUsers));
-
       if (currentUser.role === 'student' && (updates.name || updates.email || updates.avatarUrl)) {
-          const updatedStudents = students.map(s => s.id === currentUser.id ? { 
-              ...s, 
-              name: updates.name || s.name, 
-              email: updates.email || s.email,
-              avatarUrl: updates.avatarUrl || s.avatarUrl
-          } : s);
+          const updatedStudents = students.map(s => s.id === currentUser.id ? { ...s, name: updates.name || s.name, email: updates.email || s.email, avatarUrl: updates.avatarUrl || s.avatarUrl } : s);
           setStudents(updatedStudents);
       }
+  };
+
+  const changePassword = (newPassword: string) => {
+      if (!currentUser) return;
+      const users = PulseService.getUsersDB();
+      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, password: newPassword } : u);
+      localStorage.setItem('pulse_users_db', JSON.stringify(updatedUsers));
+      // Optionally update current user state if password is part of it (usually it's not kept in state for security, but here we do simple auth)
+      setCurrentUser({ ...currentUser, password: newPassword });
   };
 
   const login = async (email: string, pass: string) => {
@@ -499,9 +402,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const user = PulseService.login(email, pass);
           setCurrentUser(user);
           return true;
-      } catch (error) {
-          return false;
-      }
+      } catch (error) { return false; }
   };
 
   const registerStudent = async (data: any) => {
@@ -539,7 +440,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         markAttendance, promoteStudent, recordPayment, generateMonthlyCharges, applyLateFees, addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
         addEvent, deleteEvent, registerForEvent,
         addLibraryResource, deleteLibraryResource, toggleResourceCompletion, updateAcademySettings,
-        sendMessage, markMessageRead, updateUserProfile,
+        sendMessage, markMessageRead, updateUserProfile, changePassword,
         login, registerStudent, registerMaster, logout 
     }}>
       {children}

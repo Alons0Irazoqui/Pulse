@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
@@ -23,7 +24,6 @@ const Login: React.FC = () => {
           else navigate('/student/dashboard');
       } else {
           addToast('Credenciales incorrectas. Intenta de nuevo.', 'error');
-          // Add a subtle shake effect logic here if desired, but toast is sufficient.
       }
       setLoading(false);
   };

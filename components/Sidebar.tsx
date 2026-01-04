@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 
 interface SidebarProps {
@@ -11,6 +11,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { academySettings, currentUser } = useStore();
 
   const masterLinks = [
@@ -81,31 +82,28 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
             {/* Navigation */}
             <nav className="flex flex-col gap-2">
-              {links.map((link) => (
-                <NavLink
-                  key={link.path}
-                  to={link.path}
-                  onClick={onClose} // Close drawer on mobile click
-                  className={({ isActive }) =>
-                    `flex items-center gap-4 px-4 py-3 rounded-xl transition-all group ${
-                      isActive
-                        ? 'bg-primary/10 shadow-sm ring-1 ring-primary/5 text-primary'
-                        : 'hover:bg-white/60 text-text-secondary hover:text-text-main'
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <span className={`material-symbols-outlined ${isActive ? 'filled' : ''} ${isActive ? 'text-primary' : 'text-text-secondary group-hover:text-primary transition-colors'}`}>
-                        {link.icon}
-                      </span>
-                      <span className={`font-medium text-sm ${isActive ? 'text-primary font-semibold' : 'text-text-secondary group-hover:text-text-main transition-colors'}`}>
-                        {link.name}
-                      </span>
-                    </>
-                  )}
-                </NavLink>
-              ))}
+              {links.map((link) => {
+                const isActive = location.pathname.startsWith(link.path);
+                return (
+                    <Link
+                    key={link.path}
+                    to={link.path}
+                    onClick={onClose} // Close drawer on mobile click
+                    className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all group ${
+                        isActive
+                            ? 'bg-primary/10 shadow-sm ring-1 ring-primary/5 text-primary'
+                            : 'hover:bg-white/60 text-text-secondary hover:text-text-main'
+                        }`}
+                    >
+                        <span className={`material-symbols-outlined ${isActive ? 'filled' : ''} ${isActive ? 'text-primary' : 'text-text-secondary group-hover:text-primary transition-colors'}`}>
+                            {link.icon}
+                        </span>
+                        <span className={`font-medium text-sm ${isActive ? 'text-primary font-semibold' : 'text-text-secondary group-hover:text-text-main transition-colors'}`}>
+                            {link.name}
+                        </span>
+                    </Link>
+                );
+              })}
             </nav>
           </div>
 

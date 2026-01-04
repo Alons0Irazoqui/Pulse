@@ -1,9 +1,8 @@
+
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 const LandingPage: React.FC = () => {
-  const navigate = useNavigate();
-
   return (
     <div className="min-h-screen flex flex-col relative bg-background-light font-display">
       {/* Navbar */}
