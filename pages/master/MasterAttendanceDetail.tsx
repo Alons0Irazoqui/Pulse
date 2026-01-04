@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { Student } from '../../types';
+import { getLocalDate, formatDateDisplay } from '../../utils/dateUtils';
 
 const MasterAttendanceDetail: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
@@ -13,8 +14,8 @@ const MasterAttendanceDetail: React.FC = () => {
 
   const currentClass = classes.find(c => c.id === classId);
 
-  // States
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  // States - Initialize with safe local date string
+  const [selectedDate, setSelectedDate] = useState<string>(getLocalDate());
   const [searchQuery, setSearchQuery] = useState('');
   
   // Modals States
@@ -26,6 +27,7 @@ const MasterAttendanceDetail: React.FC = () => {
   const [studentForHistory, setStudentForHistory] = useState<Student | null>(null);
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [enrollSearchQuery, setEnrollSearchQuery] = useState('');
 
   // Derived Data
   const enrolledStudents = useMemo(() => {
@@ -39,13 +41,23 @@ const MasterAttendanceDetail: React.FC = () => {
   const availableStudents = useMemo(() => {
       if (!currentClass) return [];
       return students
-        .filter(s => !currentClass.studentIds.includes(s.id) && s.status === 'active')
+        .filter(s => !currentClass.studentIds.includes(s.id) && s.status !== 'inactive')
+        .filter(s => s.name.toLowerCase().includes(enrollSearchQuery.toLowerCase()))
         .sort((a, b) => a.name.localeCompare(b.name));
-  }, [currentClass, students]);
+  }, [currentClass, students, enrollSearchQuery]);
 
   // Helpers
   const getAttendanceRecord = (student: Student) => {
       return student.attendanceHistory?.find(r => r.date === selectedDate && r.classId === classId);
+  };
+
+  const getStatusBadge = (status: string) => {
+      switch(status) {
+          case 'active': return <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">Activo</span>;
+          case 'debtor': return <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">Adeudo</span>;
+          case 'exam_ready': return <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">Listo Examen</span>;
+          default: return null;
+      }
   };
 
   // Actions
@@ -54,7 +66,6 @@ const MasterAttendanceDetail: React.FC = () => {
 
       if (status === 'excused') {
           setStudentForReason(studentId);
-          // Pre-fill if exists
           const student = students.find(s => s.id === studentId);
           const record = getAttendanceRecord(student!);
           setReasonText(record?.reason || '');
@@ -141,7 +152,7 @@ const MasterAttendanceDetail: React.FC = () => {
                   />
               </div>
               <button 
-                  onClick={() => setShowEnrollModal(true)}
+                  onClick={() => { setShowEnrollModal(true); setEnrollSearchQuery(''); }}
                   className="w-full sm:w-auto px-5 py-2.5 bg-white border border-gray-200 text-text-main font-bold rounded-xl hover:bg-gray-50 shadow-sm flex items-center justify-center gap-2 transition-all"
               >
                   <span className="material-symbols-outlined text-primary">person_add</span>
@@ -156,7 +167,9 @@ const MasterAttendanceDetail: React.FC = () => {
                       <thead className="bg-gray-50/80 border-b border-gray-100 sticky top-0 z-10 backdrop-blur-sm">
                           <tr>
                               <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Alumno</th>
-                              <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Asistencia ({selectedDate})</th>
+                              <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">
+                                Asistencia ({formatDateDisplay(selectedDate, {weekday: 'short', day: 'numeric'})})
+                              </th>
                               <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Acciones</th>
                           </tr>
                       </thead>
@@ -263,28 +276,48 @@ const MasterAttendanceDetail: React.FC = () => {
       {/* --- MODAL: ENROLL --- */}
       {showEnrollModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
-                  <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-2xl font-bold text-text-main">Inscribir Alumno</h3>
-                      <button onClick={() => setShowEnrollModal(false)} className="p-2 hover:bg-gray-100 rounded-full"><span className="material-symbols-outlined">close</span></button>
+              <div className="bg-white rounded-3xl p-8 w-full max-w-3xl shadow-2xl flex flex-col max-h-[85vh]">
+                  <div className="flex flex-col gap-4 mb-4 border-b border-gray-100 pb-4">
+                      <div className="flex justify-between items-center">
+                          <h3 className="text-2xl font-bold text-text-main">Inscribir Alumno</h3>
+                          <button onClick={() => setShowEnrollModal(false)} className="p-2 hover:bg-gray-100 rounded-full"><span className="material-symbols-outlined">close</span></button>
+                      </div>
+                      <div className="relative">
+                          <span className="material-symbols-outlined absolute left-3 top-3 text-gray-400">search</span>
+                          <input 
+                              autoFocus
+                              value={enrollSearchQuery}
+                              onChange={(e) => setEnrollSearchQuery(e.target.value)}
+                              className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary focus:ring-primary transition-all font-medium"
+                              placeholder="Buscar alumno para inscribir..."
+                          />
+                      </div>
                   </div>
                   
                   <div className="flex-1 overflow-y-auto pr-2 space-y-2">
                       {availableStudents.map(student => (
                           <div key={student.id} className="flex justify-between items-center p-3 rounded-xl border border-gray-100 hover:bg-blue-50 hover:border-blue-200 transition-all cursor-pointer group" onClick={() => { enrollStudent(student.id, classId!); addToast('Alumno inscrito', 'success'); }}>
                               <div className="flex items-center gap-3">
-                                  <img src={student.avatarUrl} className="size-10 rounded-full object-cover" />
+                                  <img src={student.avatarUrl} className="size-12 rounded-full object-cover border border-gray-100" />
                                   <div>
-                                      <p className="font-bold text-sm text-text-main">{student.name}</p>
-                                      <p className="text-xs text-text-secondary">{student.rank}</p>
+                                      <div className="flex items-center gap-2">
+                                          <p className="font-bold text-base text-text-main">{student.name}</p>
+                                          {getStatusBadge(student.status)}
+                                      </div>
+                                      <p className="text-xs text-text-secondary font-medium">{student.rank}</p>
                                   </div>
                               </div>
-                              <button className="size-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <span className="material-symbols-outlined text-lg">add</span>
+                              <button className="size-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <span className="material-symbols-outlined text-xl">add</span>
                               </button>
                           </div>
                       ))}
-                      {availableStudents.length === 0 && <p className="text-center text-gray-400 py-4">No hay alumnos disponibles para inscribir.</p>}
+                      {availableStudents.length === 0 && (
+                          <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                              <span className="material-symbols-outlined text-4xl mb-2 opacity-50">person_off</span>
+                              <p>No se encontraron alumnos disponibles.</p>
+                          </div>
+                      )}
                   </div>
               </div>
           </div>
@@ -315,7 +348,9 @@ const MasterAttendanceDetail: React.FC = () => {
                                       record.status === 'excused' ? 'bg-blue-500' : 'bg-red-500'
                                   }`}></div>
                                   <div className="flex justify-between items-start">
-                                      <p className="font-bold text-text-main text-sm capitalize">{new Date(record.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}</p>
+                                      <p className="font-bold text-text-main text-sm capitalize">
+                                          {formatDateDisplay(record.date)}
+                                      </p>
                                       <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
                                           record.status === 'present' ? 'bg-green-50 text-green-700' :
                                           record.status === 'late' ? 'bg-yellow-50 text-yellow-700' :

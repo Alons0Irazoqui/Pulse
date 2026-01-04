@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Student, ClassCategory, Payment, UserProfile, LibraryResource, Event, AcademySettings, PromotionHistoryItem, Message, AttendanceRecord, SessionModification, ClassException } from '../types';
 import { PulseService } from '../services/pulseService';
 import { mockMessages } from '../mockData';
+import { getLocalDate } from '../utils/dateUtils';
 
 interface StoreContextType {
   students: Student[];
@@ -167,7 +168,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               studentId: studentId,
               studentName: finalStudent.name,
               amount: initialDebt,
-              date: new Date().toISOString().split('T')[0],
+              date: getLocalDate(), // Use local date
               status: 'pending', // Pending payment
               type: 'charge',    // It's a debt
               description: 'Inscripción + Mensualidad',
@@ -201,10 +202,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const markAttendance = (studentId: string, classId: string, date: string, status: 'present' | 'late' | 'excused' | 'absent' | undefined, reason?: string) => {
+    // If no date provided, use Local Date instead of ISO (UTC)
+    const recordDate = date || getLocalDate();
+
     setStudents(prev => prev.map(s => {
       if (s.id === studentId) {
         let history = [...(s.attendanceHistory || [])];
-        const existingIndex = history.findIndex(r => r.date === date && r.classId === classId);
+        const existingIndex = history.findIndex(r => r.date === recordDate && r.classId === classId);
 
         if (status === undefined) {
             // Remove record if toggled to undefined
@@ -212,10 +216,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else {
             // Upsert record
             const newRecord: AttendanceRecord = { 
-                date, 
+                date: recordDate, 
                 classId,
                 status, 
-                timestamp: new Date().toISOString(),
+                timestamp: new Date().toISOString(), // Timestamp can remain ISO for sorting precision
                 reason 
             };
 
@@ -263,17 +267,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const bulkMarkPresent = (classId: string, date: string) => {
       const cls = classes.find(c => c.id === classId);
       if (!cls) return;
+      
+      // Use Local Date if not provided
+      const recordDate = date || getLocalDate();
 
       setStudents(prev => prev.map(s => {
           // Only for students enrolled in this class
           if (cls.studentIds.includes(s.id)) {
                const history = [...(s.attendanceHistory || [])];
-               const exists = history.some(r => r.date === date && r.classId === classId);
+               const exists = history.some(r => r.date === recordDate && r.classId === classId);
 
                // Only add if not already marked for this class/date
                if (!exists) {
                     const newRecord: AttendanceRecord = { 
-                        date, 
+                        date: recordDate, 
                         classId, 
                         status: 'present', 
                         timestamp: new Date().toISOString() 
@@ -313,7 +320,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const currentRankIndex = academySettings.ranks.findIndex(r => r.id === s.rankId);
           const nextRank = academySettings.ranks[currentRankIndex + 1];
           if (!nextRank) return s;
-          const historyItem: PromotionHistoryItem = { rank: s.rank, date: new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' }), notes: `Promovido a ${nextRank.name}` };
+          const historyItem: PromotionHistoryItem = { rank: s.rank, date: getLocalDate(), notes: `Promovido a ${nextRank.name}` };
           
           return { 
               ...s, 
@@ -335,6 +342,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let newPayment = { ...payment };
       if (!newPayment.id) newPayment.id = generateId('tx');
       if (!newPayment.academyId) newPayment.academyId = currentUser!.academyId;
+      // Ensure date is set if missing (using local date)
+      if (!newPayment.date) newPayment.date = getLocalDate();
 
       setPayments(prev => [newPayment, ...prev]);
 
@@ -370,7 +379,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const generateMonthlyBilling = () => {
       if (currentUser?.role !== 'master') return;
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDate();
       const monthlyAmount = academySettings.paymentSettings.monthlyTuition || 800;
       const newCharges: Payment[] = [];
       const activeStudents = students.filter(s => s.status !== 'inactive');
@@ -411,7 +420,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const applyLateFees = () => {
       if (currentUser?.role !== 'master') return;
       const { lateFeeAmount } = academySettings.paymentSettings;
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDate();
       
       const fees: Payment[] = [];
 
@@ -525,7 +534,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const sendMessage = (msg: Omit<Message, 'id' | 'read' | 'date'>) => {
-      const newMessage: Message = { ...msg, id: generateId('msg'), read: false, date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+      // Use local date for message date
+      const dateStr = formatDateDisplay(getLocalDate(), { month: 'short', day: 'numeric' });
+      const newMessage: Message = { ...msg, id: generateId('msg'), read: false, date: dateStr };
       setMessages(prev => [newMessage, ...prev]);
   };
 
@@ -574,7 +585,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               name: user.name, email: user.email, phone: data.phone,
               rank: 'White Belt', rankId: 'rank-1', rankColor: 'white', stripes: 0,
               status: initialDebt > 0 ? 'debtor' : 'active', program: 'Adults',
-              attendance: 0, totalAttendance: 0, joinDate: new Date().toLocaleDateString(),
+              attendance: 0, totalAttendance: 0, joinDate: getLocalDate(),
               balance: initialDebt, classesId: [], attendanceHistory: [], avatarUrl: user.avatarUrl
           };
           
@@ -584,7 +595,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (initialDebt > 0) {
                const initialCharge: Payment = {
                   id: generateId('chg'), academyId: user.academyId, studentId: user.id, studentName: user.name,
-                  amount: initialDebt, date: new Date().toISOString().split('T')[0],
+                  amount: initialDebt, date: getLocalDate(),
                   status: 'pending', type: 'charge',
                   description: 'Inscripción + Mensualidad', category: 'Mensualidad', method: 'System'
               };
@@ -613,6 +624,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       PulseService.logout();
       setCurrentUser(null);
   };
+
+  // Internal helper for formatting date display inside context if needed, 
+  // but exposed getLocalDate for components to use.
+  function formatDateDisplay(dateStr: string, options: any) {
+      if(!dateStr) return '';
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m-1, d).toLocaleDateString('es-ES', options);
+  }
 
   return (
     <StoreContext.Provider value={{ 
