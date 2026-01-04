@@ -29,8 +29,10 @@ export interface AcademySettings {
     };
     paymentSettings: {
         lateFeeAmount: number;
-        lateFeeGracePeriod: number;
+        lateFeeGracePeriod: number; // Deprecated in favor of fixed days, kept for legacy
         monthlyTuition: number; // Automated billing amount
+        billingDay: number; // Day of month to generate charges (e.g., 1)
+        lateFeeDay: number; // Day of month to apply fees (e.g., 10)
     };
     bankDetails?: BankDetails;
     ranks: Rank[];
@@ -137,7 +139,7 @@ export interface Payment {
     studentName?: string;
     amount: number;
     date: string;
-    status: 'paid' | 'pending_approval' | 'pending' | 'failed'; 
+    status: 'paid' | 'pending_approval' | 'unpaid' | 'charge' | 'failed'; 
     type: 'charge' | 'payment'; // CHARGE = Deuda (+Balance), PAYMENT = Abono (-Balance)
     description: string;
     category: PaymentCategory;

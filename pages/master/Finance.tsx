@@ -67,14 +67,17 @@ const Finance: React.FC = () => {
   // --- REAL-TIME STATS ---
   const stats = useMemo(() => {
       // Income = Completed PAYMENTS
-      const totalIncome = filteredTransactions.filter(p => p.type === 'payment' && p.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0);
-      // Pending Approvals = Payments with 'pending_approval'
+      const totalIncome = payments.filter(p => p.type === 'payment' && p.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0);
+      
+      // Pending Approvals = Payments with 'pending_approval' (Specific status check)
       const pendingApproval = payments.filter(p => p.type === 'payment' && p.status === 'pending_approval').length;
-      // Pending Debt = Charges with status 'pending'
-      const totalDebt = payments.filter(p => p.type === 'charge' && p.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
+      
+      // Pending Debt = Sum of all student balances (Real-time net debt)
+      // We use the calculated balance from the students array instead of summing raw charges
+      const totalDebt = students.reduce((acc, s) => acc + (s.balance > 0 ? s.balance : 0), 0);
       
       return { totalIncome, pendingApproval, totalDebt };
-  }, [filteredTransactions, payments]);
+  }, [filteredTransactions, payments, students]);
 
   const handleExport = () => {
       exportToCSV(filteredTransactions, 'Reporte_Financiero');
@@ -109,9 +112,9 @@ const Finance: React.FC = () => {
           amount: parseFloat(newEntry.amount),
           date: newEntry.date,
           // Logic: 
-          // If 'charge', status is 'pending' (debt exists). 
+          // If 'charge', status is 'charge' (active debt). 
           // If 'payment' (manual), assume 'paid' because master is entering it.
-          status: newEntry.type === 'charge' ? 'pending' : 'paid',
+          status: newEntry.type === 'charge' ? 'charge' : 'paid',
           type: newEntry.type,
           description: newEntry.concept,
           category: newEntry.category,
@@ -172,16 +175,16 @@ const Finance: React.FC = () => {
         {/* Stats */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col">
-                <span className="text-sm font-bold text-gray-400 uppercase">Ingresos (Mes)</span>
+                <span className="text-sm font-bold text-gray-400 uppercase">Ingresos Totales (Pagados)</span>
                 <span className="text-3xl font-black text-green-600">${stats.totalIncome.toLocaleString()}</span>
             </div>
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col relative overflow-hidden">
                  <div className="absolute right-0 top-0 p-4 opacity-5"><span className="material-symbols-outlined text-6xl">pending_actions</span></div>
-                <span className="text-sm font-bold text-gray-400 uppercase">Por Aprobar</span>
+                <span className="text-sm font-bold text-gray-400 uppercase">Pagos por Aprobar</span>
                 <span className="text-3xl font-black text-blue-600">{stats.pendingApproval}</span>
             </div>
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col">
-                <span className="text-sm font-bold text-gray-400 uppercase">Deuda Total Alumnos</span>
+                <span className="text-sm font-bold text-gray-400 uppercase">Deuda Total (Saldos Alumnos)</span>
                 <span className="text-3xl font-black text-red-500">${stats.totalDebt.toLocaleString()}</span>
             </div>
         </section>
@@ -244,10 +247,10 @@ const Finance: React.FC = () => {
                                             <span className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit animate-pulse">
                                                 <span className="size-2 rounded-full bg-blue-500"></span> Revisar
                                             </span>
-                                        ) : tx.status === 'paid' ? ( // Removed check for 'completed' which is invalid
+                                        ) : tx.status === 'paid' ? ( 
                                              <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded w-fit">Aplicado</span>
                                         ) : (
-                                            <span className="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded w-fit">Pendiente</span>
+                                            <span className="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded w-fit uppercase">{tx.status === 'charge' ? 'Por Pagar' : tx.status}</span>
                                         )}
                                     </td>
                                     <td className={`p-5 text-right font-bold ${tx.type === 'charge' ? 'text-red-500' : 'text-green-600'}`}>
@@ -274,7 +277,7 @@ const Finance: React.FC = () => {
                         
                         <select required value={newEntry.studentId} onChange={e => setNewEntry({...newEntry, studentId: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm">
                             <option value="">-- Seleccionar Alumno --</option>
-                            {students.map(s => <option key={s.id} value={s.id}>{s.name} (Deuda: ${s.balance})</option>)}
+                            {students.map(s => <option key={s.id} value={s.id}>{s.name} (Deuda: ${s.balance.toFixed(2)})</option>)}
                         </select>
 
                         <div className="grid grid-cols-2 gap-4">

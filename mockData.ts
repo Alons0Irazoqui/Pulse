@@ -21,7 +21,9 @@ export const defaultAcademySettings: AcademySettings = {
     paymentSettings: {
         lateFeeAmount: 150,
         lateFeeGracePeriod: 5,
-        monthlyTuition: 800
+        monthlyTuition: 800,
+        billingDay: 1,
+        lateFeeDay: 10
     },
     bankDetails: {
         bankName: 'BBVA Bancomer',

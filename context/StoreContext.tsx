@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Student, ClassCategory, Payment, UserProfile, LibraryResource, Event, AcademySettings, PromotionHistoryItem, Message, AttendanceRecord, SessionModification, ClassException } from '../types';
 import { PulseService } from '../services/pulseService';
@@ -47,6 +46,7 @@ interface StoreContextType {
   deleteLibraryResource: (id: string) => void;
   toggleResourceCompletion: (resourceId: string, studentId: string) => void;
   updateAcademySettings: (settings: AcademySettings) => void;
+  updatePaymentDates: (billingDay: number, lateFeeDay: number) => void; // New Validation Action
   sendMessage: (msg: Omit<Message, 'id' | 'read' | 'date'>) => void;
   markMessageRead: (id: string) => void;
   updateUserProfile: (profile: Partial<UserProfile>) => void;
@@ -95,6 +95,46 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
       loadData();
   }, [currentUser]);
+
+  // --- REACTIVE BALANCE CALCULATION ---
+  // Calculates real balance based on payments history instead of manual mutation
+  useEffect(() => {
+      setStudents(currentStudents => {
+          let hasChanges = false;
+          const nextStudents = currentStudents.map(student => {
+              const studentTx = payments.filter(p => p.studentId === student.id);
+              
+              // Sum all Charges (Debts)
+              // Status 'charge' or 'unpaid' for charges count as active debt
+              const totalCharges = studentTx
+                  .filter(p => p.type === 'charge' && (p.status === 'charge' || p.status === 'unpaid'))
+                  .reduce((sum, p) => sum + p.amount, 0);
+              
+              // Sum all APPROVED Payments
+              const totalPaid = studentTx
+                  .filter(p => p.type === 'payment' && p.status === 'paid')
+                  .reduce((sum, p) => sum + p.amount, 0);
+              
+              const calculatedBalance = Math.max(0, totalCharges - totalPaid);
+              
+              // Auto-update status based on balance logic
+              let newStatus = student.status;
+              if (calculatedBalance > 0 && student.status !== 'inactive' && student.status !== 'debtor') {
+                  newStatus = 'debtor';
+              } else if (calculatedBalance === 0 && student.status === 'debtor') {
+                  newStatus = 'active';
+              }
+
+              if (student.balance !== calculatedBalance || student.status !== newStatus) {
+                  hasChanges = true;
+                  return { ...student, balance: calculatedBalance, status: newStatus };
+              }
+              return student;
+          });
+
+          return hasChanges ? nextStudents : currentStudents;
+      });
+  }, [payments]); // Runs whenever payments array changes
 
   // --- Stats Calculation ---
   const activeStudentsCount = students.filter(s => s.status === 'active' || s.status === 'exam_ready' || s.status === 'debtor').length;
@@ -154,7 +194,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           userId: studentId, 
           academyId: currentUser.academyId, 
           attendanceHistory: [],
-          balance: initialDebt, // Initial Debt
+          balance: initialDebt, 
           status: initialDebt > 0 ? ('debtor' as const) : student.status
       };
       
@@ -168,9 +208,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               studentId: studentId,
               studentName: finalStudent.name,
               amount: initialDebt,
-              date: getLocalDate(), // Use local date
-              status: 'pending', // Pending payment
-              type: 'charge',    // It's a debt
+              date: getLocalDate(), 
+              status: 'charge', // Updated to 'charge' per requirements
+              type: 'charge',    
               description: 'Inscripción + Mensualidad',
               category: 'Mensualidad',
               method: 'System'
@@ -202,7 +242,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const markAttendance = (studentId: string, classId: string, date: string, status: 'present' | 'late' | 'excused' | 'absent' | undefined, reason?: string) => {
-    // If no date provided, use Local Date instead of ISO (UTC)
     const recordDate = date || getLocalDate();
 
     setStudents(prev => prev.map(s => {
@@ -211,15 +250,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const existingIndex = history.findIndex(r => r.date === recordDate && r.classId === classId);
 
         if (status === undefined) {
-            // Remove record if toggled to undefined
             if (existingIndex >= 0) history.splice(existingIndex, 1);
         } else {
-            // Upsert record
             const newRecord: AttendanceRecord = { 
                 date: recordDate, 
                 classId,
                 status, 
-                timestamp: new Date().toISOString(), // Timestamp can remain ISO for sorting precision
+                timestamp: new Date().toISOString(), 
                 reason 
             };
 
@@ -230,25 +267,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
         }
 
-        // Sort history descending by date
         history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-        // Recalculate Totals (Only Present and Late count towards stripes/rank)
         const newAttendanceCount = history.filter(r => r.status === 'present' || r.status === 'late').length;
         
-        // Find most recent attendance for lastAttendance field
         const lastPresentRecord = history.find(r => r.status === 'present' || r.status === 'late');
         const lastAttendanceDate = lastPresentRecord ? lastPresentRecord.date : s.lastAttendance;
 
-        // Check Rank status
         const currentRank = academySettings.ranks.find(r => r.id === s.rankId);
         let newStatus = s.status;
         
-        // Auto-upgrade status if requirements met
         if (currentRank && newAttendanceCount >= currentRank.requiredAttendance && (s.status === 'active' || s.status === 'exam_ready')) {
             newStatus = 'exam_ready';
         } else if (newStatus === 'exam_ready' && currentRank && newAttendanceCount < currentRank.requiredAttendance) {
-            // Revert if count drops (e.g. marking something as absent later)
             newStatus = 'active';
         }
 
@@ -267,17 +298,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const bulkMarkPresent = (classId: string, date: string) => {
       const cls = classes.find(c => c.id === classId);
       if (!cls) return;
-      
-      // Use Local Date if not provided
       const recordDate = date || getLocalDate();
 
       setStudents(prev => prev.map(s => {
-          // Only for students enrolled in this class
           if (cls.studentIds.includes(s.id)) {
                const history = [...(s.attendanceHistory || [])];
                const exists = history.some(r => r.date === recordDate && r.classId === classId);
 
-               // Only add if not already marked for this class/date
                if (!exists) {
                     const newRecord: AttendanceRecord = { 
                         date: recordDate, 
@@ -293,7 +320,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                     const lastPresentRecord = history.find(r => r.status === 'present' || r.status === 'late');
                     const lastAttendanceDate = lastPresentRecord ? lastPresentRecord.date : s.lastAttendance;
 
-                    // Rank Check (Simplified duplicate of markAttendance logic)
                     const currentRank = academySettings.ranks.find(r => r.id === s.rankId);
                     let newStatus = s.status;
                     if (currentRank && newAttendanceCount >= currentRank.requiredAttendance && (s.status === 'active' || s.status === 'exam_ready')) {
@@ -327,8 +353,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               rank: nextRank.name, 
               rankId: nextRank.id, 
               rankColor: nextRank.color, 
-              attendance: 0, // Reset counter for next rank
-              attendanceHistory: [], // Clear history for new rank cycle
+              attendance: 0, 
+              attendanceHistory: [], 
               status: 'active', 
               promotionHistory: [historyItem, ...(s.promotionHistory || [])] 
           };
@@ -338,43 +364,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // --- FINANCIAL LOGIC ---
 
   const recordPayment = (payment: Payment) => {
-      // 1. Add Transaction Record
       let newPayment = { ...payment };
       if (!newPayment.id) newPayment.id = generateId('tx');
       if (!newPayment.academyId) newPayment.academyId = currentUser!.academyId;
-      // Ensure date is set if missing (using local date)
       if (!newPayment.date) newPayment.date = getLocalDate();
 
+      // IMPORTANT: Just add to payments. Reactive useEffect handles balance.
       setPayments(prev => [newPayment, ...prev]);
-
-      // 2. Logic: If it is a CHARGE (manual debt creation), increase balance immediately
-      if (newPayment.type === 'charge') {
-           setStudents(prev => prev.map(s => {
-              if (s.id === newPayment.studentId) {
-                  return { ...s, balance: s.balance + newPayment.amount, status: 'debtor' };
-              }
-              return s;
-           }));
-      }
-      // 3. Logic: If it is a PAYMENT (student reported), DO NOT change balance yet. Wait for approval.
   };
 
   const approvePayment = (paymentId: string) => {
       const payment = payments.find(p => p.id === paymentId);
       if (!payment || payment.status === 'paid' || payment.type !== 'payment') return;
 
-      // 1. Mark Payment as Paid
+      // Update to PAID. Reactive useEffect handles balance subtraction.
       setPayments(prev => prev.map(p => p.id === paymentId ? { ...p, status: 'paid' } : p));
-
-      // 2. Reduce Student Debt
-      setStudents(prev => prev.map(s => {
-          if (s.id === payment.studentId) {
-              const newBalance = Math.max(0, s.balance - payment.amount);
-              const newStatus = newBalance <= 0 && s.status === 'debtor' ? 'active' : s.status;
-              return { ...s, balance: newBalance, status: newStatus };
-          }
-          return s;
-      }));
   };
 
   const generateMonthlyBilling = () => {
@@ -385,7 +389,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const activeStudents = students.filter(s => s.status !== 'inactive');
       
       activeStudents.forEach(s => {
-          // Check if already charged for current month
           const alreadyCharged = payments.some(p => p.studentId === s.id && p.type === 'charge' && p.category === 'Mensualidad' && p.date.substring(0, 7) === today.substring(0, 7));
           if (!alreadyCharged) {
               const charge: Payment = {
@@ -395,8 +398,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   studentName: s.name, 
                   amount: monthlyAmount, 
                   date: today, 
-                  status: 'pending', // It's a pending debt
-                  type: 'charge',    // It's a charge
+                  status: 'charge', // Updated status
+                  type: 'charge',    
                   category: 'Mensualidad', 
                   description: 'Mensualidad Automática', 
                   method: 'System'
@@ -407,13 +410,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (newCharges.length > 0) {
           setPayments(prev => [...newCharges, ...prev]);
-          // Update Student Balances (Increase Debt)
-          setStudents(prev => prev.map(s => {
-              if (s.status !== 'inactive' && newCharges.some(p => p.studentId === s.id)) {
-                   return { ...s, balance: s.balance + monthlyAmount, status: 'debtor' };
-              }
-              return s;
-          }));
+          // Reactive useEffect handles balance
       }
   };
 
@@ -424,7 +421,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       const fees: Payment[] = [];
 
-      setStudents(prev => prev.map(s => {
+      // Logic: If balance > 0, apply fee
+      students.forEach(s => {
           if (s.balance > 0 && s.status !== 'inactive') {
               const penalty: Payment = { 
                   id: generateId('fee'), 
@@ -433,83 +431,142 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   studentName: s.name, 
                   amount: lateFeeAmount, 
                   date: today, 
-                  status: 'pending', 
-                  type: 'charge', // Debt
+                  status: 'charge', // Updated status
+                  type: 'charge', 
                   category: 'Late Fee', 
                   description: 'Recargo tardío', 
                   method: 'System' 
               };
               fees.push(penalty);
-              return { ...s, balance: s.balance + lateFeeAmount, status: 'debtor' };
           }
-          return s;
-      }));
-      setPayments(prev => [...fees, ...prev]);
+      });
+      if (fees.length > 0) {
+          setPayments(prev => [...fees, ...prev]);
+      }
   };
 
-  // --- CLASS ACTIONS ---
-
-  const addClass = (newClass: ClassCategory) => {
+  const updateAcademySettings = (settings: AcademySettings) => {
       if (currentUser?.role !== 'master') return;
-      setClasses(prev => [...prev, { ...newClass, id: generateId('cls'), academyId: currentUser!.academyId, modifications: [] }]);
+      setAcademySettings(settings);
+  };
+
+  const updatePaymentDates = (billingDay: number, lateFeeDay: number) => {
+      if (currentUser?.role !== 'master') return;
+      if (lateFeeDay <= billingDay) {
+          throw new Error("El día de recargo debe ser posterior al día de corte.");
+      }
+      setAcademySettings(prev => ({
+          ...prev,
+          paymentSettings: {
+              ...prev.paymentSettings,
+              billingDay,
+              lateFeeDay
+          }
+      }));
+  };
+
+  // --- CLASSES MANAGEMENT ---
+  const addClass = (newClass: ClassCategory) => {
+    if (currentUser?.role !== 'master') return;
+    // Generate ID if not present
+    const cls = { ...newClass, id: newClass.id || generateId('cls'), academyId: currentUser.academyId };
+    setClasses(prev => [...prev, cls]);
   };
 
   const updateClass = (updatedClass: ClassCategory) => {
-      if (currentUser?.role !== 'master') return;
-      setClasses(prev => prev.map(c => c.id === updatedClass.id ? updatedClass : c));
+    if (currentUser?.role !== 'master') return;
+    setClasses(prev => prev.map(c => c.id === updatedClass.id ? updatedClass : c));
   };
 
-  const modifyClassSession = (classId: string, modification: ClassException) => {
-      setClasses(prev => prev.map(c => {
-          if (c.id === classId) {
-              const existingIndex = c.modifications.findIndex(m => m.date === modification.date);
-              let newModifications = [...c.modifications];
-              if (existingIndex >= 0) newModifications[existingIndex] = modification;
-              else newModifications.push(modification);
-              return { ...c, modifications: newModifications };
-          }
-          return c;
-      }));
+  const modifyClassSession = (classId: string, modification: SessionModification) => {
+    if (currentUser?.role !== 'master') return;
+    setClasses(prev => prev.map(c => {
+        if (c.id === classId) {
+            // Remove existing modification for this date if exists, then add new one
+            const newModifications = c.modifications.filter(m => m.date !== modification.date);
+            newModifications.push(modification);
+            return { ...c, modifications: newModifications };
+        }
+        return c;
+    }));
   };
 
   const deleteClass = (id: string) => {
       if (currentUser?.role !== 'master') return;
       setClasses(prev => prev.filter(c => c.id !== id));
+      // Also remove class from students
+      setStudents(prev => prev.map(s => ({
+          ...s,
+          classesId: s.classesId.filter(cid => cid !== id)
+      })));
   };
 
   const enrollStudent = (studentId: string, classId: string) => {
-      const result = PulseService.enrollStudentInClass(studentId, classId, students, classes);
-      setClasses(result.updatedClasses);
-      setStudents(result.updatedStudents);
-      PulseService.saveClasses(result.updatedClasses);
-      PulseService.saveStudents(result.updatedStudents);
+      if (currentUser?.role !== 'master') return;
+      
+      // Update Class
+      setClasses(prev => prev.map(c => {
+          if (c.id === classId && !c.studentIds.includes(studentId)) {
+              return { ...c, studentIds: [...c.studentIds, studentId], studentCount: c.studentCount + 1 };
+          }
+          return c;
+      }));
+
+      // Update Student
+      setStudents(prev => prev.map(s => {
+          if (s.id === studentId && !s.classesId.includes(classId)) {
+              return { ...s, classesId: [...s.classesId, classId] };
+          }
+          return s;
+      }));
   };
 
   const unenrollStudent = (studentId: string, classId: string) => {
-      const result = PulseService.unenrollStudentFromClass(studentId, classId, students, classes);
-      setClasses(result.updatedClasses);
-      setStudents(result.updatedStudents);
-      PulseService.saveClasses(result.updatedClasses);
-      PulseService.saveStudents(result.updatedStudents);
+      if (currentUser?.role !== 'master') return;
+
+       // Update Class
+       setClasses(prev => prev.map(c => {
+          if (c.id === classId) {
+              return { ...c, studentIds: c.studentIds.filter(id => id !== studentId), studentCount: Math.max(0, c.studentCount - 1) };
+          }
+          return c;
+      }));
+
+      // Update Student
+      setStudents(prev => prev.map(s => {
+          if (s.id === studentId) {
+              return { ...s, classesId: s.classesId.filter(id => id !== classId) };
+          }
+          return s;
+      }));
   };
-  
+
+  // --- EVENTS MANAGEMENT ---
   const addEvent = (event: Event) => {
       if (currentUser?.role !== 'master') return;
-      setEvents(prev => [...prev, { ...event, id: generateId('evt'), academyId: currentUser!.academyId }]);
+      const newEvent = { ...event, id: event.id || generateId('evt'), academyId: currentUser.academyId };
+      setEvents(prev => [...prev, newEvent]);
   };
 
   const deleteEvent = (id: string) => {
       if (currentUser?.role !== 'master') return;
       setEvents(prev => prev.filter(e => e.id !== id));
   };
-  
+
   const registerForEvent = (studentId: string, eventId: string) => {
-      setEvents(PulseService.registerStudentForEvent(studentId, eventId, events));
+      setEvents(prev => prev.map(e => {
+          if (e.id === eventId && !e.registrants?.includes(studentId)) {
+              return { ...e, registrants: [...(e.registrants || []), studentId], registeredCount: (e.registeredCount || 0) + 1 };
+          }
+          return e;
+      }));
   };
 
+  // --- LIBRARY MANAGEMENT ---
   const addLibraryResource = (resource: LibraryResource) => {
       if (currentUser?.role !== 'master') return;
-      setLibraryResources(prev => [...prev, { ...resource, id: generateId('lib'), academyId: currentUser!.academyId }]);
+      const newResource = { ...resource, id: resource.id || generateId('lib'), academyId: currentUser.academyId };
+      setLibraryResources(prev => [...prev, newResource]);
   };
 
   const deleteLibraryResource = (id: string) => {
@@ -518,23 +575,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const toggleResourceCompletion = (resourceId: string, studentId: string) => {
-      setLibraryResources(prev => prev.map(res => {
-          if (res.id === resourceId) {
-              const isCompleted = res.completedBy.includes(studentId);
-              let newCompletedBy = isCompleted ? res.completedBy.filter(id => id !== studentId) : [...res.completedBy, studentId];
-              return { ...res, completedBy: newCompletedBy };
+      setLibraryResources(prev => prev.map(r => {
+          if (r.id === resourceId) {
+              const completedBy = r.completedBy || [];
+              if (completedBy.includes(studentId)) {
+                  return { ...r, completedBy: completedBy.filter(id => id !== studentId) };
+              } else {
+                  return { ...r, completedBy: [...completedBy, studentId] };
+              }
           }
-          return res;
+          return r;
       }));
   };
 
-  const updateAcademySettings = (settings: AcademySettings) => {
-      if (currentUser?.role !== 'master') return;
-      setAcademySettings(settings);
-  };
-
   const sendMessage = (msg: Omit<Message, 'id' | 'read' | 'date'>) => {
-      // Use local date for message date
       const dateStr = formatDateDisplay(getLocalDate(), { month: 'short', day: 'numeric' });
       const newMessage: Message = { ...msg, id: generateId('msg'), read: false, date: dateStr };
       setMessages(prev => [newMessage, ...prev]);
@@ -596,7 +650,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                const initialCharge: Payment = {
                   id: generateId('chg'), academyId: user.academyId, studentId: user.id, studentName: user.name,
                   amount: initialDebt, date: getLocalDate(),
-                  status: 'pending', type: 'charge',
+                  status: 'charge', // Updated status
+                  type: 'charge',
                   description: 'Inscripción + Mensualidad', category: 'Mensualidad', method: 'System'
               };
               setPayments(prev => [initialCharge, ...prev]);
@@ -625,13 +680,46 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setCurrentUser(null);
   };
 
-  // Internal helper for formatting date display inside context if needed, 
-  // but exposed getLocalDate for components to use.
   function formatDateDisplay(dateStr: string, options: any) {
       if(!dateStr) return '';
       const [y, m, d] = dateStr.split('-').map(Number);
       return new Date(y, m-1, d).toLocaleDateString('es-ES', options);
   }
+
+  // --- AUTOMATION ENGINE ---
+  // Checks daily for billing and late fee triggers
+  useEffect(() => {
+      if (!currentUser || currentUser.role !== 'master') return;
+
+      const runAutomation = () => {
+          const todayStr = getLocalDate(); // YYYY-MM-DD
+          const currentDay = parseInt(todayStr.split('-')[2], 10);
+          const { billingDay, lateFeeDay } = academySettings.paymentSettings;
+
+          // 1. BILLING AUTOMATION
+          const lastBillingDate = localStorage.getItem('pulse_last_billing_run');
+          
+          if (currentDay === billingDay && lastBillingDate !== todayStr) {
+              console.log("Auto-running Monthly Billing...");
+              generateMonthlyBilling(); 
+              localStorage.setItem('pulse_last_billing_run', todayStr);
+          }
+
+          // 2. LATE FEE AUTOMATION
+          const lastFeeDate = localStorage.getItem('pulse_last_fee_run');
+          
+          if (currentDay === lateFeeDay && lastFeeDate !== todayStr) {
+              console.log("Auto-running Late Fees...");
+              applyLateFees();
+              localStorage.setItem('pulse_last_fee_run', todayStr);
+          }
+      };
+
+      runAutomation();
+      
+      // We rely on students/payments changing to trigger re-evaluations if data loads late,
+      // but the localStorage check prevents double-execution.
+  }, [currentUser, academySettings, students.length, payments.length]);
 
   return (
     <StoreContext.Provider value={{ 
@@ -640,7 +728,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addStudent, updateStudent, deleteStudent, updateStudentStatus, 
         markAttendance, bulkMarkPresent, promoteStudent, recordPayment, approvePayment, generateMonthlyBilling, applyLateFees, addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
         addEvent, deleteEvent, registerForEvent,
-        addLibraryResource, deleteLibraryResource, toggleResourceCompletion, updateAcademySettings,
+        addLibraryResource, deleteLibraryResource, toggleResourceCompletion, updateAcademySettings, updatePaymentDates,
         sendMessage, markMessageRead, updateUserProfile, changePassword,
         login, registerStudent, registerMaster, logout 
     }}>

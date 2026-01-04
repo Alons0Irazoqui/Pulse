@@ -126,7 +126,7 @@ export const PulseService = {
                 studentName: data.name,
                 amount: initialAmount,
                 date: new Date().toISOString().split('T')[0],
-                status: 'pending',
+                status: 'charge', // Corrected to 'charge' to match types
                 type: 'charge', // Added type
                 description: 'Mensualidad (Inscripción)',
                 category: 'Mensualidad',

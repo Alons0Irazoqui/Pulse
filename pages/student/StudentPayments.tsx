@@ -294,7 +294,7 @@ const StudentPayments: React.FC = () => {
                         </div>
                     )}
                     {myTransactions.map((tx) => (
-                        <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors border-b border-gray-50 last:border-0">
+                        <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors border-b border-gray-50 last:border-0 group">
                             <div className="flex items-center gap-3">
                                 {/* Icon based on Type */}
                                 <div className={`size-10 rounded-full flex items-center justify-center shrink-0 ${
@@ -316,16 +316,27 @@ const StudentPayments: React.FC = () => {
                                     {tx.type === 'charge' ? '-' : '+'}${tx.amount.toFixed(2)}
                                 </p>
                                 
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-2 mt-1">
                                     <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
                                         tx.status === 'paid' ? 'bg-gray-100 text-gray-600' :
-                                        tx.status === 'pending' ? 'bg-red-50 text-red-500' :
+                                        tx.status === 'charge' || tx.status === 'unpaid' ? 'bg-red-50 text-red-500' :
                                         'bg-orange-50 text-orange-600'
                                     }`}>
-                                        {tx.status === 'pending' && tx.type === 'charge' ? 'Por Pagar' :
+                                        {(tx.status === 'charge' || tx.status === 'unpaid') ? 'Por Pagar' :
                                          tx.status === 'pending_approval' ? 'En Revisión' : 
                                          tx.status === 'paid' ? 'Aplicado' : 'Pendiente'}
                                     </span>
+                                    
+                                    {/* DOWNLOAD BUTTON FOR PAID */}
+                                    {tx.status === 'paid' && (
+                                        <button 
+                                            onClick={() => handleDownloadReceipt(tx)} 
+                                            className="size-6 bg-gray-100 hover:bg-primary hover:text-white text-gray-500 rounded-full flex items-center justify-center transition-colors shadow-sm"
+                                            title="Descargar Recibo"
+                                        >
+                                            <span className="material-symbols-outlined text-[14px]">download</span>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

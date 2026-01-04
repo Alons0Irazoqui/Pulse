@@ -25,9 +25,19 @@ const StudentDashboard: React.FC = () => {
     .filter(e => e.date >= today)
     .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // --- PENDING PAYMENTS LOGIC ---
-  const pendingPayments = payments.filter(p => p.studentId === student?.id && p.status === 'pending');
-  const totalDebt = pendingPayments.reduce((acc, p) => acc + p.amount, 0);
+  // --- FINANCIAL LOGIC ---
+  // Use 'student.balance' directly for reactivity. It comes pre-calculated from StoreContext useEffect.
+  const totalDebt = student?.balance || 0;
+  
+  // Check for Pending Payments to show alert
+  const hasPendingPayment = payments.some(p => p.studentId === student?.id && p.status === 'pending_approval');
+
+  // Pending Charges List (for display details)
+  const pendingCharges = payments.filter(p => 
+      p.studentId === student?.id && 
+      p.type === 'charge' && 
+      (p.status === 'charge' || p.status === 'unpaid')
+  ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   // --- NEXT CLASS LOGIC (SMART) ---
   const todayDate = new Date();
@@ -181,14 +191,22 @@ const StudentDashboard: React.FC = () => {
                 Estado de Cuenta
             </h3>
             
-            {pendingPayments.length > 0 ? (
+            {totalDebt > 0 ? (
                 <div className="flex-1 flex flex-col gap-4">
                     <div className="p-4 rounded-2xl bg-orange-50 border border-orange-100 flex flex-col gap-1">
                         <span className="text-xs font-bold text-orange-600 uppercase tracking-wider">Total Pendiente</span>
                         <span className="text-2xl font-black text-orange-700">${totalDebt.toFixed(2)}</span>
+                        
+                        {hasPendingPayment && (
+                            <div className="mt-2 flex items-center gap-2 text-xs font-bold text-blue-600 bg-blue-100 px-3 py-1.5 rounded-lg animate-pulse">
+                                <span className="material-symbols-outlined text-sm">hourglass_top</span>
+                                Pago en revisión por el maestro
+                            </div>
+                        )}
                     </div>
-                    <div className="flex-1 overflow-y-auto max-h-[200px] space-y-2 pr-2">
-                        {pendingPayments.map(p => (
+                    
+                    <div className="flex-1 overflow-y-auto max-h-[150px] space-y-2 pr-2">
+                        {pendingCharges.map(p => (
                             <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
                                 <div>
                                     <p className="text-sm font-semibold text-text-main">{p.category}</p>
