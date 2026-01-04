@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Student, ClassCategory, Payment, UserProfile, LibraryResource, Event, AcademySettings, PromotionHistoryItem, Message, AttendanceRecord, SessionModification } from '../types';
+import { Student, ClassCategory, Payment, UserProfile, LibraryResource, Event, AcademySettings, PromotionHistoryItem, Message, AttendanceRecord, SessionModification, ClassException } from '../types';
 import { PulseService } from '../services/pulseService';
 import { mockMessages } from '../mockData';
 
@@ -29,11 +29,11 @@ interface StoreContextType {
   markAttendance: (studentId: string) => void;
   promoteStudent: (studentId: string) => void;
   recordPayment: (payment: Payment) => void;
-  generateMonthlyCharges: () => void;
+  generateMonthlyBilling: () => void; // Renamed from generateMonthlyCharges
   applyLateFees: () => void;
   addClass: (newClass: ClassCategory) => void;
   updateClass: (updatedClass: ClassCategory) => void; 
-  modifyClassSession: (classId: string, modification: SessionModification) => void; 
+  modifyClassSession: (classId: string, modification: ClassException) => void; 
   deleteClass: (id: string) => void;
   enrollStudent: (studentId: string, classId: string) => void;
   unenrollStudent: (studentId: string, classId: string) => void;
@@ -142,8 +142,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addStudent = (student: Student) => {
       if (currentUser?.role !== 'master') return;
-      
-      // Calculate initial debt
       const initialDebt = academySettings.paymentSettings.monthlyTuition || 0;
       const studentId = student.id || generateId('stu');
       
@@ -159,7 +157,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       setStudents(prev => [...prev, finalStudent]);
 
-      // Create initial payment pending record
       if (initialDebt > 0) {
           const initialPayment: Payment = {
               id: generateId('pay'),
@@ -204,8 +201,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (s.id === studentId) {
         const today = new Date().toISOString().split('T')[0];
         const history = s.attendanceHistory || [];
+        // Prevent double marking
         if (history.some(record => record.date === today)) return s;
-        const newRecord: AttendanceRecord = { date: today, status: 'present', timestamp: new Date().toISOString() };
+        
+        const newRecord: AttendanceRecord = { 
+            date: today, 
+            status: 'present', 
+            timestamp: new Date().toISOString() 
+        };
         const newAttendance = s.attendance + 1;
         const totalAttendance = (s.totalAttendance || s.attendance) + 1;
         
@@ -263,7 +266,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
   };
 
-  const generateMonthlyCharges = () => {
+  // Renamed and updated logic for Task 4
+  const generateMonthlyBilling = () => {
       if (currentUser?.role !== 'master') return;
       const today = new Date().toISOString().split('T')[0];
       const monthlyAmount = academySettings.paymentSettings.monthlyTuition || 800;
@@ -271,10 +275,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const activeStudents = students.filter(s => s.status !== 'inactive');
       
       activeStudents.forEach(s => {
+          // Check if already charged for current month
           const alreadyCharged = payments.some(p => p.studentId === s.id && p.category === 'Mensualidad' && p.date.substring(0, 7) === today.substring(0, 7));
           if (!alreadyCharged) {
               const charge: Payment = {
-                  id: generateId('inv'), academyId: currentUser.academyId, studentId: s.id, studentName: s.name, amount: monthlyAmount, date: today, status: 'pending', category: 'Mensualidad', description: 'Mensualidad Automática', method: 'System'
+                  id: generateId('inv'), 
+                  academyId: currentUser.academyId, 
+                  studentId: s.id, 
+                  studentName: s.name, 
+                  amount: monthlyAmount, 
+                  date: today, 
+                  status: 'pending', 
+                  category: 'Mensualidad', 
+                  description: 'Mensualidad Automática', 
+                  method: 'System'
               };
               newPayments.push(charge);
           }
@@ -313,7 +327,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setClasses(prev => prev.map(c => c.id === updatedClass.id ? updatedClass : c));
   };
 
-  const modifyClassSession = (classId: string, modification: SessionModification) => {
+  const modifyClassSession = (classId: string, modification: ClassException) => {
       setClasses(prev => prev.map(c => {
           if (c.id === classId) {
               const existingIndex = c.modifications.findIndex(m => m.date === modification.date);
@@ -332,16 +346,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const enrollStudent = (studentId: string, classId: string) => {
-      // Critical Fix: Update both local state and call service to ensure UI refreshes immediately
       const result = PulseService.enrollStudentInClass(studentId, classId, students, classes);
-      
-      // Update Classes State
       setClasses(result.updatedClasses);
-      
-      // Update Students State (This is vital for the Student Dashboard)
       setStudents(result.updatedStudents);
-      
-      // Sync with storage immediately
       PulseService.saveClasses(result.updatedClasses);
       PulseService.saveStudents(result.updatedStudents);
   };
@@ -350,7 +357,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const result = PulseService.unenrollStudentFromClass(studentId, classId, students, classes);
       setClasses(result.updatedClasses);
       setStudents(result.updatedStudents);
-      
       PulseService.saveClasses(result.updatedClasses);
       PulseService.saveStudents(result.updatedStudents);
   };
@@ -465,7 +471,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         students, classes, events, currentUser, payments, libraryResources, academySettings, stats, messages,
         refreshData: loadData,
         addStudent, updateStudent, deleteStudent, updateStudentStatus, 
-        markAttendance, promoteStudent, recordPayment, generateMonthlyCharges, applyLateFees, addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
+        markAttendance, promoteStudent, recordPayment, generateMonthlyBilling, applyLateFees, addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
         addEvent, deleteEvent, registerForEvent,
         addLibraryResource, deleteLibraryResource, toggleResourceCompletion, updateAcademySettings,
         sendMessage, markMessageRead, updateUserProfile, changePassword,

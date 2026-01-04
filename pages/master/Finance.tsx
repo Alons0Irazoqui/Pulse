@@ -8,7 +8,7 @@ import { generateReceipt } from '../../utils/pdfGenerator';
 import ConfirmationModal from '../../components/ConfirmationModal';
 
 const Finance: React.FC = () => {
-  const { payments, recordPayment, students, academySettings, currentUser, generateMonthlyCharges } = useStore();
+  const { payments, recordPayment, students, academySettings, currentUser, generateMonthlyBilling } = useStore();
   const { addToast } = useToast();
   
   // Filtering States
@@ -83,8 +83,8 @@ const Finance: React.FC = () => {
           title: 'Generar Cobros Mensuales',
           message: '¿Deseas generar automáticamente los cargos de mensualidad para todos los alumnos activos? Esto sumará el monto configurado a sus balances.',
           action: () => {
-              if (generateMonthlyCharges) {
-                  generateMonthlyCharges();
+              if (generateMonthlyBilling) {
+                  generateMonthlyBilling();
                   addToast('Cargos mensuales generados correctamente.', 'success');
                   setConfirmModal(prev => ({...prev, isOpen: false}));
               }
@@ -170,7 +170,7 @@ const Finance: React.FC = () => {
                     className="glass-panel hover:bg-white px-5 py-3 rounded-xl font-semibold shadow-sm flex items-center gap-2 transition-all text-text-main"
                 >
                     <span className="material-symbols-outlined text-[20px]">calendar_add_on</span>
-                    Generar Cobros
+                    Generar Cobros del Mes
                 </button>
                 <button 
                     onClick={handleExport}

@@ -92,6 +92,12 @@ export interface SessionModification {
     newInstructor?: string; // Overrides default instructor
 }
 
+// Alias for the requested type name, extending SessionModification for compatibility
+export interface ClassException extends SessionModification {
+    id?: string;
+    reason?: string;
+}
+
 export interface ClassCategory {
     id: string;
     academyId: string;
@@ -103,7 +109,7 @@ export interface ClassCategory {
     instructor: string; // Default instructor
     studentCount: number;
     studentIds: string[];
-    modifications: SessionModification[]; // Array of exceptions to the rule
+    modifications: ClassException[]; // Array of exceptions to the rule
 }
 
 export interface Event {

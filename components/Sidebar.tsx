@@ -18,6 +18,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
     { name: 'Dashboard', icon: 'grid_view', path: '/master/dashboard' },
     { name: 'Students', icon: 'groups', path: '/master/students' },
     { name: 'Schedule', icon: 'calendar_month', path: '/master/schedule' },
+    { name: 'Calendar', icon: 'event', path: '/master/calendar' }, // New Link
     { name: 'Library', icon: 'video_library', path: '/master/library' },
     { name: 'Finance', icon: 'account_balance_wallet', path: '/master/finance' },
     { name: 'Communication', icon: 'mail', path: '/master/communication' },
@@ -34,49 +35,52 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
   const links = role === 'master' ? masterLinks : studentLinks;
 
-  // Use real user data or fallbacks
   const displayName = currentUser?.name || (role === 'master' ? 'Sensei' : 'Alumno');
   const displaySubtext = role === 'master' ? academySettings.name : 'Estudiante';
   const displayAvatar = currentUser?.avatarUrl || `https://i.pravatar.cc/150?u=${role}`;
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Mobile Backdrop - Overlay */}
       <div 
-        className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container - Drawer */}
       <aside 
         className={`
           fixed md:static inset-y-0 left-0 z-50
           flex flex-col w-72 h-full glassmorphism border-r border-gray-200 bg-white/95 md:bg-white/50 backdrop-blur-xl
-          transform transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
+          transform transition-transform duration-300 ease-out shadow-2xl md:shadow-none
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
         <div className="flex flex-col h-full p-6 justify-between overflow-y-auto">
           <div className="flex flex-col gap-8">
-            {/* Brand/Profile Header */}
-            <div className="flex justify-between items-center px-2">
+            {/* Header */}
+            <div className="flex justify-between items-center px-2 pt-2">
               <div className="flex gap-4 items-center">
                 <div 
                     className="bg-center bg-no-repeat bg-cover rounded-full h-12 w-12 shadow-sm ring-2 ring-white" 
                     style={{ backgroundImage: `url("${displayAvatar}")` }}
                 ></div>
                 <div className="flex flex-col">
-                  <h1 className="text-text-main text-lg font-semibold leading-tight truncate max-w-[140px]">
+                  <h1 className="text-text-main text-lg font-bold leading-tight truncate max-w-[140px]">
                       {displayName}
                   </h1>
-                  <p className="text-text-secondary text-xs font-normal truncate max-w-[140px]">
+                  <p className="text-text-secondary text-xs font-medium truncate max-w-[140px]">
                       {displaySubtext}
                   </p>
                 </div>
               </div>
-              {/* Mobile Close Button */}
-              <button onClick={onClose} className="md:hidden text-text-secondary p-1 hover:bg-gray-100 rounded-full transition-colors">
-                <span className="material-symbols-outlined">close</span>
+              
+              {/* Close Button (Mobile Only) */}
+              <button 
+                onClick={onClose} 
+                className="md:hidden size-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-text-secondary rounded-full transition-colors active:scale-90"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
               </button>
             </div>
 
@@ -88,19 +92,20 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
                     <Link
                     key={link.path}
                     to={link.path}
-                    onClick={onClose} // Close drawer on mobile click
-                    className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all group ${
+                    onClick={onClose}
+                    className={`flex items-center gap-4 px-4 py-3 rounded-2xl transition-all group relative overflow-hidden ${
                         isActive
-                            ? 'bg-primary/10 shadow-sm ring-1 ring-primary/5 text-primary'
-                            : 'hover:bg-white/60 text-text-secondary hover:text-text-main'
+                            ? 'bg-primary/10 text-primary shadow-sm'
+                            : 'hover:bg-gray-50 text-text-secondary hover:text-text-main'
                         }`}
                     >
                         <span className={`material-symbols-outlined ${isActive ? 'filled' : ''} ${isActive ? 'text-primary' : 'text-text-secondary group-hover:text-primary transition-colors'}`}>
                             {link.icon}
                         </span>
-                        <span className={`font-medium text-sm ${isActive ? 'text-primary font-semibold' : 'text-text-secondary group-hover:text-text-main transition-colors'}`}>
+                        <span className={`font-medium text-sm ${isActive ? 'text-primary font-bold' : 'transition-colors'}`}>
                             {link.name}
                         </span>
+                        {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full"></div>}
                     </Link>
                 );
               })}
@@ -112,10 +117,10 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
               onClick={() => {
                   navigate('/');
               }}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 cursor-pointer transition-colors group mt-8 w-full text-left"
+              className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 text-text-secondary hover:text-red-500 cursor-pointer transition-colors group mt-8 w-full text-left"
           >
-            <span className="material-symbols-outlined text-text-secondary group-hover:text-red-500 transition-colors">logout</span>
-            <span className="text-text-secondary font-medium text-sm group-hover:text-red-500 transition-colors">Cerrar Sesión</span>
+            <span className="material-symbols-outlined group-hover:text-red-500 transition-colors">logout</span>
+            <span className="font-medium text-sm transition-colors">Cerrar Sesión</span>
           </button>
         </div>
       </aside>
