@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { PaymentCategory } from '../../types';
+import { generateReceipt } from '../../utils/pdfGenerator';
 
 const StudentPayments: React.FC = () => {
   const { currentUser, students, recordPayment, academySettings, payments } = useStore();
@@ -85,6 +87,10 @@ const StudentPayments: React.FC = () => {
 
       // Reset
       setPaymentForm({ category: 'Mensualidad', amount: '', description: '', otherDescription: '', proofFile: null });
+  };
+
+  const handleDownloadReceipt = (payment: any) => {
+      generateReceipt(payment, academySettings, currentUser);
   };
 
   return (
@@ -341,7 +347,7 @@ const StudentPayments: React.FC = () => {
                                     <p className="text-xs text-text-secondary">{new Date(p.date).toLocaleDateString()} • {p.method}</p>
                                 </div>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right flex flex-col items-end">
                                 <p className="font-bold text-text-main text-sm">${p.amount.toFixed(2)}</p>
                                 <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
                                     p.status === 'paid' ? 'bg-green-50 text-green-600' :
@@ -350,6 +356,14 @@ const StudentPayments: React.FC = () => {
                                 }`}>
                                     {p.status === 'paid' ? 'Pagado' : p.status === 'pending_approval' ? (p.method === 'Efectivo en Academia' ? 'Pago en Caja' : 'En Revisión') : 'Pendiente'}
                                 </span>
+                                {p.status === 'paid' && (
+                                    <button 
+                                        onClick={() => handleDownloadReceipt(p)} 
+                                        className="mt-1 text-xs text-primary font-bold hover:underline flex items-center gap-1"
+                                    >
+                                        <span className="material-symbols-outlined text-xs">print</span> Recibo
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}

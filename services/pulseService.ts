@@ -69,6 +69,7 @@ export const PulseService = {
         const users = PulseService.getUsersDB();
         const academies = PulseService.getAcademiesDB();
         const students = PulseService.getStudents();
+        const payments = PulseService.getPayments(); // Fetch existing payments
 
         if (users.find(u => u.email === data.email)) {
             throw new Error("El correo electrónico ya está registrado.");
@@ -91,6 +92,9 @@ export const PulseService = {
             studentId: userId 
         };
 
+        // AUTOMATIC DEBT GENERATION LOGIC
+        const initialAmount = academy.paymentSettings?.monthlyTuition || 0;
+        
         const newStudent: Student = {
             id: userId,
             userId: userId,
@@ -102,16 +106,34 @@ export const PulseService = {
             rankColor: 'white',
             rankId: academy.ranks[0].id,
             stripes: 0,
-            status: 'active',
+            status: initialAmount > 0 ? 'debtor' : 'active', // Set to debtor immediately
             program: 'Adults',
             attendance: 0,
             totalAttendance: 0,
             joinDate: new Date().toLocaleDateString(),
-            balance: 0,
+            balance: initialAmount, // Set initial balance
             classesId: [],
             attendanceHistory: [],
             avatarUrl: newUser.avatarUrl
         };
+
+        // Create the pending payment record
+        if (initialAmount > 0) {
+            const initialPayment: Payment = {
+                id: uuid(),
+                academyId: academy.id,
+                studentId: userId,
+                studentName: data.name,
+                amount: initialAmount,
+                date: new Date().toISOString().split('T')[0],
+                status: 'pending',
+                description: 'Mensualidad (Inscripción)',
+                category: 'Mensualidad',
+                method: 'System'
+            };
+            payments.push(initialPayment);
+            localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
+        }
 
         users.push(newUser);
         students.push(newStudent);

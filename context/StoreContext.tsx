@@ -47,7 +47,7 @@ interface StoreContextType {
   sendMessage: (msg: Omit<Message, 'id' | 'read' | 'date'>) => void;
   markMessageRead: (id: string) => void;
   updateUserProfile: (profile: Partial<UserProfile>) => void;
-  changePassword: (newPassword: string) => void; // NEW
+  changePassword: (newPassword: string) => void; 
   // Auth
   login: (email: string, pass: string) => Promise<boolean>;
   registerStudent: (data: any) => Promise<boolean>;
@@ -142,12 +142,41 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addStudent = (student: Student) => {
       if (currentUser?.role !== 'master') return;
+      
+      // Calculate initial debt
+      const initialDebt = academySettings.paymentSettings.monthlyTuition || 0;
       const studentId = student.id || generateId('stu');
-      const finalStudent = { ...student, id: studentId, userId: studentId, academyId: currentUser.academyId, attendanceHistory: [] };
+      
+      const finalStudent = { 
+          ...student, 
+          id: studentId, 
+          userId: studentId, 
+          academyId: currentUser.academyId, 
+          attendanceHistory: [],
+          balance: initialDebt,
+          status: initialDebt > 0 ? ('debtor' as const) : student.status
+      };
+      
       setStudents(prev => [...prev, finalStudent]);
+
+      // Create initial payment pending record
+      if (initialDebt > 0) {
+          const initialPayment: Payment = {
+              id: generateId('pay'),
+              academyId: currentUser.academyId,
+              studentId: studentId,
+              studentName: finalStudent.name,
+              amount: initialDebt,
+              date: new Date().toISOString().split('T')[0],
+              status: 'pending',
+              description: 'Mensualidad (Inscripción)',
+              category: 'Mensualidad',
+              method: 'System'
+          };
+          setPayments(prev => [initialPayment, ...prev]);
+      }
+
       try {
-          // Password logic handled in component, passed via student object or handled separately
-          // For simplicity in this demo, assume component generated user object
           PulseService.createStudentAccountFromMaster(finalStudent, (student as any).password);
       } catch (e) { console.error("Failed to auto-create user account", e); }
   };
@@ -393,7 +422,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const users = PulseService.getUsersDB();
       const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, password: newPassword } : u);
       localStorage.setItem('pulse_users_db', JSON.stringify(updatedUsers));
-      // Optionally update current user state if password is part of it (usually it's not kept in state for security, but here we do simple auth)
       setCurrentUser({ ...currentUser, password: newPassword });
   };
 

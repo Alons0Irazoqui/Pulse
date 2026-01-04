@@ -298,38 +298,46 @@ const ClassesManager: React.FC = () => {
             ))}
         </div>
 
-        {/* --- STUDENT / ATTENDANCE OVERLAY --- */}
+        {/* --- STUDENT / ATTENDANCE OVERLAY (RESTORED UI) --- */}
         {attendanceClass && (
-            <div className="fixed inset-0 z-50 bg-white/50 backdrop-blur-xl flex justify-end animate-in fade-in duration-200">
-                <div className="w-full max-w-2xl bg-white h-full shadow-2xl border-l border-gray-200 flex flex-col animate-in slide-in-from-right-10 duration-300">
-                    {/* Header */}
-                    <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-10">
+            <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-center items-center animate-in fade-in duration-200 p-4">
+                <div className="w-full max-w-3xl bg-white rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
+                    {/* Header RESTORED */}
+                    <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
                         <div>
-                            <h2 className="text-2xl font-bold text-text-main">{attendanceClass.name}</h2>
-                            <p className="text-text-secondary text-sm">Gestión de inscripciones y asistencia</p>
+                            <h2 className="text-2xl font-bold text-text-main flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">groups</span>
+                                {attendanceClass.name}
+                            </h2>
+                            <p className="text-text-secondary text-sm">Gestiona la lista de asistencia e inscripciones.</p>
                         </div>
-                        <button onClick={() => { setAttendanceClassId(null); setIsEnrollMode(false); }} className="size-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                        <button onClick={() => { setAttendanceClassId(null); setIsEnrollMode(false); }} className="size-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-gray-100 text-gray-500 transition-colors">
                             <span className="material-symbols-outlined">close</span>
                         </button>
                     </div>
 
-                    <div className="p-8 flex-1 overflow-y-auto">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-lg text-text-main">
-                                {isEnrollMode ? 'Inscribir Alumnos' : `Alumnos Inscritos (${attendanceClass.studentIds.length})`}
-                            </h3>
-                            <button 
-                                onClick={() => setIsEnrollMode(!isEnrollMode)}
-                                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${isEnrollMode ? 'bg-gray-100 text-text-main' : 'bg-primary text-white shadow-lg shadow-primary/20'}`}
-                            >
-                                <span className="material-symbols-outlined text-lg">{isEnrollMode ? 'arrow_back' : 'person_add'}</span>
-                                {isEnrollMode ? 'Volver a Lista' : 'Inscribir Nuevo'}
-                            </button>
+                    {/* Toolbar RESTORED */}
+                    <div className="px-8 py-4 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-gray-100">
+                        <div className="text-sm font-bold text-text-secondary uppercase tracking-wider">
+                            {isEnrollMode ? 'Modo de Inscripción' : `Lista de Clase (${attendanceClass.studentIds.length})`}
                         </div>
+                        <button 
+                            onClick={() => setIsEnrollMode(!isEnrollMode)}
+                            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm ${
+                                isEnrollMode 
+                                ? 'bg-white text-text-main border border-gray-200 hover:bg-gray-50' 
+                                : 'bg-primary text-white hover:bg-primary-hover shadow-primary/20'
+                            }`}
+                        >
+                            <span className="material-symbols-outlined text-[18px]">{isEnrollMode ? 'arrow_back' : 'person_add'}</span>
+                            {isEnrollMode ? 'Volver a Asistencia' : 'Gestionar Alumnos'}
+                        </button>
+                    </div>
 
+                    <div className="p-0 flex-1 overflow-y-auto">
                         {/* Search Bar (Only visible in Enroll Mode) */}
                         {isEnrollMode && (
-                            <div className="mb-6">
+                            <div className="p-4 bg-white border-b border-gray-100 sticky top-0 z-10">
                                 <div className="relative">
                                     <span className="absolute left-4 top-3.5 text-gray-400 material-symbols-outlined">search</span>
                                     <input 
@@ -343,17 +351,21 @@ const ClassesManager: React.FC = () => {
                             </div>
                         )}
 
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col">
                             {isEnrollMode ? (
-                                // LISTADO PARA INSCRIBIR
+                                // LISTADO PARA INSCRIBIR (RESTORED LIST STYLE)
                                 students
-                                    .filter(s => !attendanceClass.studentIds.includes(s.id) && s.status === 'active' && s.name.toLowerCase().includes(enrollSearch.toLowerCase()))
+                                    // UPDATED FILTER: Allow active OR debtor status
+                                    .filter(s => !attendanceClass.studentIds.includes(s.id) && s.status !== 'inactive' && s.name.toLowerCase().includes(enrollSearch.toLowerCase()))
                                     .map(student => (
-                                        <div key={student.id} className="p-3 border border-gray-100 rounded-2xl flex items-center justify-between hover:bg-blue-50 transition-colors cursor-pointer group" onClick={() => enrollStudent(student.id, attendanceClass.id)}>
-                                            <div className="flex items-center gap-3">
+                                        <div key={student.id} className="px-8 py-4 border-b border-gray-50 flex items-center justify-between hover:bg-blue-50/50 transition-colors cursor-pointer group" onClick={() => enrollStudent(student.id, attendanceClass.id)}>
+                                            <div className="flex items-center gap-4">
                                                 <img src={student.avatarUrl} className="size-10 rounded-full object-cover bg-gray-200" />
                                                 <div>
-                                                    <p className="font-bold text-sm text-text-main">{student.name}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-bold text-sm text-text-main">{student.name}</p>
+                                                        {student.status === 'debtor' && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">ADEUDO</span>}
+                                                    </div>
                                                     <p className="text-xs text-text-secondary">{student.rank}</p>
                                                 </div>
                                             </div>
@@ -363,7 +375,7 @@ const ClassesManager: React.FC = () => {
                                         </div>
                                     ))
                             ) : (
-                                // LISTADO DE ASISTENCIA / INSCRITOS
+                                // LISTADO DE ASISTENCIA (RESTORED LIST STYLE)
                                 attendanceClass.studentIds.length > 0 ? (
                                     attendanceClass.studentIds.map(studentId => {
                                         const student = students.find(s => s.id === studentId);
@@ -371,7 +383,7 @@ const ClassesManager: React.FC = () => {
                                         const attended = hasAttendedToday(student.id);
 
                                         return (
-                                            <div key={student.id} className={`p-4 border rounded-2xl flex items-center justify-between transition-all ${attended ? 'bg-green-50 border-green-100' : 'bg-white border-gray-100'}`}>
+                                            <div key={student.id} className={`px-8 py-4 border-b border-gray-50 flex items-center justify-between transition-all ${attended ? 'bg-green-50/50' : 'hover:bg-gray-50'}`}>
                                                 <div className="flex items-center gap-4">
                                                     <div className="relative">
                                                         <img src={student.avatarUrl} className="size-12 rounded-full object-cover bg-gray-200" />
@@ -382,28 +394,35 @@ const ClassesManager: React.FC = () => {
                                                         <p className="text-xs text-text-secondary">{student.rank}</p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-3">
                                                     <button 
                                                         onClick={() => handleAttendance(student.id)}
                                                         disabled={attended}
-                                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${attended ? 'bg-green-100 text-green-700 cursor-default' : 'bg-gray-100 text-text-secondary hover:bg-green-50 hover:text-green-600'}`}
+                                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${attended ? 'bg-green-100 text-green-700 cursor-default' : 'bg-gray-100 text-text-secondary hover:bg-green-50 hover:text-green-600'}`}
                                                     >
+                                                        <span className="material-symbols-outlined text-[16px]">{attended ? 'check' : 'touch_app'}</span>
                                                         {attended ? 'Presente' : 'Marcar'}
                                                     </button>
                                                     <button 
                                                         onClick={() => { if(confirm('¿Desinscribir alumno de esta clase?')) unenrollStudent(student.id, attendanceClass.id) }}
                                                         className="size-8 rounded-lg flex items-center justify-center text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                                                        title="Desinscribir"
                                                     >
-                                                        <span className="material-symbols-outlined text-lg">logout</span>
+                                                        <span className="material-symbols-outlined text-[18px]">person_remove</span>
                                                     </button>
                                                 </div>
                                             </div>
                                         );
                                     })
                                 ) : (
-                                    <div className="text-center py-10 text-gray-400">
-                                        <span className="material-symbols-outlined text-4xl mb-2 opacity-50">group_off</span>
-                                        <p>No hay alumnos inscritos.</p>
+                                    <div className="text-center py-16 flex flex-col items-center justify-center text-gray-400">
+                                        <div className="size-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                                            <span className="material-symbols-outlined text-3xl opacity-50">group_off</span>
+                                        </div>
+                                        <p className="font-medium text-gray-500">No hay alumnos inscritos.</p>
+                                        <button onClick={() => setIsEnrollMode(true)} className="mt-4 text-primary font-bold text-sm hover:underline">
+                                            Inscribir alumnos ahora
+                                        </button>
                                     </div>
                                 )
                             )}

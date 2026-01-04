@@ -6,14 +6,13 @@ import { useToast } from '../../context/ToastContext';
 const Settings: React.FC = () => {
   const { currentUser, academySettings, updateAcademySettings, updateUserProfile, changePassword } = useStore();
   const { addToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'profile' | 'academy' | 'notifications' | 'billing'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'academy' | 'notifications'>('profile');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Profile Form State
   const [profileData, setProfileData] = useState({
       name: currentUser?.name || '',
       email: currentUser?.email || '',
-      bio: 'Martial arts enthusiast.',
       avatarUrl: currentUser?.avatarUrl || ''
   });
 
@@ -54,7 +53,6 @@ const Settings: React.FC = () => {
       addToast('Información de academia y pagos actualizada', 'success');
   };
 
-  // Image Upload Logic
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -69,6 +67,11 @@ const Settings: React.FC = () => {
   };
   const triggerFileInput = () => fileInputRef.current?.click();
 
+  const copyCode = () => {
+    navigator.clipboard.writeText(academySettings.code);
+    addToast('Código copiado al portapapeles', 'success');
+  };
+
   return (
     <div className="max-w-5xl mx-auto p-6 md:p-10 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       <header className="mb-10">
@@ -77,6 +80,7 @@ const Settings: React.FC = () => {
       </header>
 
       <div className="flex flex-col lg:flex-row gap-8">
+          {/* Sidebar */}
           <nav className="lg:w-64 flex flex-col gap-1">
               {[
                   { id: 'profile', label: 'Perfil y Seguridad', icon: 'security' },
@@ -91,10 +95,11 @@ const Settings: React.FC = () => {
           </nav>
 
           <div className="flex-1">
+              {/* Profile Tab */}
               {activeTab === 'profile' && (
                   <div className="flex flex-col gap-8">
-                      {/* Public Profile */}
-                      <form onSubmit={handleProfileSave} className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
+                      {/* Public Profile Form */}
+                       <form onSubmit={handleProfileSave} className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
                            <h3 className="text-lg font-bold text-text-main mb-6">Información Básica</h3>
                            <div className="flex items-center gap-6 mb-8">
                                <div className="relative group cursor-pointer" onClick={triggerFileInput}>
@@ -121,7 +126,7 @@ const Settings: React.FC = () => {
                            </div>
                       </form>
 
-                      {/* Password Change */}
+                      {/* Password Form */}
                       <form onSubmit={handlePasswordChange} className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
                           <h3 className="text-lg font-bold text-text-main mb-6">Seguridad</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -141,12 +146,41 @@ const Settings: React.FC = () => {
                   </div>
               )}
 
-              {/* RESTORED: Academy & Bank Settings */}
+              {/* Academy Tab */}
               {activeTab === 'academy' && currentUser?.role === 'master' && (
                   <form onSubmit={handleAcademySave} className="flex flex-col gap-8">
+                      {/* Academy Code Section - CRITICAL RESTORATION */}
+                      <div className="bg-gradient-to-r from-primary to-blue-600 rounded-3xl p-8 text-white shadow-lg relative overflow-hidden group">
+                        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                            <div>
+                                <h3 className="text-blue-100 font-bold text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">vpn_key</span>
+                                    Código de Vinculación
+                                </h3>
+                                <p className="text-white/90 text-sm max-w-md">
+                                    Comparte este código con tus alumnos para que puedan registrarse y vincularse automáticamente a tu academia.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-4 bg-white/10 p-2 pr-4 rounded-xl border border-white/20 backdrop-blur-sm">
+                                <span className="text-4xl font-black tracking-widest font-mono pl-2">{academySettings.code}</span>
+                                <button 
+                                    type="button"
+                                    onClick={copyCode}
+                                    className="size-10 bg-white text-primary rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors shadow-sm"
+                                    title="Copiar código"
+                                >
+                                    <span className="material-symbols-outlined">content_copy</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="absolute -right-10 -bottom-10 opacity-10 rotate-12 pointer-events-none">
+                             <span className="material-symbols-outlined text-[150px]">qr_code_2</span>
+                        </div>
+                      </div>
+
                       {/* General Info */}
                       <div className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
-                          <h3 className="text-lg font-bold text-text-main mb-6">Datos de la Academia</h3>
+                          <h3 className="text-lg font-bold text-text-main mb-6">Configuración General</h3>
                           <div className="grid grid-cols-1 gap-6">
                               <div className="space-y-2">
                                   <label className="text-sm font-semibold text-text-main">Nombre de la Academia</label>
@@ -196,7 +230,7 @@ const Settings: React.FC = () => {
                   </form>
               )}
 
-              {/* RESTORED: Notifications Settings */}
+              {/* Notifications Tab */}
               {activeTab === 'notifications' && (
                   <div className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
                       <h3 className="text-lg font-bold text-text-main mb-6">Preferencias de Notificación</h3>
