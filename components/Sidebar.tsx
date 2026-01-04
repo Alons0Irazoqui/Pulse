@@ -26,6 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
   const studentLinks = [
     { name: 'Progress Profile', icon: 'dashboard', path: '/student/dashboard' },
+    { name: 'Mis Clases', icon: 'class', path: '/student/classes' },
     ...(academySettings.modules.library ? [{ name: 'Library', icon: 'school', path: '/student/library' }] : []),
     { name: 'Schedule', icon: 'calendar_today', path: '/student/schedule' },
     ...(academySettings.modules.payments ? [{ name: 'Payments', icon: 'credit_card', path: '/student/payments' }] : []),

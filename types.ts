@@ -46,8 +46,10 @@ export interface PromotionHistoryItem {
 // Detailed attendance record
 export interface AttendanceRecord {
     date: string; // ISO Date "YYYY-MM-DD"
+    classId: string; // Specific class context
     status: 'present' | 'late' | 'excused' | 'absent';
     timestamp: string; // ISO Full Timestamp
+    reason?: string; // Optional justification or note
 }
 
 export interface Student {

@@ -26,7 +26,8 @@ interface StoreContextType {
   updateStudent: (student: Student) => void;
   deleteStudent: (id: string) => void;
   updateStudentStatus: (id: string, status: Student['status']) => void;
-  markAttendance: (studentId: string, date: string, status: 'present' | 'late' | 'excused' | 'absent' | undefined) => void;
+  markAttendance: (studentId: string, classId: string, date: string, status: 'present' | 'late' | 'excused' | 'absent' | undefined, reason?: string) => void;
+  bulkMarkPresent: (classId: string, date: string) => void;
   promoteStudent: (studentId: string) => void;
   recordPayment: (payment: Payment) => void;
   approvePayment: (paymentId: string) => void; 
@@ -199,21 +200,29 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setStudents(prev => prev.map(s => s.id === id ? { ...s, status } : s));
   };
 
-  const markAttendance = (studentId: string, date: string, status: 'present' | 'late' | 'excused' | 'absent' | undefined) => {
+  const markAttendance = (studentId: string, classId: string, date: string, status: 'present' | 'late' | 'excused' | 'absent' | undefined, reason?: string) => {
     setStudents(prev => prev.map(s => {
       if (s.id === studentId) {
         let history = [...(s.attendanceHistory || [])];
-        const existingIndex = history.findIndex(r => r.date === date);
+        const existingIndex = history.findIndex(r => r.date === date && r.classId === classId);
 
         if (status === undefined) {
             // Remove record if toggled to undefined
             if (existingIndex >= 0) history.splice(existingIndex, 1);
         } else {
             // Upsert record
+            const newRecord: AttendanceRecord = { 
+                date, 
+                classId,
+                status, 
+                timestamp: new Date().toISOString(),
+                reason 
+            };
+
             if (existingIndex >= 0) {
-                history[existingIndex] = { ...history[existingIndex], status, timestamp: new Date().toISOString() };
+                history[existingIndex] = { ...history[existingIndex], ...newRecord };
             } else {
-                history.push({ date, status, timestamp: new Date().toISOString() });
+                history.push(newRecord);
             }
         }
 
@@ -249,6 +258,52 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       return s;
     }));
+  };
+
+  const bulkMarkPresent = (classId: string, date: string) => {
+      const cls = classes.find(c => c.id === classId);
+      if (!cls) return;
+
+      setStudents(prev => prev.map(s => {
+          // Only for students enrolled in this class
+          if (cls.studentIds.includes(s.id)) {
+               const history = [...(s.attendanceHistory || [])];
+               const exists = history.some(r => r.date === date && r.classId === classId);
+
+               // Only add if not already marked for this class/date
+               if (!exists) {
+                    const newRecord: AttendanceRecord = { 
+                        date, 
+                        classId, 
+                        status: 'present', 
+                        timestamp: new Date().toISOString() 
+                    };
+                    history.push(newRecord);
+                    history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                    const newAttendanceCount = history.filter(r => r.status === 'present' || r.status === 'late').length;
+                    
+                    const lastPresentRecord = history.find(r => r.status === 'present' || r.status === 'late');
+                    const lastAttendanceDate = lastPresentRecord ? lastPresentRecord.date : s.lastAttendance;
+
+                    // Rank Check (Simplified duplicate of markAttendance logic)
+                    const currentRank = academySettings.ranks.find(r => r.id === s.rankId);
+                    let newStatus = s.status;
+                    if (currentRank && newAttendanceCount >= currentRank.requiredAttendance && (s.status === 'active' || s.status === 'exam_ready')) {
+                        newStatus = 'exam_ready';
+                    }
+
+                    return { 
+                        ...s, 
+                        attendance: newAttendanceCount, 
+                        attendanceHistory: history, 
+                        lastAttendance: lastAttendanceDate,
+                        status: newStatus
+                    };
+               }
+          }
+          return s;
+      }));
   };
 
   const promoteStudent = (studentId: string) => {
@@ -564,7 +619,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         students, classes, events, currentUser, payments, libraryResources, academySettings, stats, messages,
         refreshData: loadData,
         addStudent, updateStudent, deleteStudent, updateStudentStatus, 
-        markAttendance, promoteStudent, recordPayment, approvePayment, generateMonthlyBilling, applyLateFees, addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
+        markAttendance, bulkMarkPresent, promoteStudent, recordPayment, approvePayment, generateMonthlyBilling, applyLateFees, addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
         addEvent, deleteEvent, registerForEvent,
         addLibraryResource, deleteLibraryResource, toggleResourceCompletion, updateAcademySettings,
         sendMessage, markMessageRead, updateUserProfile, changePassword,

@@ -11,10 +11,13 @@ import MasterDashboard from './pages/master/MasterDashboard';
 import StudentsList from './pages/master/StudentsList';
 import ScheduleManager from './pages/master/ScheduleManager';
 import ClassesManager from './pages/master/ClassesManager';
+import MasterAttendanceDetail from './pages/master/MasterAttendanceDetail';
 import MasterLibrary from './pages/master/MasterLibrary';
 import Finance from './pages/master/Finance';
 import Communication from './pages/master/Communication';
 import StudentDashboard from './pages/student/StudentDashboard';
+import StudentClasses from './pages/student/StudentClasses';
+import StudentClassDetail from './pages/student/StudentClassDetail';
 import StudentSchedule from './pages/student/StudentSchedule';
 import StudentPayments from './pages/student/StudentPayments';
 import Library from './pages/student/Library';
@@ -44,8 +47,8 @@ const App: React.FC = () => {
                         <Routes>
                             <Route path="dashboard" element={<MasterDashboard />} />
                             <Route path="students" element={<StudentsList />} />
-                            {/* Updated to use the new ClassesManager for improved calendar editing */}
-                            <Route path="schedule" element={<ClassesManager />} /> 
+                            <Route path="schedule" element={<ClassesManager />} />
+                            <Route path="attendance/:classId" element={<MasterAttendanceDetail />} />
                             <Route path="library" element={<MasterLibrary />} />
                             <Route path="finance" element={<Finance />} />
                             <Route path="communication" element={<Communication />} />
@@ -62,6 +65,8 @@ const App: React.FC = () => {
                     <DashboardLayout>
                         <Routes>
                             <Route path="dashboard" element={<StudentDashboard />} />
+                            <Route path="classes" element={<StudentClasses />} />
+                            <Route path="classes/:classId" element={<StudentClassDetail />} />
                             <Route path="schedule" element={<StudentSchedule />} />
                             <Route path="library" element={<Library />} />
                             <Route path="payments" element={<StudentPayments />} />

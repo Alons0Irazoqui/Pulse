@@ -138,9 +138,12 @@ const ScheduleManager: React.FC = () => {
 
   const handleAttendanceAction = (studentId: string, status: 'present' | 'late' | 'absent') => {
       setLocalAttendance(prev => ({ ...prev, [studentId]: status }));
-      if (status === 'present' || status === 'late') {
-          markAttendance(studentId);
-          addToast('Asistencia registrada', 'success');
+      if (selectedClassId) {
+          const today = new Date().toISOString().split('T')[0];
+          markAttendance(studentId, selectedClassId, today, status);
+          if (status === 'present' || status === 'late') {
+              addToast('Asistencia registrada', 'success');
+          }
       }
   };
 

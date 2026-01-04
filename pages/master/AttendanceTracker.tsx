@@ -73,7 +73,32 @@ const AttendanceTracker: React.FC = () => {
 
   const handleStatusChange = (studentId: string, date: Date, currentStatus: string | undefined) => {
       const dateStr = date.toISOString().split('T')[0];
+      const dayNameEnglish = date.toLocaleString('en-US', { weekday: 'long' });
+
+      // Determine which class ID to use for the record
+      let targetClassId = selectedClassId;
       
+      if (targetClassId === 'all') {
+          // If viewing 'all', try to find a class the student is enrolled in that occurs on this day
+          const student = students.find(s => s.id === studentId);
+          const relevantClass = classes.find(c => 
+              student?.classesId?.includes(c.id) && c.days.includes(dayNameEnglish)
+          );
+          
+          if (relevantClass) {
+              targetClassId = relevantClass.id;
+          } else {
+              // Fallback: If no specific class scheduled for this day, grab their first enrolled class 
+              // or alert user to select a class filter. For now, let's use a fallback or skip.
+              if (student?.classesId && student.classesId.length > 0) {
+                  targetClassId = student.classesId[0];
+              } else {
+                  addToast("Selecciona una clase específica para marcar asistencia fuera de horario.", "info");
+                  return;
+              }
+          }
+      }
+
       // Cycle: Unmarked -> Present -> Late -> Excused -> Absent -> Unmarked
       const nextStatusMap: Record<string, 'present' | 'late' | 'excused' | 'absent' | undefined> = {
           'undefined': 'present',
@@ -87,7 +112,7 @@ const AttendanceTracker: React.FC = () => {
       const key = currentStatus || 'undefined';
       const newStatus = nextStatusMap[key]; 
       
-      markAttendance(studentId, dateStr, newStatus);
+      markAttendance(studentId, targetClassId, dateStr, newStatus);
       
       // Toast feedback only on initial mark to avoid spam
       if (newStatus === 'present') {
@@ -213,8 +238,14 @@ const AttendanceTracker: React.FC = () => {
                                 {/* Days Columns */}
                                 {weekDays.map((day, idx) => {
                                     const dateStr = day.toISOString().split('T')[0];
-                                    // Find record in history
-                                    const record = student.attendanceHistory?.find(r => r.date === dateStr);
+                                    // Find record in history. Since history now has classId, we need to be careful.
+                                    // If a student has attended ANY class on this date, show it.
+                                    // Or better, if selectedClassId is set, show for that class.
+                                    
+                                    const record = student.attendanceHistory?.find(r => {
+                                        if (selectedClassId === 'all') return r.date === dateStr;
+                                        return r.date === dateStr && r.classId === selectedClassId;
+                                    });
                                     
                                     // Is class scheduled?
                                     const isActiveDay = isClassScheduledOn(day);
