@@ -1,15 +1,15 @@
-
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
+import { useConfirmation } from '../../context/ConfirmationContext';
 import { Payment, PaymentCategory } from '../../types';
 import { exportToCSV } from '../../utils/csvExport';
 import { generateReceipt } from '../../utils/pdfGenerator';
-import ConfirmationModal from '../../components/ConfirmationModal';
 
 const Finance: React.FC = () => {
   const { payments, recordPayment, approvePayment, rejectPayment, students, academySettings, currentUser, generateMonthlyBilling } = useStore();
   const { addToast } = useToast();
+  const { confirm } = useConfirmation();
   
   // Filtering States
   const [filterTime, setFilterTime] = useState<'all' | 'month' | 'week'>('month');
@@ -19,11 +19,6 @@ const Finance: React.FC = () => {
   // Modal States
   const [showModal, setShowModal] = useState(false); // For manual charge/payment
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
-  
-  // Confirmation Modal State
-  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void, type?: 'info' | 'danger'}>({
-      isOpen: false, title: '', message: '', action: () => {}, type: 'info'
-  });
 
   // Manual Entry State
   const initialEntryState = {
@@ -84,16 +79,13 @@ const Finance: React.FC = () => {
   };
 
   const handleGenerateMonthly = () => {
-      setConfirmModal({
-          isOpen: true,
+      confirm({
           title: 'Generar Cargos Mensuales',
           message: '¿Generar deuda de mensualidad a todos los alumnos activos? Esto aumentará el saldo deudor de cada alumno.',
           type: 'info',
-          action: () => {
+          onConfirm: () => {
               if (generateMonthlyBilling) {
                   generateMonthlyBilling();
-                  addToast('Cargos mensuales generados correctamente.', 'success');
-                  setConfirmModal(prev => ({...prev, isOpen: false}));
               }
           }
       });
@@ -121,30 +113,30 @@ const Finance: React.FC = () => {
       recordPayment(transactionData);
       setShowModal(false);
       setNewEntry(initialEntryState);
-      addToast(newEntry.type === 'charge' ? 'Cargo registrado (Deuda aumentada)' : 'Pago registrado (Deuda reducida)', 'success');
   };
 
   const handleApprovePayment = (payment: Payment) => {
-      setConfirmModal({
-          isOpen: true,
+      confirm({
           title: 'Aprobar Pago',
           message: `¿Confirmas haber recibido $${payment.amount}? Esto reducirá el saldo del alumno.`,
           type: 'info',
-          action: () => {
+          onConfirm: () => {
               approvePayment(payment.id);
               setSelectedTransactionId(null);
-              addToast('Pago aprobado y saldo actualizado.', 'success');
-              setConfirmModal(prev => ({...prev, isOpen: false}));
           }
       });
   };
 
   const handleRejectPayment = (payment: Payment) => {
-      if(confirm('¿Rechazar este pago? No afectará el saldo del alumno.')) {
-          rejectPayment(payment.id);
-          setSelectedTransactionId(null);
-          addToast('Pago rechazado.', 'info');
-      }
+      confirm({
+          title: 'Rechazar Pago',
+          message: '¿Rechazar este pago? No afectará el saldo del alumno.',
+          type: 'info',
+          onConfirm: () => {
+              rejectPayment(payment.id);
+              setSelectedTransactionId(null);
+          }
+      });
   };
 
   const selectedTransaction = payments.find(t => t.id === selectedTransactionId);
@@ -152,15 +144,6 @@ const Finance: React.FC = () => {
   return (
     <div className="max-w-[1600px] w-full mx-auto p-6 md:p-10 flex flex-col gap-8 h-full z-10">
         
-        <ConfirmationModal 
-            isOpen={confirmModal.isOpen}
-            title={confirmModal.title}
-            message={confirmModal.message}
-            onConfirm={confirmModal.action}
-            onCancel={() => setConfirmModal(prev => ({...prev, isOpen: false}))}
-            type={confirmModal.type}
-        />
-
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>

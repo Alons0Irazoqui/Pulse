@@ -1,12 +1,9 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
-import { useToast } from '../../context/ToastContext';
 
 const Login: React.FC = () => {
   const { login } = useStore();
-  const { addToast } = useToast();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -17,13 +14,10 @@ const Login: React.FC = () => {
       
       const success = await login(formData.email, formData.password);
       if (success) {
-          addToast('¡Bienvenido de nuevo!', 'success');
           // Retrieve user directly for instant redirect logic
           const user = JSON.parse(localStorage.getItem('pulse_current_session') || '{}');
           if (user.role === 'master') navigate('/master/dashboard');
           else navigate('/student/dashboard');
-      } else {
-          addToast('Credenciales incorrectas. Intenta de nuevo.', 'error');
       }
       setLoading(false);
   };

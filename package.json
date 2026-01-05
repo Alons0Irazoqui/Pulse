@@ -12,7 +12,10 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.11.0",
-    "recharts": "^3.6.0"
+    "recharts": "^3.6.0",
+    "zod": "^4.3.5",
+    "@hookform/resolvers": "^5.2.2",
+    "react-hook-form": "^7.70.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

@@ -1,48 +1,38 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { studentRegistrationSchema, StudentRegistrationForm } from '../../schemas/authSchemas';
 
 const StudentRegistration: React.FC = () => {
   const { registerStudent } = useStore();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    academyCode: '',
-    password: '',
-    confirmPassword: ''
+  
+  const { 
+    register, 
+    handleSubmit, 
+    formState: { errors, isSubmitting },
+    setError
+  } = useForm<StudentRegistrationForm>({
+    resolver: zodResolver(studentRegistrationSchema)
   });
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      
-      if (formData.password !== formData.confirmPassword) {
-          alert("Las contraseñas no coinciden.");
-          return;
-      }
-
-      setLoading(true);
+  const onSubmit = async (data: StudentRegistrationForm) => {
       const success = await registerStudent({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          academyCode: formData.academyCode,
-          password: formData.password
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          academyCode: data.academyCode,
+          password: data.password
       });
 
       if (success) {
-          alert('Cuenta creada exitosamente.');
           navigate('/student/dashboard');
+      } else {
+          // General fallback error if context doesn't throw specific field errors
+          setError("root", { message: "Error al registrar. Verifica el código de academia." });
       }
-      setLoading(false);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const { name, value } = e.target;
-      setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   return (
@@ -53,14 +43,20 @@ const StudentRegistration: React.FC = () => {
              <p className="text-text-secondary text-sm mt-1">Ingresa el código de tu academia para vincularte.</p>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-8 flex flex-col gap-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-8 flex flex-col gap-5">
             {/* Academy Link */}
             <div>
                 <label className="text-sm font-bold text-text-main mb-1.5 block">Código de Academia</label>
                 <div className="relative">
                     <span className="absolute left-4 top-3 text-gray-400 material-symbols-outlined text-[20px]">vpn_key</span>
-                    <input name="academyCode" value={formData.academyCode} onChange={handleInputChange} className="w-full rounded-xl border-gray-200 pl-11 pr-4 py-3 text-sm focus:border-primary focus:ring-primary placeholder:text-gray-400" placeholder="Ej. ACAD-1234" required type="text"/>
+                    <input 
+                        {...register('academyCode')}
+                        className={`w-full rounded-xl border pl-11 pr-4 py-3 text-sm focus:ring-primary placeholder:text-gray-400 transition-colors ${errors.academyCode ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                        placeholder="Ej. ACAD-1234" 
+                        type="text"
+                    />
                 </div>
+                {errors.academyCode && <p className="text-xs text-red-500 mt-1 font-medium">{errors.academyCode.message}</p>}
                 <p className="text-xs text-text-secondary mt-1 ml-1">Solicita este código a tu maestro.</p>
             </div>
 
@@ -68,16 +64,34 @@ const StudentRegistration: React.FC = () => {
             <div className="flex flex-col gap-4">
                 <div>
                     <label className="text-sm font-semibold text-text-main mb-1.5 block">Nombre Completo</label>
-                    <input name="name" value={formData.name} onChange={handleInputChange} className="w-full rounded-xl border-gray-200 px-4 py-3 text-sm focus:border-primary focus:ring-primary" placeholder="Ej. Juan Pérez" required type="text"/>
+                    <input 
+                        {...register('name')}
+                        className={`w-full rounded-xl border px-4 py-3 text-sm focus:ring-primary transition-colors ${errors.name ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                        placeholder="Ej. Juan Pérez" 
+                        type="text"
+                    />
+                    {errors.name && <p className="text-xs text-red-500 mt-1 font-medium">{errors.name.message}</p>}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="text-sm font-semibold text-text-main mb-1.5 block">Correo Electrónico</label>
-                        <input name="email" value={formData.email} onChange={handleInputChange} className="w-full rounded-xl border-gray-200 px-4 py-3 text-sm focus:border-primary focus:ring-primary" placeholder="tu@email.com" required type="email"/>
+                        <input 
+                            {...register('email')}
+                            className={`w-full rounded-xl border px-4 py-3 text-sm focus:ring-primary transition-colors ${errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                            placeholder="tu@email.com" 
+                            type="email"
+                        />
+                        {errors.email && <p className="text-xs text-red-500 mt-1 font-medium">{errors.email.message}</p>}
                     </div>
                     <div>
                         <label className="text-sm font-semibold text-text-main mb-1.5 block">Teléfono</label>
-                        <input name="phone" value={formData.phone} onChange={handleInputChange} className="w-full rounded-xl border-gray-200 px-4 py-3 text-sm focus:border-primary focus:ring-primary" placeholder="+52 ..." required type="tel"/>
+                        <input 
+                            {...register('phone')}
+                            className={`w-full rounded-xl border px-4 py-3 text-sm focus:ring-primary transition-colors ${errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                            placeholder="+52 ..." 
+                            type="tel"
+                        />
+                        {errors.phone && <p className="text-xs text-red-500 mt-1 font-medium">{errors.phone.message}</p>}
                     </div>
                 </div>
             </div>
@@ -87,17 +101,37 @@ const StudentRegistration: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="text-sm font-semibold text-text-main mb-1.5 block">Contraseña</label>
-                        <input name="password" value={formData.password} onChange={handleInputChange} className="w-full rounded-xl border-gray-200 px-4 py-3 text-sm focus:border-primary focus:ring-primary" placeholder="••••••••" required type="password"/>
+                        <input 
+                            {...register('password')}
+                            className={`w-full rounded-xl border px-4 py-3 text-sm focus:ring-primary transition-colors ${errors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                            placeholder="••••••••" 
+                            type="password"
+                        />
+                        {errors.password && <p className="text-xs text-red-500 mt-1 font-medium">{errors.password.message}</p>}
                     </div>
                     <div>
                         <label className="text-sm font-semibold text-text-main mb-1.5 block">Confirmar Contraseña</label>
-                        <input name="confirmPassword" value={formData.confirmPassword} onChange={handleInputChange} className="w-full rounded-xl border-gray-200 px-4 py-3 text-sm focus:border-primary focus:ring-primary" placeholder="••••••••" required type="password"/>
+                        <input 
+                            {...register('confirmPassword')}
+                            className={`w-full rounded-xl border px-4 py-3 text-sm focus:ring-primary transition-colors ${errors.confirmPassword ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                            placeholder="••••••••" 
+                            type="password"
+                        />
+                        {errors.confirmPassword && <p className="text-xs text-red-500 mt-1 font-medium">{errors.confirmPassword.message}</p>}
                     </div>
                 </div>
             </div>
 
-            <button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary-hover disabled:opacity-70 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-primary/30 transition-all mt-4">
-                {loading ? 'Creando cuenta...' : 'Registrarme'}
+            {errors.root && (
+                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl border border-red-100 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg">error</span>
+                    {errors.root.message}
+                </div>
+            )}
+
+            <button type="submit" disabled={isSubmitting} className="w-full bg-primary hover:bg-primary-hover disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-primary/30 transition-all mt-4 flex items-center justify-center gap-2">
+                {isSubmitting && <span className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>}
+                {isSubmitting ? 'Creando cuenta...' : 'Registrarme'}
             </button>
         </form>
 

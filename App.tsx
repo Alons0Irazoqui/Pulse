@@ -1,8 +1,10 @@
-
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { StoreProvider } from './context/StoreContext';
+import { AuthProvider } from './context/AuthContext';
+import { AcademyProvider } from './context/AcademyContext';
+import { FinanceProvider } from './context/FinanceContext';
 import { ToastProvider } from './context/ToastContext';
+import { ConfirmationProvider } from './context/ConfirmationContext';
 import DashboardLayout from './layouts/DashboardLayout';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/auth/Login';
@@ -29,57 +31,63 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
   return (
-    <StoreProvider>
-      <ToastProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/role-selection" element={<RoleSelection />} />
-            <Route path="/register/student" element={<StudentRegistration />} />
-            <Route path="/register/master" element={<MasterRegistration />} />
-            <Route path="/403" element={<Forbidden />} />
-            
-            {/* Master Routes (Protected) */}
-            <Route path="/master/*" element={
-                <ProtectedRoute allowedRoles={['master']}>
-                    <DashboardLayout>
-                        <Routes>
-                            <Route path="dashboard" element={<MasterDashboard />} />
-                            <Route path="students" element={<StudentsList />} />
-                            <Route path="schedule" element={<ClassesManager />} />
-                            <Route path="attendance/:classId" element={<MasterAttendanceDetail />} />
-                            <Route path="library" element={<MasterLibrary />} />
-                            <Route path="finance" element={<Finance />} />
-                            <Route path="communication" element={<Communication />} />
-                            <Route path="settings" element={<Settings />} />
-                            <Route path="*" element={<Navigate to="dashboard" replace />} />
-                        </Routes>
-                    </DashboardLayout>
-                </ProtectedRoute>
-            } />
+    <ToastProvider>
+      <ConfirmationProvider>
+        <AuthProvider>
+          <AcademyProvider>
+            <FinanceProvider>
+              <Router>
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/role-selection" element={<RoleSelection />} />
+                  <Route path="/register/student" element={<StudentRegistration />} />
+                  <Route path="/register/master" element={<MasterRegistration />} />
+                  <Route path="/403" element={<Forbidden />} />
+                  
+                  {/* Master Routes (Protected) */}
+                  <Route path="/master/*" element={
+                      <ProtectedRoute allowedRoles={['master']}>
+                          <DashboardLayout>
+                              <Routes>
+                                  <Route path="dashboard" element={<MasterDashboard />} />
+                                  <Route path="students" element={<StudentsList />} />
+                                  <Route path="schedule" element={<ClassesManager />} />
+                                  <Route path="attendance/:classId" element={<MasterAttendanceDetail />} />
+                                  <Route path="library" element={<MasterLibrary />} />
+                                  <Route path="finance" element={<Finance />} />
+                                  <Route path="communication" element={<Communication />} />
+                                  <Route path="settings" element={<Settings />} />
+                                  <Route path="*" element={<Navigate to="dashboard" replace />} />
+                              </Routes>
+                          </DashboardLayout>
+                      </ProtectedRoute>
+                  } />
 
-            {/* Student Routes (Protected) */}
-            <Route path="/student/*" element={
-                <ProtectedRoute allowedRoles={['student']}>
-                    <DashboardLayout>
-                        <Routes>
-                            <Route path="dashboard" element={<StudentDashboard />} />
-                            <Route path="classes" element={<StudentClasses />} />
-                            <Route path="classes/:classId" element={<StudentClassDetail />} />
-                            <Route path="schedule" element={<StudentSchedule />} />
-                            <Route path="library" element={<Library />} />
-                            <Route path="payments" element={<StudentPayments />} />
-                            <Route path="settings" element={<Settings />} />
-                            <Route path="*" element={<Navigate to="dashboard" replace />} />
-                        </Routes>
-                    </DashboardLayout>
-                </ProtectedRoute>
-            } />
-          </Routes>
-        </Router>
-      </ToastProvider>
-    </StoreProvider>
+                  {/* Student Routes (Protected) */}
+                  <Route path="/student/*" element={
+                      <ProtectedRoute allowedRoles={['student']}>
+                          <DashboardLayout>
+                              <Routes>
+                                  <Route path="dashboard" element={<StudentDashboard />} />
+                                  <Route path="classes" element={<StudentClasses />} />
+                                  <Route path="classes/:classId" element={<StudentClassDetail />} />
+                                  <Route path="schedule" element={<StudentSchedule />} />
+                                  <Route path="library" element={<Library />} />
+                                  <Route path="payments" element={<StudentPayments />} />
+                                  <Route path="settings" element={<Settings />} />
+                                  <Route path="*" element={<Navigate to="dashboard" replace />} />
+                              </Routes>
+                          </DashboardLayout>
+                      </ProtectedRoute>
+                  } />
+                </Routes>
+              </Router>
+            </FinanceProvider>
+          </AcademyProvider>
+        </AuthProvider>
+      </ConfirmationProvider>
+    </ToastProvider>
   );
 };
 

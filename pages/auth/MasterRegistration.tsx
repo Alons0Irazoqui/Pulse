@@ -1,49 +1,40 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { masterRegistrationSchema, MasterRegistrationForm } from '../../schemas/authSchemas';
 
 const MasterRegistration: React.FC = () => {
   const { registerMaster } = useStore();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    academyName: '',
-    password: '',
-    confirmPassword: '',
-    termsAccepted: false
-  });
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.password !== formData.confirmPassword) {
-        alert("Las contraseñas no coinciden.");
-        return;
+  
+  const { 
+    register, 
+    handleSubmit, 
+    formState: { errors, isSubmitting },
+    setError
+  } = useForm<MasterRegistrationForm>({
+    resolver: zodResolver(masterRegistrationSchema),
+    defaultValues: {
+      termsAccepted: false
     }
+  });
 
-    setLoading(true);
+  const onSubmit = async (data: MasterRegistrationForm) => {
     const success = await registerMaster({
-        name: formData.name,
-        email: formData.email,
-        academyName: formData.academyName,
-        password: formData.password
+        name: data.name,
+        email: data.email,
+        academyName: data.academyName,
+        password: data.password
     });
 
     if (success) {
         alert("Academia creada exitosamente. Bienvenido Sensei.");
         navigate('/master/dashboard');
+    } else {
+        setError("root", { message: "Error al registrar la academia. El correo podría estar en uso." });
     }
-    setLoading(false);
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [id]: type === 'checkbox' ? checked : value
-    }));
   };
 
   return (
@@ -59,42 +50,93 @@ const MasterRegistration: React.FC = () => {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="px-8 pb-10 flex flex-col gap-5">
+          <form onSubmit={handleSubmit(onSubmit)} className="px-8 pb-10 flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">
               <label className="text-text-main text-sm font-semibold" htmlFor="name">Nombre del Maestro</label>
-              <input id="name" value={formData.name} onChange={handleChange} className="w-full rounded-lg border-gray-200 focus:border-primary focus:ring-primary px-4 py-3" placeholder="Ej. Sensei Alejandro" type="text" required />
+              <input 
+                id="name" 
+                {...register('name')}
+                className={`w-full rounded-lg border px-4 py-3 focus:ring-primary transition-colors ${errors.name ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                placeholder="Ej. Sensei Alejandro" 
+                type="text" 
+              />
+              {errors.name && <p className="text-xs text-red-500 font-medium">{errors.name.message}</p>}
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-text-main text-sm font-semibold" htmlFor="email">Correo electrónico</label>
-              <input id="email" type="email" value={formData.email} onChange={handleChange} className="w-full rounded-lg border-gray-200 focus:border-primary focus:ring-primary px-4 py-3" placeholder="ejemplo@academia.com" required />
+              <input 
+                id="email" 
+                {...register('email')}
+                className={`w-full rounded-lg border px-4 py-3 focus:ring-primary transition-colors ${errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                placeholder="ejemplo@academia.com" 
+                type="email"
+              />
+              {errors.email && <p className="text-xs text-red-500 font-medium">{errors.email.message}</p>}
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-text-main text-sm font-semibold" htmlFor="academyName">Nombre de la Academia</label>
-              <input id="academyName" value={formData.academyName} onChange={handleChange} className="w-full rounded-lg border-gray-200 focus:border-primary focus:ring-primary px-4 py-3" placeholder="Ej. Academia Cobra Kai" type="text" required />
+              <input 
+                id="academyName" 
+                {...register('academyName')}
+                className={`w-full rounded-lg border px-4 py-3 focus:ring-primary transition-colors ${errors.academyName ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                placeholder="Ej. Academia Cobra Kai" 
+                type="text" 
+              />
+              {errors.academyName && <p className="text-xs text-red-500 font-medium">{errors.academyName.message}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                     <label className="text-text-main text-sm font-semibold" htmlFor="password">Contraseña</label>
-                    <input id="password" value={formData.password} onChange={handleChange} className="w-full rounded-lg border-gray-200 focus:border-primary focus:ring-primary px-4 py-3" placeholder="••••••••" type="password" required />
+                    <input 
+                        id="password" 
+                        {...register('password')}
+                        className={`w-full rounded-lg border px-4 py-3 focus:ring-primary transition-colors ${errors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                        placeholder="••••••••" 
+                        type="password" 
+                    />
+                    {errors.password && <p className="text-xs text-red-500 font-medium">{errors.password.message}</p>}
                 </div>
                 <div className="flex flex-col gap-1.5">
                     <label className="text-text-main text-sm font-semibold" htmlFor="confirmPassword">Confirmar</label>
-                    <input id="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full rounded-lg border-gray-200 focus:border-primary focus:ring-primary px-4 py-3" placeholder="••••••••" type="password" required />
+                    <input 
+                        id="confirmPassword" 
+                        {...register('confirmPassword')}
+                        className={`w-full rounded-lg border px-4 py-3 focus:ring-primary transition-colors ${errors.confirmPassword ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-primary'}`}
+                        placeholder="••••••••" 
+                        type="password" 
+                    />
+                    {errors.confirmPassword && <p className="text-xs text-red-500 font-medium">{errors.confirmPassword.message}</p>}
                 </div>
             </div>
 
-            <div className="flex items-start gap-3 mt-2">
-              <input id="termsAccepted" type="checkbox" checked={formData.termsAccepted} onChange={handleChange} className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" required />
-              <label className="text-sm text-text-secondary leading-snug cursor-pointer" htmlFor="termsAccepted">
-                  Acepto los <span className="text-primary font-bold">Términos de Servicio</span> y la Política de Privacidad.
-              </label>
+            <div className="flex flex-col gap-1">
+                <div className="flex items-start gap-3 mt-2">
+                  <input 
+                    id="termsAccepted" 
+                    type="checkbox" 
+                    {...register('termsAccepted')}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer" 
+                  />
+                  <label className="text-sm text-text-secondary leading-snug cursor-pointer select-none" htmlFor="termsAccepted">
+                      Acepto los <span className="text-primary font-bold">Términos de Servicio</span> y la Política de Privacidad.
+                  </label>
+                </div>
+                {errors.termsAccepted && <p className="text-xs text-red-500 font-medium ml-7">{errors.termsAccepted.message}</p>}
             </div>
 
-            <button type="submit" disabled={!formData.termsAccepted || loading} className="mt-2 w-full rounded-lg bg-primary py-3.5 px-4 text-white font-bold shadow-lg shadow-primary/25 hover:bg-primary-hover disabled:opacity-50 transition-all">
-              {loading ? 'Registrando...' : 'Crear mi Academia'}
+            {errors.root && (
+                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-100 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg">error</span>
+                    {errors.root.message}
+                </div>
+            )}
+
+            <button type="submit" disabled={isSubmitting} className="mt-2 w-full rounded-lg bg-primary py-3.5 px-4 text-white font-bold shadow-lg shadow-primary/25 hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+              {isSubmitting && <span className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>}
+              {isSubmitting ? 'Registrando...' : 'Crear mi Academia'}
             </button>
           </form>
 

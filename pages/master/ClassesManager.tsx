@@ -1,13 +1,14 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { ClassCategory, SessionModification, Event } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useConfirmation } from '../../context/ConfirmationContext';
 import { useNavigate } from 'react-router-dom';
 
 const ClassesManager: React.FC = () => {
   const { classes, events, addClass, updateClass, deleteClass, modifyClassSession, addEvent, deleteEvent } = useStore();
   const { addToast } = useToast();
+  const { confirm } = useConfirmation();
   const navigate = useNavigate();
   
   // -- GLOBAL STATES --
@@ -104,14 +105,12 @@ const ClassesManager: React.FC = () => {
           const original = classes.find(c => c.id === editingClassId);
           if (original) {
               updateClass({ ...original, ...commonData });
-              addToast('Clase actualizada', 'success');
           }
       } else {
           addClass({
               id: '', academyId: '', studentCount: 0, studentIds: [], modifications: [],
               ...commonData
           });
-          addToast('Clase creada', 'success');
       }
       setShowCreateModal(false);
       resetClassForm();
@@ -133,9 +132,26 @@ const ClassesManager: React.FC = () => {
           capacity: eventForm.capacity
       });
       
-      addToast('Evento publicado exitosamente', 'success');
       setEventForm({ title: '', date: '', time: '', type: 'exam', description: '', capacity: 50 });
       setShowEventModal(false);
+  };
+
+  const handleDeleteClass = (id: string) => {
+      confirm({
+          title: 'Eliminar Clase',
+          message: '¿Estás seguro de eliminar esta clase? Se perderá el historial de sesiones futuras.',
+          type: 'danger',
+          onConfirm: () => deleteClass(id)
+      });
+  };
+
+  const handleDeleteEvent = (id: string) => {
+      confirm({
+          title: 'Eliminar Evento',
+          message: '¿Estás seguro de eliminar este evento?',
+          type: 'danger',
+          onConfirm: () => deleteEvent(id)
+      });
   };
 
   // --- CALENDAR LOGIC ---
@@ -229,7 +245,6 @@ const ClassesManager: React.FC = () => {
       };
 
       modifyClassSession(managingClass.id, mod);
-      addToast('Sesión actualizada', 'success');
       setSelectedSession(null);
   };
 
@@ -292,7 +307,7 @@ const ClassesManager: React.FC = () => {
                                 <button onClick={() => handleOpenEditClass(cls)} className="size-9 bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-full flex items-center justify-center transition-colors shadow-sm">
                                     <span className="material-symbols-outlined text-[18px]">edit</span>
                                 </button>
-                                <button onClick={() => { if(confirm('¿Eliminar clase?')) deleteClass(cls.id) }} className="size-9 bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-600 rounded-full flex items-center justify-center transition-colors shadow-sm">
+                                <button onClick={() => handleDeleteClass(cls.id)} className="size-9 bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-600 rounded-full flex items-center justify-center transition-colors shadow-sm">
                                     <span className="material-symbols-outlined text-[18px]">delete</span>
                                 </button>
                             </div>
@@ -369,7 +384,7 @@ const ClassesManager: React.FC = () => {
                             const typeInfo = getEventTypeLabel(event.type);
                             return (
                                 <div key={event.id} className="bg-white p-6 rounded-[2rem] shadow-card border border-gray-100 flex flex-col relative group">
-                                     <button onClick={() => { if(confirm('¿Eliminar evento?')) deleteEvent(event.id) }} className="absolute top-4 right-4 size-8 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full flex items-center justify-center transition-colors">
+                                     <button onClick={() => handleDeleteEvent(event.id)} className="absolute top-4 right-4 size-8 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full flex items-center justify-center transition-colors">
                                         <span className="material-symbols-outlined text-sm">delete</span>
                                     </button>
                                     
@@ -613,7 +628,7 @@ const ClassesManager: React.FC = () => {
                         Publicar Nuevo Evento
                     </h2>
                     <form onSubmit={handleCreateEvent} className="flex flex-col gap-5">
-                        <input required value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full rounded-xl border-gray-300 p-3 text-sm" placeholder="Nombre del Evento (ej. Torneo de Invierno)" />
+                        <input required value={eventForm.title} onChange={e => setEventForm({...eventForm,title: e.target.value})} className="w-full rounded-xl border-gray-300 p-3 text-sm" placeholder="Nombre del Evento (ej. Torneo de Invierno)" />
                         
                         <div className="grid grid-cols-2 gap-4">
                             <select value={eventForm.type} onChange={e => setEventForm({...eventForm, type: e.target.value as any})} className="w-full rounded-xl border-gray-300 p-3 text-sm bg-white">
