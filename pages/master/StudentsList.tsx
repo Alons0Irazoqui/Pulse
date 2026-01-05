@@ -2,14 +2,13 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
-import { Student, StudentStatus, PaymentCategory, FinancialRecord } from '../../types';
+import { Student, StudentStatus } from '../../types';
 import { exportToCSV } from '../../utils/csvExport';
 import { useNavigate } from 'react-router-dom';
 import ConfirmationModal from '../../components/ConfirmationModal';
-import { getLocalDate } from '../../utils/dateUtils';
 
 const StudentsList: React.FC = () => {
-  const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, payments, recordPayment } = useStore();
+  const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, payments } = useStore();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,10 +21,6 @@ const StudentsList: React.FC = () => {
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null); 
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   
-  // Quick Cash Modal State
-  const [showCashModal, setShowCashModal] = useState(false);
-  const [cashForm, setCashForm] = useState({ amount: '', concept: 'Mensualidad' });
-
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void, type?: 'danger'|'info'}>({
       isOpen: false, title: '', message: '', action: () => {}
   });
@@ -45,19 +40,29 @@ const StudentsList: React.FC = () => {
       });
   }, [students, searchTerm, filterStatus]);
 
-  // Derived Financial Data for Viewing Student (Reactive)
-  const studentDebts = useMemo(() => {
-      if (!viewingStudent) return [];
-      return payments
-        .filter(p => p.studentId === viewingStudent.id && p.type === 'charge' && p.status === 'charged')
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [viewingStudent, payments]);
-
-  // We find the CURRENT version of the viewing student from the global store to ensure balance is reactive
+  // --- REACTIVE DATA ENGINE ---
+  
+  // 1. Get the LIVE version of the student from the store (to ensure balance updates instantly)
   const reactiveViewingStudent = useMemo(() => {
       if (!viewingStudent) return null;
       return students.find(s => s.id === viewingStudent.id) || viewingStudent;
   }, [students, viewingStudent]);
+
+  // 2. Split Financial History into Charges and Payments (Reactive from global payments)
+  const financialHistory = useMemo(() => {
+      if (!reactiveViewingStudent) return { charges: [], payments: [] };
+      
+      const records = payments.filter(p => p.studentId === reactiveViewingStudent.id);
+      
+      return {
+          charges: records
+              .filter(r => r.type === 'charge')
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+          payments: records
+              .filter(r => r.type === 'payment')
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      };
+  }, [reactiveViewingStudent, payments]);
 
   const handleExport = () => {
       const dataToExport = filteredStudents.map(({ classesId, promotionHistory, ...rest }) => rest);
@@ -168,56 +173,9 @@ const StudentsList: React.FC = () => {
               promoteStudent(viewingStudent.id);
               addToast(`${viewingStudent.name} ha sido promovido`, 'success');
               setConfirmModal(prev => ({...prev, isOpen: false}));
-              setViewingStudent(null); // Close modal to refresh or keep open but logic is handled
+              setViewingStudent(null); 
           }
       });
-  };
-
-  const handleManualCharge = () => {
-      if (!reactiveViewingStudent) return;
-      
-      const charge: FinancialRecord = {
-          id: '', // Will be generated
-          academyId: reactiveViewingStudent.academyId,
-          studentId: reactiveViewingStudent.id,
-          studentName: reactiveViewingStudent.name,
-          amount: academySettings.paymentSettings.monthlyTuition || 0,
-          date: getLocalDate(),
-          type: 'charge',
-          status: 'charged',
-          category: 'Mensualidad',
-          description: `Mensualidad Manual - ${new Date().toLocaleString('es-ES', { month: 'long' })}`,
-          method: 'System'
-      };
-
-      recordPayment(charge);
-      addToast('Cargo generado exitosamente. El saldo se ha actualizado.', 'success');
-  };
-
-  const handleRegisterCashPayment = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!reactiveViewingStudent || !cashForm.amount) return;
-
-      const payment: FinancialRecord = {
-          id: '',
-          academyId: reactiveViewingStudent.academyId,
-          studentId: reactiveViewingStudent.id,
-          studentName: reactiveViewingStudent.name,
-          amount: parseFloat(cashForm.amount),
-          date: getLocalDate(),
-          type: 'payment',
-          status: 'paid', // Instant approval for cash
-          category: 'Mensualidad', // Default, could be selectable
-          description: cashForm.concept || 'Pago en Efectivo',
-          method: 'Efectivo',
-          processedBy: 'Maestro',
-          processedAt: new Date().toISOString()
-      };
-
-      recordPayment(payment);
-      addToast('Pago registrado. Saldo actualizado al instante.', 'success');
-      setShowCashModal(false);
-      setCashForm({ amount: '', concept: 'Mensualidad' });
   };
 
   return (
@@ -469,43 +427,6 @@ const StudentsList: React.FC = () => {
           </div>
       )}
 
-      {/* QUICK CASH MODAL */}
-      {showCashModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
-                  <h3 className="text-xl font-bold text-text-main mb-4">Registrar Cobro en Efectivo</h3>
-                  <form onSubmit={handleRegisterCashPayment} className="flex flex-col gap-4">
-                      <div>
-                          <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Concepto</label>
-                          <input 
-                              required 
-                              value={cashForm.concept} 
-                              onChange={e => setCashForm({...cashForm, concept: e.target.value})} 
-                              className="w-full rounded-xl border-gray-300 p-3 text-sm focus:border-green-500 focus:ring-green-500" 
-                              placeholder="Ej. Mensualidad" 
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Monto ($)</label>
-                          <input 
-                              required 
-                              type="number" 
-                              value={cashForm.amount} 
-                              onChange={e => setCashForm({...cashForm, amount: e.target.value})} 
-                              className="w-full rounded-xl border-gray-300 p-3 text-2xl font-bold text-green-600 focus:border-green-500 focus:ring-green-500" 
-                              placeholder="0.00" 
-                              autoFocus
-                          />
-                      </div>
-                      <div className="flex gap-3 mt-2">
-                          <button type="button" onClick={() => setShowCashModal(false)} className="flex-1 py-3 rounded-xl border border-gray-300 font-bold text-gray-500">Cancelar</button>
-                          <button type="submit" className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold shadow-lg hover:bg-green-700">Cobrar</button>
-                      </div>
-                  </form>
-              </div>
-          </div>
-      )}
-
       {/* STUDENT DETAIL MODAL WITH TABS */}
       {reactiveViewingStudent && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -534,7 +455,7 @@ const StudentsList: React.FC = () => {
                   <div className="pt-14 px-8 border-b border-gray-100 flex gap-6 shrink-0">
                       <button onClick={() => setActiveTab('info')} className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'info' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>General</button>
                       <button onClick={() => setActiveTab('attendance')} className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'attendance' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Historial Asistencia</button>
-                      <button onClick={() => setActiveTab('finance')} className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'finance' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Finanzas ({studentDebts.length})</button>
+                      <button onClick={() => setActiveTab('finance')} className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'finance' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Finanzas ({financialHistory.charges.length + financialHistory.payments.length})</button>
                   </div>
 
                   <div className="p-8 overflow-y-auto">
@@ -650,9 +571,10 @@ const StudentsList: React.FC = () => {
                           </div>
                       )}
 
-                      {/* --- TAB: FINANCE --- */}
+                      {/* --- TAB: FINANCE (REFACTORED) --- */}
                       {activeTab === 'finance' && (
-                          <div className="space-y-6">
+                          <div className="space-y-8">
+                              {/* Balance Card */}
                               {reactiveViewingStudent.balance > 0 ? (
                                   <div className="bg-red-50 p-6 rounded-2xl border border-red-100 flex justify-between items-center">
                                       <div className="flex items-center gap-4">
@@ -678,38 +600,64 @@ const StudentsList: React.FC = () => {
                                   </div>
                               )}
 
-                              <div>
-                                  <div className="flex justify-between items-end mb-3">
-                                      <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Detalle de Cargos (Deuda Activa)</h4>
-                                      <div className="flex gap-2">
-                                          <button 
-                                              onClick={handleManualCharge}
-                                              className="text-xs font-bold bg-white border border-gray-200 text-text-main px-3 py-1.5 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-1"
-                                          >
-                                              <span className="material-symbols-outlined text-[14px]">add</span>
-                                              Generar Cargo
-                                          </button>
-                                          <button 
-                                              onClick={() => setShowCashModal(true)}
-                                              className="text-xs font-bold bg-green-600 text-white px-3 py-1.5 rounded-lg shadow-sm hover:bg-green-700 transition-colors flex items-center gap-1 shadow-green-500/20"
-                                          >
-                                              <span className="material-symbols-outlined text-[14px]">payments</span>
-                                              Registrar Pago (Efectivo)
-                                          </button>
+                              {/* Navigation Hint */}
+                              <div className="flex justify-end">
+                                  <button 
+                                      onClick={() => navigate('/master/finance')}
+                                      className="text-sm font-bold text-primary hover:text-primary-hover flex items-center gap-1 bg-blue-50 px-4 py-2 rounded-lg transition-colors"
+                                  >
+                                      Ir al Módulo Financiero
+                                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                  </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                  {/* Charges Column */}
+                                  <div className="space-y-4">
+                                      <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider border-b border-gray-100 pb-2">
+                                          Historial de Cargos
+                                      </h4>
+                                      <div className="space-y-2">
+                                          {financialHistory.charges.map(charge => (
+                                              <div key={charge.id} className="p-3 bg-gray-50 border border-gray-100 rounded-xl flex justify-between items-center">
+                                                  <div>
+                                                      <p className="font-bold text-text-main text-sm">{charge.category}</p>
+                                                      <p className="text-xs text-text-secondary">{charge.description} • {new Date(charge.date).toLocaleDateString()}</p>
+                                                  </div>
+                                                  <p className="font-bold text-red-500 text-sm">-${charge.amount.toFixed(2)}</p>
+                                              </div>
+                                          ))}
+                                          {financialHistory.charges.length === 0 && <p className="text-xs text-gray-400">Sin cargos registrados.</p>}
                                       </div>
                                   </div>
-                                  <div className="space-y-2">
-                                      {studentDebts.length > 0 ? studentDebts.map(debt => (
-                                          <div key={debt.id} className="flex justify-between items-center p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
-                                              <div>
-                                                  <p className="font-bold text-text-main text-sm">{debt.category}</p>
-                                                  <p className="text-xs text-text-secondary">{debt.description} • {new Date(debt.date).toLocaleDateString()}</p>
+
+                                  {/* Payments Column */}
+                                  <div className="space-y-4">
+                                      <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider border-b border-gray-100 pb-2">
+                                          Historial de Pagos
+                                      </h4>
+                                      <div className="space-y-2">
+                                          {financialHistory.payments.map(payment => (
+                                              <div key={payment.id} className="p-3 bg-white border border-gray-200 rounded-xl flex justify-between items-center shadow-sm">
+                                                  <div>
+                                                      <div className="flex items-center gap-2">
+                                                          <p className="font-bold text-text-main text-sm">{payment.method || 'Pago'}</p>
+                                                          {/* Status Badge */}
+                                                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                                              payment.status === 'paid' ? 'bg-green-100 text-green-700' :
+                                                              payment.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-700' :
+                                                              'bg-red-100 text-red-700'
+                                                          }`}>
+                                                              {payment.status === 'paid' ? 'Aprobado' : payment.status === 'pending_approval' ? 'Pendiente' : 'Rechazado'}
+                                                          </span>
+                                                      </div>
+                                                      <p className="text-xs text-text-secondary">{new Date(payment.date).toLocaleDateString()}</p>
+                                                  </div>
+                                                  <p className="font-bold text-green-600 text-sm">+${payment.amount.toFixed(2)}</p>
                                               </div>
-                                              <p className="font-bold text-red-500">${debt.amount.toFixed(2)}</p>
-                                          </div>
-                                      )) : (
-                                          <p className="text-center py-8 text-gray-400 text-sm">No hay cargos pendientes.</p>
-                                      )}
+                                          ))}
+                                          {financialHistory.payments.length === 0 && <p className="text-xs text-gray-400">Sin pagos registrados.</p>}
+                                      </div>
                                   </div>
                               </div>
                           </div>

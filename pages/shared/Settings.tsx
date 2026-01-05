@@ -33,6 +33,9 @@ const Settings: React.FC = () => {
       isOpen: false, title: '', message: '', action: () => {}
   });
 
+  // Validation State for Billing Dates
+  const isValidBillingDates = academyData.paymentSettings.lateFeeDay > academyData.paymentSettings.billingDay;
+
   const handleProfileSave = (e: React.FormEvent) => {
       e.preventDefault();
       updateUserProfile({ name: profileData.name, avatarUrl: profileData.avatarUrl });
@@ -56,6 +59,12 @@ const Settings: React.FC = () => {
 
   const handleAcademySave = (e: React.FormEvent) => {
       e.preventDefault();
+      
+      if (!isValidBillingDates) {
+          addToast('Error en configuración: El día de recargo debe ser posterior al día de cobro.', 'error');
+          return;
+      }
+
       updateAcademySettings({ ...academyData, bankDetails: bankData });
       addToast('Configuración guardada exitosamente', 'success');
   };
@@ -132,6 +141,9 @@ const Settings: React.FC = () => {
       { value: 'brown', label: 'Marrón', bg: 'bg-amber-800' },
       { value: 'black', label: 'Negro', bg: 'bg-gray-900' },
   ];
+
+  // Days 1-28 for billing
+  const billingDays = Array.from({ length: 28 }, (_, i) => i + 1);
 
   return (
     <div className="max-w-5xl mx-auto p-6 md:p-10 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
@@ -269,6 +281,62 @@ const Settings: React.FC = () => {
                           </div>
                       </div>
 
+                      {/* Billing Automation Settings */}
+                      <div className={`bg-white rounded-3xl p-8 shadow-card border transition-colors ${!isValidBillingDates ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
+                          <div className="flex justify-between items-end mb-6">
+                              <div>
+                                  <h3 className="text-lg font-bold text-text-main flex items-center gap-2">
+                                      <span className="material-symbols-outlined text-gray-400">avg_pace</span>
+                                      Automatización de Cobros
+                                  </h3>
+                                  <p className="text-xs text-text-secondary mt-1">Configura las fechas en que el sistema generará cargos automáticamente.</p>
+                              </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-2">
+                                  <label className="text-sm font-semibold text-text-main">Día de Cobro Mensual (Día de Corte)</label>
+                                  <div className="relative">
+                                      <select 
+                                          value={academyData.paymentSettings.billingDay} 
+                                          onChange={e => setAcademyData({...academyData, paymentSettings: {...academyData.paymentSettings, billingDay: parseInt(e.target.value)}})}
+                                          className="w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary focus:ring-primary appearance-none cursor-pointer"
+                                      >
+                                          {billingDays.map(day => (
+                                              <option key={`bill-${day}`} value={day}>Día {day}</option>
+                                          ))}
+                                      </select>
+                                      <span className="absolute right-4 top-3 text-gray-400 pointer-events-none material-symbols-outlined text-sm">calendar_month</span>
+                                  </div>
+                                  <p className="text-[10px] text-gray-500">Se generará la deuda de mensualidad a todos los alumnos activos.</p>
+                              </div>
+
+                              <div className="space-y-2">
+                                  <label className="text-sm font-semibold text-text-main">Día de Aplicación de Recargo</label>
+                                  <div className="relative">
+                                      <select 
+                                          value={academyData.paymentSettings.lateFeeDay} 
+                                          onChange={e => setAcademyData({...academyData, paymentSettings: {...academyData.paymentSettings, lateFeeDay: parseInt(e.target.value)}})}
+                                          className={`w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary focus:ring-primary appearance-none cursor-pointer ${!isValidBillingDates ? 'border-red-300 text-red-600 bg-red-50' : ''}`}
+                                      >
+                                          {billingDays.map(day => (
+                                              <option key={`late-${day}`} value={day}>Día {day}</option>
+                                          ))}
+                                      </select>
+                                      <span className="absolute right-4 top-3 text-gray-400 pointer-events-none material-symbols-outlined text-sm">warning</span>
+                                  </div>
+                                  <p className="text-[10px] text-gray-500">Si el alumno tiene deuda este día, se sumará el cargo por mora.</p>
+                              </div>
+                          </div>
+
+                          {!isValidBillingDates && (
+                              <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-xl flex items-center gap-2 text-red-700 text-xs font-bold animate-in fade-in slide-in-from-top-2">
+                                  <span className="material-symbols-outlined text-sm">error</span>
+                                  El día de recargo debe ser posterior al día de cobro mensual.
+                              </div>
+                          )}
+                      </div>
+
                       {/* Bank Details */}
                       <div className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
                           <h3 className="text-lg font-bold text-text-main mb-6">Información Bancaria (Para Alumnos)</h3>
@@ -376,7 +444,13 @@ const Settings: React.FC = () => {
                       </div>
 
                       <div className="flex justify-end pt-4">
-                          <button type="submit" className="px-8 py-3 rounded-xl bg-primary text-white text-sm font-bold shadow-lg hover:bg-primary-hover transform transition-all active:scale-95">Guardar Configuración</button>
+                          <button 
+                            type="submit" 
+                            disabled={!isValidBillingDates}
+                            className={`px-8 py-3 rounded-xl text-white text-sm font-bold shadow-lg transform transition-all active:scale-95 ${!isValidBillingDates ? 'bg-gray-400 cursor-not-allowed shadow-none' : 'bg-primary hover:bg-primary-hover'}`}
+                          >
+                              Guardar Configuración
+                          </button>
                       </div>
                   </form>
               )}
