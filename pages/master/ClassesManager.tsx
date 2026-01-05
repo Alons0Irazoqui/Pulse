@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { ClassCategory, SessionModification, Event } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useConfirmation } from '../../context/ConfirmationContext';
 import { useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const ClassesManager: React.FC = () => {
-  const { classes, events, addClass, updateClass, deleteClass, modifyClassSession, addEvent, deleteEvent } = useStore();
+  const { classes, events, students, addClass, updateClass, deleteClass, modifyClassSession, addEvent, updateEvent, deleteEvent, updateEventRegistrants } = useStore();
   const { addToast } = useToast();
   const { confirm } = useConfirmation();
   const navigate = useNavigate();
@@ -18,8 +19,9 @@ const ClassesManager: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
 
-  // -- EVENT MODALS --
+  // -- EVENT MANAGEMENT STATES --
   const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   
   // -- CALENDAR MANAGER STATES --
   const [managingClassId, setManagingClassId] = useState<string | null>(null);
@@ -46,6 +48,12 @@ const ClassesManager: React.FC = () => {
   const [eventForm, setEventForm] = useState({
       title: '', date: '', time: '', type: 'exam' as Event['type'], description: '', capacity: 50
   });
+
+  // Event Side Panel States
+  const [activeEventId, setActiveEventId] = useState<string | null>(null);
+  const activeEvent = events.find(e => e.id === activeEventId);
+  const [attendeeSearch, setAttendeeSearch] = useState('');
+  const [eventPanelTab, setEventPanelTab] = useState<'info' | 'attendees'>('info');
 
   const daysOptions = [
       { key: 'Monday', label: 'Lun', full: 'Lunes' },
@@ -150,9 +158,71 @@ const ClassesManager: React.FC = () => {
           title: 'Eliminar Evento',
           message: '¿Estás seguro de eliminar este evento?',
           type: 'danger',
-          onConfirm: () => deleteEvent(id)
+          onConfirm: () => {
+              deleteEvent(id);
+              setActiveEventId(null);
+          }
       });
   };
+
+  const handleUpdateEventDetails = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (activeEvent) {
+          // Here we assume activeEvent is linked to state via eventForm logic or we update directly
+          // For simplicity in this panel, we'll implement a direct update via form binding if needed
+          // But for now, let's just trigger a toast as strict update logic usually binds to a form state
+          // Re-using addEvent/updateEvent logic:
+          updateEvent(activeEvent); 
+          // Note: In a real app, inputs would be controlled. 
+          // For this demo, let's assume direct mutation via inputs in the drawer updating a local state
+          addToast('Evento actualizado', 'success');
+      }
+  };
+
+  // --- ATTENDEE MANAGEMENT LOGIC ---
+  const handleToggleAttendee = (studentId: string) => {
+      if (!activeEvent) return;
+      const currentRegistrants = activeEvent.registrants || [];
+      let newRegistrants;
+      
+      if (currentRegistrants.includes(studentId)) {
+          newRegistrants = currentRegistrants.filter(id => id !== studentId);
+      } else {
+          // Check capacity
+          if (currentRegistrants.length >= activeEvent.capacity) {
+              addToast('Cupo lleno', 'error');
+              return;
+          }
+          newRegistrants = [...currentRegistrants, studentId];
+      }
+      
+      updateEventRegistrants(activeEvent.id, newRegistrants);
+  };
+
+  const sortedStudentsForEvent = useMemo(() => {
+      if (!activeEvent) return [];
+      
+      return students.filter(s => 
+          s.status !== 'inactive' && 
+          s.name.toLowerCase().includes(attendeeSearch.toLowerCase())
+      ).sort((a, b) => {
+          // Priority 1: Already Registered
+          const aReg = activeEvent.registrants?.includes(a.id) ? 1 : 0;
+          const bReg = activeEvent.registrants?.includes(b.id) ? 1 : 0;
+          if (aReg !== bReg) return bReg - aReg; // Registered first
+
+          // Priority 2: Exam Ready (only if event is exam)
+          if (activeEvent.type === 'exam') {
+              const aReady = a.status === 'exam_ready' ? 1 : 0;
+              const bReady = b.status === 'exam_ready' ? 1 : 0;
+              if (aReady !== bReady) return bReady - aReady;
+          }
+
+          // Priority 3: Alphabetical
+          return a.name.localeCompare(b.name);
+      });
+  }, [students, activeEvent, attendeeSearch]);
+
 
   // --- CALENDAR LOGIC ---
 
@@ -250,17 +320,17 @@ const ClassesManager: React.FC = () => {
 
   const getEventTypeLabel = (type: string) => {
       switch(type) {
-          case 'exam': return { label: 'Examen de Grado', color: 'bg-purple-100 text-purple-700' };
-          case 'tournament': return { label: 'Torneo', color: 'bg-orange-100 text-orange-700' };
-          case 'seminar': return { label: 'Seminario', color: 'bg-blue-100 text-blue-700' };
-          default: return { label: 'Evento', color: 'bg-gray-100 text-gray-700' };
+          case 'exam': return { label: 'Examen de Grado', color: 'bg-purple-100 text-purple-700', icon: 'workspace_premium' };
+          case 'tournament': return { label: 'Torneo', color: 'bg-orange-100 text-orange-700', icon: 'emoji_events' };
+          case 'seminar': return { label: 'Seminario', color: 'bg-blue-100 text-blue-700', icon: 'school' };
+          default: return { label: 'Evento', color: 'bg-gray-100 text-gray-700', icon: 'event' };
       }
   };
 
   // --- RENDER ---
 
   return (
-    <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full h-full flex flex-col font-sans">
+    <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full h-full flex flex-col font-sans relative">
         {/* Header with Tabs */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-6">
             <div>
@@ -359,7 +429,7 @@ const ClassesManager: React.FC = () => {
             </div>
         )}
 
-        {/* --- EVENTS TAB CONTENT --- */}
+        {/* --- EVENTS TAB CONTENT (Updated Card Design) --- */}
         {activeTab === 'events' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex justify-end mb-6">
@@ -368,7 +438,7 @@ const ClassesManager: React.FC = () => {
                         className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-primary/25 flex items-center gap-2 transition-all active:scale-95"
                     >
                         <span className="material-symbols-outlined">add_circle</span>
-                        Crear Evento / Torneo
+                        Publicar Nuevo Evento
                     </button>
                  </div>
 
@@ -382,35 +452,50 @@ const ClassesManager: React.FC = () => {
                     ) : (
                         events.map(event => {
                             const typeInfo = getEventTypeLabel(event.type);
+                            const percentFull = Math.min(((event.registeredCount || 0) / event.capacity) * 100, 100);
+                            
                             return (
-                                <div key={event.id} className="bg-white p-6 rounded-[2rem] shadow-card border border-gray-100 flex flex-col relative group">
-                                     <button onClick={() => handleDeleteEvent(event.id)} className="absolute top-4 right-4 size-8 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full flex items-center justify-center transition-colors">
-                                        <span className="material-symbols-outlined text-sm">delete</span>
+                                <div key={event.id} className="bg-white p-6 rounded-[2rem] shadow-card border border-gray-100 flex flex-col relative group hover:shadow-xl transition-all">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="flex gap-4">
+                                            <div className="flex flex-col items-center justify-center w-16 h-16 bg-gray-50 rounded-2xl border border-gray-200 shrink-0">
+                                                <span className="text-xs font-bold text-red-500 uppercase">{new Date(event.date).toLocaleString('es-ES', { month: 'short' })}</span>
+                                                <span className="text-2xl font-black text-text-main leading-none">{new Date(event.date).getDate()}</span>
+                                            </div>
+                                            <div>
+                                                <div className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mb-1 ${typeInfo.color}`}>
+                                                    <span className="material-symbols-outlined text-[12px]">{typeInfo.icon}</span>
+                                                    {typeInfo.label}
+                                                </div>
+                                                <h3 className="text-xl font-bold text-text-main leading-tight line-clamp-1">{event.title}</h3>
+                                                <p className="text-sm text-text-secondary mt-0.5 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[14px]">schedule</span> {event.time}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Capacity Progress */}
+                                    <div className="mb-6">
+                                        <div className="flex justify-between text-xs font-bold text-text-secondary mb-1">
+                                            <span>Cupo</span>
+                                            <span className={`${percentFull >= 100 ? 'text-red-500' : 'text-text-main'}`}>{event.registeredCount || 0} / {event.capacity}</span>
+                                        </div>
+                                        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                                            <div 
+                                                className={`h-full rounded-full transition-all duration-500 ${percentFull >= 100 ? 'bg-red-500' : 'bg-primary'}`} 
+                                                style={{ width: `${percentFull}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => { setActiveEventId(event.id); setEventPanelTab('info'); }}
+                                        className="mt-auto w-full py-3 rounded-xl border border-gray-200 bg-white text-text-main font-bold hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                                    >
+                                        <span className="material-symbols-outlined">settings</span>
+                                        Gestionar Inscritos
                                     </button>
-                                    
-                                    <div className="flex gap-4 mb-4">
-                                        <div className="flex flex-col items-center justify-center w-16 bg-gray-50 rounded-2xl border border-gray-200">
-                                            <span className="text-xs font-bold text-red-500 uppercase">{new Date(event.date).toLocaleString('es-ES', { month: 'short' })}</span>
-                                            <span className="text-2xl font-black text-text-main">{new Date(event.date).getDate()}</span>
-                                        </div>
-                                        <div>
-                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${typeInfo.color}`}>{typeInfo.label}</span>
-                                            <h3 className="text-xl font-bold text-text-main leading-tight mt-1">{event.title}</h3>
-                                        </div>
-                                    </div>
-
-                                    <p className="text-sm text-text-secondary mb-6 line-clamp-2">{event.description}</p>
-
-                                    <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-50">
-                                        <div className="flex items-center gap-2 text-sm font-semibold text-text-main">
-                                            <span className="material-symbols-outlined text-gray-400">schedule</span>
-                                            {event.time}
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm font-semibold text-text-main">
-                                            <span className="material-symbols-outlined text-gray-400">group</span>
-                                            {event.registeredCount || 0} / {event.capacity}
-                                        </div>
-                                    </div>
                                 </div>
                             );
                         })
@@ -418,6 +503,186 @@ const ClassesManager: React.FC = () => {
                  </div>
             </div>
         )}
+
+        {/* --- SIDE PANEL: EVENT MANAGEMENT --- */}
+        <AnimatePresence>
+            {activeEvent && (
+                <>
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setActiveEventId(null)}
+                        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+                    />
+                    <motion.div 
+                        initial={{ x: '100%' }}
+                        animate={{ x: 0 }}
+                        exit={{ x: '100%' }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl border-l border-gray-100 flex flex-col"
+                    >
+                        {/* Panel Header */}
+                        <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-start">
+                            <div>
+                                <h2 className="text-2xl font-bold text-text-main">{activeEvent.title}</h2>
+                                <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm">event</span>
+                                    {new Date(activeEvent.date).toLocaleDateString()} a las {activeEvent.time}
+                                </p>
+                            </div>
+                            <button onClick={() => setActiveEventId(null)} className="p-2 hover:bg-gray-200 rounded-full text-text-secondary transition-colors">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="flex border-b border-gray-200 px-6">
+                            <button 
+                                onClick={() => setEventPanelTab('info')}
+                                className={`py-4 px-4 text-sm font-bold border-b-2 transition-colors ${eventPanelTab === 'info' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-main'}`}
+                            >
+                                Editar Detalles
+                            </button>
+                            <button 
+                                onClick={() => setEventPanelTab('attendees')}
+                                className={`py-4 px-4 text-sm font-bold border-b-2 transition-colors ${eventPanelTab === 'attendees' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-main'}`}
+                            >
+                                Inscritos ({activeEvent.registeredCount})
+                            </button>
+                        </div>
+
+                        {/* Panel Content */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {eventPanelTab === 'info' ? (
+                                <form onSubmit={(e) => { e.preventDefault(); updateEvent(activeEvent); addToast('Cambios guardados', 'success'); }} className="flex flex-col gap-5">
+                                    <div>
+                                        <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Nombre del Evento</label>
+                                        <input 
+                                            value={activeEvent.title} 
+                                            onChange={e => updateEvent({...activeEvent, title: e.target.value})}
+                                            className="w-full rounded-xl border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary" 
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Fecha</label>
+                                            <input 
+                                                type="date"
+                                                value={activeEvent.date} 
+                                                onChange={e => updateEvent({...activeEvent, date: e.target.value})}
+                                                className="w-full rounded-xl border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary" 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Hora</label>
+                                            <input 
+                                                type="time"
+                                                value={activeEvent.time} 
+                                                onChange={e => updateEvent({...activeEvent, time: e.target.value})}
+                                                className="w-full rounded-xl border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary" 
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Descripción</label>
+                                        <textarea 
+                                            value={activeEvent.description} 
+                                            onChange={e => updateEvent({...activeEvent, description: e.target.value})}
+                                            rows={4}
+                                            className="w-full rounded-xl border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Capacidad</label>
+                                        <input 
+                                            type="number"
+                                            value={activeEvent.capacity} 
+                                            onChange={e => updateEvent({...activeEvent, capacity: parseInt(e.target.value)})}
+                                            className="w-full rounded-xl border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary" 
+                                        />
+                                    </div>
+                                    
+                                    <div className="pt-6 mt-auto flex flex-col gap-3">
+                                        <button className="w-full py-3 rounded-xl bg-black text-white font-bold hover:opacity-90 transition-all">
+                                            Guardar Cambios
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleDeleteEvent(activeEvent.id)}
+                                            className="w-full py-3 rounded-xl border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-all"
+                                        >
+                                            Eliminar Evento
+                                        </button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <div className="flex flex-col gap-4 h-full">
+                                    <div className="relative">
+                                        <span className="material-symbols-outlined absolute left-3 top-3 text-gray-400">search</span>
+                                        <input 
+                                            placeholder="Buscar alumno para inscribir..." 
+                                            value={attendeeSearch}
+                                            onChange={e => setAttendeeSearch(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-3 rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:border-primary transition-all text-sm"
+                                        />
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                                        {sortedStudentsForEvent.map(student => {
+                                            const isRegistered = activeEvent.registrants?.includes(student.id);
+                                            const isReady = student.status === 'exam_ready';
+                                            
+                                            return (
+                                                <div 
+                                                    key={student.id} 
+                                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                                        isRegistered 
+                                                        ? 'bg-blue-50 border-blue-200' 
+                                                        : isReady && activeEvent.type === 'exam'
+                                                            ? 'bg-yellow-50 border-yellow-200'
+                                                            : 'bg-white border-gray-100 hover:border-gray-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <img src={student.avatarUrl} className="size-10 rounded-full bg-gray-200 object-cover" />
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-sm font-bold text-text-main">{student.name}</p>
+                                                                {isReady && activeEvent.type === 'exam' && (
+                                                                    <span className="text-[9px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold uppercase">Listo</span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs text-text-secondary">{student.rank}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <button 
+                                                        onClick={() => handleToggleAttendee(student.id)}
+                                                        className={`size-8 rounded-full flex items-center justify-center transition-all ${
+                                                            isRegistered 
+                                                            ? 'bg-red-100 text-red-600 hover:bg-red-200' 
+                                                            : 'bg-gray-100 text-gray-400 hover:bg-green-100 hover:text-green-600'
+                                                        }`}
+                                                    >
+                                                        <span className="material-symbols-outlined text-lg">
+                                                            {isRegistered ? 'remove' : 'add'}
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                        {sortedStudentsForEvent.length === 0 && (
+                                            <p className="text-center text-gray-400 text-sm py-4">No se encontraron alumnos.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                </>
+            )}
+        </AnimatePresence>
 
         {/* --- FULL SCREEN CALENDAR OVERLAY (Apple Style) --- */}
         {managingClass && (

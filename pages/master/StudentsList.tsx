@@ -5,6 +5,8 @@ import { useConfirmation } from '../../context/ConfirmationContext';
 import { Student, StudentStatus } from '../../types';
 import { exportToCSV } from '../../utils/csvExport';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import EmptyState from '../../components/ui/EmptyState';
 
 const StudentsList: React.FC = () => {
   const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, payments, isLoading } = useStore();
@@ -27,6 +29,22 @@ const StudentsList: React.FC = () => {
   };
   const [formData, setFormData] = useState(initialFormState);
 
+  // Animation Variants
+  const containerVariants = {
+      hidden: { opacity: 0 },
+      show: {
+          opacity: 1,
+          transition: {
+              staggerChildren: 0.05
+          }
+      }
+  };
+
+  const itemVariants = {
+      hidden: { opacity: 0, y: 20 },
+      show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
   // Filter Students
   const filteredStudents = useMemo(() => {
       return students.filter(student => {
@@ -39,14 +57,11 @@ const StudentsList: React.FC = () => {
   }, [students, searchTerm, filterStatus, filterRank]);
 
   // --- REACTIVE DATA ENGINE ---
-  
-  // 1. Get the LIVE version of the student from the store (to ensure balance updates instantly)
   const reactiveViewingStudent = useMemo(() => {
       if (!viewingStudent) return null;
       return students.find(s => s.id === viewingStudent.id) || viewingStudent;
   }, [students, viewingStudent]);
 
-  // 2. Split Financial History into Charges and Payments (Reactive from global payments)
   const financialHistory = useMemo(() => {
       if (!reactiveViewingStudent) return { charges: [], payments: [] };
       
@@ -190,32 +205,6 @@ const StudentsList: React.FC = () => {
       </div>
   );
 
-  const SkeletonTable = () => (
-      <div className="bg-white rounded-[1.5rem] shadow-card border border-gray-100 overflow-hidden">
-          <table className="w-full text-left">
-              <thead className="bg-gray-50/80 border-b border-gray-100">
-                  <tr>
-                      {['Alumno', 'Rango', 'Estado', 'Asistencia', 'Saldo', 'Acciones'].map((h, i) => (
-                          <th key={i} className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">{h}</th>
-                      ))}
-                  </tr>
-              </thead>
-              <tbody>
-                  {Array.from({ length: 5 }).map((_, i) => (
-                      <tr key={i} className="animate-pulse">
-                          <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="size-10 rounded-full bg-gray-200"></div><div className="space-y-1"><div className="h-3 w-24 bg-gray-200 rounded"></div><div className="h-2 w-16 bg-gray-200 rounded"></div></div></div></td>
-                          <td className="px-6 py-4"><div className="h-3 w-20 bg-gray-200 rounded mb-1"></div><div className="h-2 w-12 bg-gray-200 rounded"></div></td>
-                          <td className="px-6 py-4"><div className="h-5 w-16 bg-gray-200 rounded-full"></div></td>
-                          <td className="px-6 py-4"><div className="h-2 w-32 bg-gray-200 rounded-full"></div></td>
-                          <td className="px-6 py-4 text-right"><div className="h-3 w-12 bg-gray-200 rounded ml-auto"></div></td>
-                          <td className="px-6 py-4"></td>
-                      </tr>
-                  ))}
-              </tbody>
-          </table>
-      </div>
-  );
-
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:px-10 h-full">
       <div className="max-w-[1600px] mx-auto flex flex-col gap-8">
@@ -231,14 +220,14 @@ const StudentsList: React.FC = () => {
               <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-200">
                   <button 
                     onClick={() => setViewMode('grid')}
-                    className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-gray-100 text-primary shadow-sm' : 'text-text-secondary hover:bg-gray-50'}`}
+                    className={`p-2 rounded-lg transition-all active:scale-95 ${viewMode === 'grid' ? 'bg-gray-100 text-primary shadow-sm' : 'text-text-secondary hover:bg-gray-50'}`}
                     title="Vista Cuadrícula"
                   >
                       <span className="material-symbols-outlined">grid_view</span>
                   </button>
                   <button 
                     onClick={() => setViewMode('table')}
-                    className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-gray-100 text-primary shadow-sm' : 'text-text-secondary hover:bg-gray-50'}`}
+                    className={`p-2 rounded-lg transition-all active:scale-95 ${viewMode === 'table' ? 'bg-gray-100 text-primary shadow-sm' : 'text-text-secondary hover:bg-gray-50'}`}
                     title="Vista Tabla"
                   >
                       <span className="material-symbols-outlined">table_rows</span>
@@ -246,7 +235,7 @@ const StudentsList: React.FC = () => {
               </div>
 
               {/* Create Button */}
-              <button onClick={handleCreate} className="bg-primary hover:bg-primary-hover text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2">
+              <button onClick={handleCreate} className="bg-primary hover:bg-primary-hover text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2 active:scale-95">
                 <span className="material-symbols-outlined">person_add</span> 
                 <span className="hidden sm:inline">Nuevo Alumno</span>
               </button>
@@ -268,7 +257,6 @@ const StudentsList: React.FC = () => {
                 </div>
                 <div className="w-px h-8 bg-gray-200 hidden md:block"></div>
                 <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide items-center">
-                    {/* Rank Filter Dropdown */}
                     <div className="relative">
                         <select 
                             value={filterRank}
@@ -289,7 +277,7 @@ const StudentsList: React.FC = () => {
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-all border ${
+                            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-all border active:scale-95 ${
                                 filterStatus === status 
                                 ? 'bg-black text-white border-black' 
                                 : 'bg-white text-text-secondary border-gray-200 hover:bg-gray-50'
@@ -304,123 +292,149 @@ const StudentsList: React.FC = () => {
 
         {/* --- CONTENT --- */}
         {isLoading ? (
-            viewMode === 'grid' ? <SkeletonGrid /> : <SkeletonTable />
+            <SkeletonGrid />
         ) : (
             <>
-                {viewMode === 'grid' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                        {filteredStudents.map((student) => (
-                            <div key={student.id} className="bg-white p-6 rounded-[1.5rem] shadow-card border border-gray-100 flex flex-col gap-4 group hover:-translate-y-1 transition-all relative overflow-hidden">
-                                {/* Status Badge */}
-                                <div className={`absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(student.status)}`}>
-                                    {getStatusLabel(student.status)}
-                                </div>
+                {filteredStudents.length === 0 ? (
+                    <EmptyState 
+                        title="No se encontraron alumnos"
+                        description="Intenta ajustar los filtros de búsqueda o agrega un nuevo alumno a tu academia."
+                        icon="person_search"
+                        action={
+                            <button onClick={handleCreate} className="mt-4 text-primary font-bold text-sm hover:underline">
+                                Agregar Nuevo Alumno
+                            </button>
+                        }
+                    />
+                ) : (
+                    <>
+                        {viewMode === 'grid' && (
+                            <motion.div 
+                                variants={containerVariants}
+                                initial="hidden"
+                                animate="show"
+                                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                            >
+                                {filteredStudents.map((student) => (
+                                    <motion.div 
+                                        key={student.id} 
+                                        variants={itemVariants}
+                                        className="bg-white p-6 rounded-[1.5rem] shadow-card border border-gray-100 flex flex-col gap-4 group hover:-translate-y-1 transition-all relative overflow-hidden"
+                                    >
+                                        <div className={`absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(student.status)}`}>
+                                            {getStatusLabel(student.status)}
+                                        </div>
 
-                                <div className="flex gap-4 items-center">
-                                    <img src={student.avatarUrl} className="size-16 rounded-2xl object-cover bg-gray-100 shadow-sm" />
-                                    <div>
-                                        <h3 className="text-lg font-bold text-text-main leading-tight line-clamp-1">{student.name}</h3>
-                                        <p className="text-sm text-text-secondary font-medium">{student.rank}</p>
-                                    </div>
-                                </div>
-                                
-                                <div className="space-y-1">
-                                    <div className="flex justify-between text-xs text-text-secondary font-semibold">
-                                        <span>Asistencia</span>
-                                        <span>{student.attendance} Clases</span>
-                                    </div>
-                                    <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                                        <div className="bg-primary h-full rounded-full" style={{width: `${Math.min(student.attendance, 100)}%`}}></div>
-                                    </div>
-                                </div>
-                                
-                                {/* Action Buttons */}
-                                <div className="flex justify-end gap-2 pt-4 border-t border-gray-50 mt-auto">
-                                    <button onClick={(e) => handleViewDetails(student, e)} className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors" title="Ver Perfil">
-                                        <span className="material-symbols-outlined text-[20px]">visibility</span>
-                                    </button>
-                                    <button onClick={(e) => handleEdit(student, e)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-text-main transition-colors" title="Editar">
-                                        <span className="material-symbols-outlined text-[20px]">edit</span>
-                                    </button>
-                                    <button onClick={(e) => handleDelete(student.id, e)} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-colors" title="Eliminar">
-                                        <span className="material-symbols-outlined text-[20px]">delete</span>
-                                    </button>
+                                        <div className="flex gap-4 items-center">
+                                            <img src={student.avatarUrl} className="size-16 rounded-2xl object-cover bg-gray-100 shadow-sm" />
+                                            <div>
+                                                <h3 className="text-lg font-bold text-text-main leading-tight line-clamp-1">{student.name}</h3>
+                                                <p className="text-sm text-text-secondary font-medium">{student.rank}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-xs text-text-secondary font-semibold">
+                                                <span>Asistencia</span>
+                                                <span>{student.attendance} Clases</span>
+                                            </div>
+                                            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                                                <div className="bg-primary h-full rounded-full" style={{width: `${Math.min(student.attendance, 100)}%`}}></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex justify-end gap-2 pt-4 border-t border-gray-50 mt-auto">
+                                            <button onClick={(e) => handleViewDetails(student, e)} className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors active:scale-90" title="Ver Perfil">
+                                                <span className="material-symbols-outlined text-[20px]">visibility</span>
+                                            </button>
+                                            <button onClick={(e) => handleEdit(student, e)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-text-main transition-colors active:scale-90" title="Editar">
+                                                <span className="material-symbols-outlined text-[20px]">edit</span>
+                                            </button>
+                                            <button onClick={(e) => handleDelete(student.id, e)} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-colors active:scale-90" title="Eliminar">
+                                                <span className="material-symbols-outlined text-[20px]">delete</span>
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </motion.div>
+                        )}
+
+                        {viewMode === 'table' && (
+                            <div className="bg-white rounded-[1.5rem] shadow-card border border-gray-100 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-gray-50/80 border-b border-gray-100">
+                                            <tr>
+                                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Alumno</th>
+                                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Rango & Programa</th>
+                                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
+                                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Asistencia</th>
+                                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Saldo</th>
+                                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <motion.tbody 
+                                            variants={containerVariants}
+                                            initial="hidden"
+                                            animate="show"
+                                            className="divide-y divide-gray-50"
+                                        >
+                                            {filteredStudents.map((student) => (
+                                                <motion.tr 
+                                                    variants={itemVariants}
+                                                    key={student.id} 
+                                                    className="hover:bg-blue-50/30 transition-colors group cursor-pointer" 
+                                                    onClick={(e) => handleViewDetails(student, e)}
+                                                >
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <img src={student.avatarUrl} className="size-10 rounded-full object-cover bg-gray-100" />
+                                                            <div>
+                                                                <p className="font-bold text-sm text-text-main">{student.name}</p>
+                                                                <p className="text-xs text-text-secondary">{student.email}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <p className="font-semibold text-sm text-text-main">{student.rank}</p>
+                                                        <p className="text-xs text-text-secondary">{student.program}</p>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(student.status)}`}>
+                                                            {getStatusLabel(student.status)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 w-48">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex-1 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                                                                <div className="bg-primary h-full rounded-full" style={{width: `${Math.min(student.attendance, 100)}%`}}></div>
+                                                            </div>
+                                                            <span className="text-xs font-bold text-text-secondary">{student.attendance}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <span className={`font-bold text-sm ${student.balance > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                                            ${student.balance.toFixed(2)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button onClick={(e) => handleEdit(student, e)} className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-primary transition-colors active:scale-90">
+                                                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                            </button>
+                                                            <button onClick={(e) => handleDelete(student.id, e)} className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors active:scale-90">
+                                                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </motion.tr>
+                                            ))}
+                                        </motion.tbody>
+                                    </table>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                )}
-
-                {viewMode === 'table' && (
-                    <div className="bg-white rounded-[1.5rem] shadow-card border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="bg-gray-50/80 border-b border-gray-100">
-                                    <tr>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Alumno</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Rango & Programa</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Asistencia</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Saldo</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {filteredStudents.map((student) => (
-                                        <tr key={student.id} className="hover:bg-blue-50/30 transition-colors group cursor-pointer" onClick={(e) => handleViewDetails(student, e)}>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <img src={student.avatarUrl} className="size-10 rounded-full object-cover bg-gray-100" />
-                                                    <div>
-                                                        <p className="font-bold text-sm text-text-main">{student.name}</p>
-                                                        <p className="text-xs text-text-secondary">{student.email}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <p className="font-semibold text-sm text-text-main">{student.rank}</p>
-                                                <p className="text-xs text-text-secondary">{student.program}</p>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(student.status)}`}>
-                                                    {getStatusLabel(student.status)}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 w-48">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex-1 bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                                                        <div className="bg-primary h-full rounded-full" style={{width: `${Math.min(student.attendance, 100)}%`}}></div>
-                                                    </div>
-                                                    <span className="text-xs font-bold text-text-secondary">{student.attendance}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span className={`font-bold text-sm ${student.balance > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                                    ${student.balance.toFixed(2)}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={(e) => handleEdit(student, e)} className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-primary transition-colors">
-                                                        <span className="material-symbols-outlined text-[18px]">edit</span>
-                                                    </button>
-                                                    <button onClick={(e) => handleDelete(student.id, e)} className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors">
-                                                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                            {filteredStudents.length === 0 && (
-                                <div className="p-12 text-center text-text-secondary">
-                                    <span className="material-symbols-outlined text-4xl opacity-30 mb-2">person_off</span>
-                                    <p>No se encontraron alumnos.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                        )}
+                    </>
                 )}
             </>
         )}
@@ -472,21 +486,21 @@ const StudentsList: React.FC = () => {
                           </label>
                       </div>
                       <div className="flex gap-3 mt-6">
-                          <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-300 font-medium hover:bg-gray-50">Cancelar</button>
-                          <button type="submit" className="flex-1 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover shadow-lg">Guardar</button>
+                          <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-300 font-medium hover:bg-gray-50 active:scale-95 transition-all">Cancelar</button>
+                          <button type="submit" className="flex-1 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover shadow-lg active:scale-95 transition-all">Guardar</button>
                       </div>
                   </form>
               </div>
           </div>
       )}
 
-      {/* STUDENT DETAIL MODAL WITH TABS */}
+      {/* STUDENT DETAIL MODAL (Kept same logic, hidden for brevity but assumes full implementation from previous context) */}
       {reactiveViewingStudent && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
                   {/* Header */}
                   <div className="relative h-32 bg-gradient-to-r from-gray-900 to-gray-800 shrink-0">
-                      <button onClick={() => setViewingStudent(null)} className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full backdrop-blur-md transition-colors z-10">
+                      <button onClick={() => setViewingStudent(null)} className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full backdrop-blur-md transition-colors z-10 active:scale-90">
                           <span className="material-symbols-outlined">close</span>
                       </button>
                       
@@ -547,11 +561,11 @@ const StudentsList: React.FC = () => {
                               <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 border border-gray-100">
                                   <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-4">Acciones Rápidas</h4>
                                   <div className="flex flex-col gap-3">
-                                      <button onClick={() => { navigate('/master/communication', { state: { recipientId: reactiveViewingStudent.id } }) }} className="w-full py-3 px-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all flex items-center justify-between group">
+                                      <button onClick={() => { navigate('/master/communication', { state: { recipientId: reactiveViewingStudent.id } }) }} className="w-full py-3 px-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all flex items-center justify-between group active:scale-95">
                                           <span className="font-semibold text-sm">Enviar Mensaje</span>
                                           <span className="material-symbols-outlined text-gray-400 group-hover:text-blue-500">mail</span>
                                       </button>
-                                      <button onClick={handlePromote} className="w-full py-3 px-4 rounded-xl border border-gray-200 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-all flex items-center justify-between group">
+                                      <button onClick={handlePromote} className="w-full py-3 px-4 rounded-xl border border-gray-200 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-all flex items-center justify-between group active:scale-95">
                                           <span className="font-semibold text-sm">Promover de Rango</span>
                                           <span className="material-symbols-outlined text-gray-400 group-hover:text-purple-500">workspace_premium</span>
                                       </button>
@@ -624,7 +638,7 @@ const StudentsList: React.FC = () => {
                           </div>
                       )}
 
-                      {/* --- TAB: FINANCE (REFACTORED) --- */}
+                      {/* --- TAB: FINANCE --- */}
                       {activeTab === 'finance' && (
                           <div className="space-y-8">
                               {/* Balance Card */}
@@ -657,7 +671,7 @@ const StudentsList: React.FC = () => {
                               <div className="flex justify-end">
                                   <button 
                                       onClick={() => navigate('/master/finance')}
-                                      className="text-sm font-bold text-primary hover:text-primary-hover flex items-center gap-1 bg-blue-50 px-4 py-2 rounded-lg transition-colors"
+                                      className="text-sm font-bold text-primary hover:text-primary-hover flex items-center gap-1 bg-blue-50 px-4 py-2 rounded-lg transition-colors active:scale-95"
                                   >
                                       Ir al Módulo Financiero
                                       <span className="material-symbols-outlined text-sm">arrow_forward</span>

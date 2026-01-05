@@ -45,8 +45,10 @@ interface AcademyContextType {
   unenrollStudent: (studentId: string, classId: string) => void;
   
   addEvent: (event: Event) => void;
+  updateEvent: (event: Event) => void;
   deleteEvent: (id: string) => void;
   registerForEvent: (studentId: string, eventId: string) => void;
+  updateEventRegistrants: (eventId: string, studentIds: string[]) => void;
   
   addLibraryResource: (resource: LibraryResource) => void;
   deleteLibraryResource: (id: string) => void;
@@ -329,9 +331,37 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const addEvent = (event: Event) => {
       if (currentUser?.role !== 'master') return;
-      const newEvent = { ...event, id: event.id || generateId('evt'), academyId: currentUser.academyId };
+      
+      let initialRegistrants = event.registrants || [];
+      
+      // AUTOMATION: If event is exam, automatically add 'exam_ready' students
+      if (event.type === 'exam') {
+          const readyStudents = students.filter(s => s.status === 'exam_ready').map(s => s.id);
+          // Combine keeping uniques, just in case
+          initialRegistrants = Array.from(new Set([...initialRegistrants, ...readyStudents]));
+      }
+
+      const newEvent = { 
+          ...event, 
+          id: event.id || generateId('evt'), 
+          academyId: currentUser.academyId,
+          registrants: initialRegistrants,
+          registeredCount: initialRegistrants.length
+      };
+      
       setEvents(prev => [...prev, newEvent]);
-      addToast('Evento creado', 'success');
+      
+      if (event.type === 'exam' && initialRegistrants.length > 0) {
+          addToast(`Evento creado con ${initialRegistrants.length} alumnos asignados automáticamente.`, 'success');
+      } else {
+          addToast('Evento creado', 'success');
+      }
+  };
+
+  const updateEvent = (updatedEvent: Event) => {
+      if (currentUser?.role !== 'master') return;
+      setEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+      addToast('Evento actualizado', 'success');
   };
 
   const deleteEvent = (id: string) => {
@@ -341,12 +371,26 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const registerForEvent = (studentId: string, eventId: string) => {
+      const event = events.find(e => e.id === eventId);
+      
+      // RESTRICTION: Students cannot auto-register for exams
+      if (event && event.type === 'exam') {
+          addToast('La inscripción a exámenes es gestionada exclusivamente por el maestro.', 'error');
+          return;
+      }
+
       setEvents(prev => prev.map(e => {
           if (e.id === eventId && !e.registrants?.includes(studentId)) {
               return { ...e, registrants: [...(e.registrants || []), studentId], registeredCount: (e.registeredCount || 0) + 1 };
           }
           return e;
       }));
+  };
+
+  const updateEventRegistrants = (eventId: string, studentIds: string[]) => {
+      if (currentUser?.role !== 'master') return;
+      setEvents(prev => PulseService.updateEventRegistrants(prev, eventId, studentIds));
+      addToast('Lista de asistentes actualizada', 'success');
   };
 
   const addLibraryResource = (resource: LibraryResource) => {
@@ -413,7 +457,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addStudent, updateStudent, deleteStudent, updateStudentStatus, batchUpdateStudents,
         markAttendance, bulkMarkPresent, promoteStudent, 
         addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
-        addEvent, deleteEvent, registerForEvent,
+        addEvent, updateEvent, deleteEvent, registerForEvent, updateEventRegistrants,
         addLibraryResource, deleteLibraryResource, toggleResourceCompletion, 
         updateAcademySettings, updatePaymentDates,
         sendMessage, markMessageRead

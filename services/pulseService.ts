@@ -1,4 +1,3 @@
-
 import { Student, ClassCategory, FinancialRecord, UserProfile, LibraryResource, Event, AcademySettings } from '../types';
 import { mockStudents, mockLibraryResources, defaultAcademySettings } from '../mockData';
 
@@ -339,6 +338,19 @@ export const PulseService = {
                     ...e, 
                     registrants: [...(e.registrants || []), studentId], 
                     registeredCount: (e.registeredCount || 0) + 1 
+                };
+            }
+            return e;
+        });
+    },
+
+    updateEventRegistrants: (events: Event[], eventId: string, studentIds: string[]) => {
+        return events.map(e => {
+            if (e.id === eventId) {
+                return {
+                    ...e,
+                    registrants: studentIds,
+                    registeredCount: studentIds.length
                 };
             }
             return e;

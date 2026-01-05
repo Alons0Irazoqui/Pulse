@@ -1,7 +1,7 @@
-
-import React from 'react';
+import React, { memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useStore } from '../context/StoreContext';
+import { useAuth } from '../context/AuthContext';
+import { useAcademy } from '../context/AcademyContext';
 
 interface SidebarProps {
   role: 'master' | 'student';
@@ -12,7 +12,8 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { academySettings, currentUser } = useStore();
+  const { currentUser, logout } = useAuth();
+  const { academySettings } = useAcademy();
 
   const masterLinks = [
     { name: 'Dashboard', icon: 'grid_view', path: '/master/dashboard' },
@@ -38,6 +39,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
   const displayName = currentUser?.name || (role === 'master' ? 'Sensei' : 'Alumno');
   const displaySubtext = role === 'master' ? academySettings.name : 'Estudiante';
   const displayAvatar = currentUser?.avatarUrl || `https://i.pravatar.cc/150?u=${role}`;
+
+  const handleLogout = () => {
+      logout();
+      navigate('/');
+  };
 
   return (
     <>
@@ -114,9 +120,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
           {/* Footer Action */}
           <button 
-              onClick={() => {
-                  navigate('/');
-              }}
+              onClick={handleLogout}
               className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 text-text-secondary hover:text-red-500 cursor-pointer transition-colors group mt-8 w-full text-left"
           >
             <span className="material-symbols-outlined group-hover:text-red-500 transition-colors">logout</span>
@@ -128,4 +132,4 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
   );
 };
 
-export default Sidebar;
+export default memo(Sidebar);

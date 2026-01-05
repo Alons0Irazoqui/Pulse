@@ -5,13 +5,13 @@ import { AcademyProvider } from './context/AcademyContext';
 import { FinanceProvider } from './context/FinanceContext';
 import { ToastProvider } from './context/ToastContext';
 import { ConfirmationProvider } from './context/ConfirmationContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import DashboardLayout from './layouts/DashboardLayout';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/auth/Login';
 import RoleSelection from './pages/auth/RoleSelection';
 import MasterDashboard from './pages/master/MasterDashboard';
 import StudentsList from './pages/master/StudentsList';
-import ScheduleManager from './pages/master/ScheduleManager';
 import ClassesManager from './pages/master/ClassesManager';
 import MasterAttendanceDetail from './pages/master/MasterAttendanceDetail';
 import MasterLibrary from './pages/master/MasterLibrary';
@@ -31,63 +31,65 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
   return (
-    <ToastProvider>
-      <ConfirmationProvider>
+    <ErrorBoundary>
+        <ToastProvider>
         <AuthProvider>
-          <AcademyProvider>
+            <AcademyProvider>
             <FinanceProvider>
-              <Router>
-                <Routes>
-                  <Route path="/" element={<LandingPage />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/role-selection" element={<RoleSelection />} />
-                  <Route path="/register/student" element={<StudentRegistration />} />
-                  <Route path="/register/master" element={<MasterRegistration />} />
-                  <Route path="/403" element={<Forbidden />} />
-                  
-                  {/* Master Routes (Protected) */}
-                  <Route path="/master/*" element={
-                      <ProtectedRoute allowedRoles={['master']}>
-                          <DashboardLayout>
-                              <Routes>
-                                  <Route path="dashboard" element={<MasterDashboard />} />
-                                  <Route path="students" element={<StudentsList />} />
-                                  <Route path="schedule" element={<ClassesManager />} />
-                                  <Route path="attendance/:classId" element={<MasterAttendanceDetail />} />
-                                  <Route path="library" element={<MasterLibrary />} />
-                                  <Route path="finance" element={<Finance />} />
-                                  <Route path="communication" element={<Communication />} />
-                                  <Route path="settings" element={<Settings />} />
-                                  <Route path="*" element={<Navigate to="dashboard" replace />} />
-                              </Routes>
-                          </DashboardLayout>
-                      </ProtectedRoute>
-                  } />
+                <ConfirmationProvider>
+                <Router>
+                    <Routes>
+                    <Route path="/" element={<LandingPage />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/role-selection" element={<RoleSelection />} />
+                    <Route path="/register/student" element={<StudentRegistration />} />
+                    <Route path="/register/master" element={<MasterRegistration />} />
+                    <Route path="/403" element={<Forbidden />} />
+                    
+                    {/* Master Routes (Protected) */}
+                    <Route path="/master/*" element={
+                        <ProtectedRoute allowedRoles={['master']}>
+                            <DashboardLayout>
+                                <Routes>
+                                    <Route path="dashboard" element={<MasterDashboard />} />
+                                    <Route path="students" element={<StudentsList />} />
+                                    <Route path="schedule" element={<ClassesManager />} />
+                                    <Route path="attendance/:classId" element={<MasterAttendanceDetail />} />
+                                    <Route path="library" element={<MasterLibrary />} />
+                                    <Route path="finance" element={<Finance />} />
+                                    <Route path="communication" element={<Communication />} />
+                                    <Route path="settings" element={<Settings />} />
+                                    <Route path="*" element={<Navigate to="dashboard" replace />} />
+                                </Routes>
+                            </DashboardLayout>
+                        </ProtectedRoute>
+                    } />
 
-                  {/* Student Routes (Protected) */}
-                  <Route path="/student/*" element={
-                      <ProtectedRoute allowedRoles={['student']}>
-                          <DashboardLayout>
-                              <Routes>
-                                  <Route path="dashboard" element={<StudentDashboard />} />
-                                  <Route path="classes" element={<StudentClasses />} />
-                                  <Route path="classes/:classId" element={<StudentClassDetail />} />
-                                  <Route path="schedule" element={<StudentSchedule />} />
-                                  <Route path="library" element={<Library />} />
-                                  <Route path="payments" element={<StudentPayments />} />
-                                  <Route path="settings" element={<Settings />} />
-                                  <Route path="*" element={<Navigate to="dashboard" replace />} />
-                              </Routes>
-                          </DashboardLayout>
-                      </ProtectedRoute>
-                  } />
-                </Routes>
-              </Router>
+                    {/* Student Routes (Protected) */}
+                    <Route path="/student/*" element={
+                        <ProtectedRoute allowedRoles={['student']}>
+                            <DashboardLayout>
+                                <Routes>
+                                    <Route path="dashboard" element={<StudentDashboard />} />
+                                    <Route path="classes" element={<StudentClasses />} />
+                                    <Route path="classes/:classId" element={<StudentClassDetail />} />
+                                    <Route path="schedule" element={<StudentSchedule />} />
+                                    <Route path="library" element={<Library />} />
+                                    <Route path="payments" element={<StudentPayments />} />
+                                    <Route path="settings" element={<Settings />} />
+                                    <Route path="*" element={<Navigate to="dashboard" replace />} />
+                                </Routes>
+                            </DashboardLayout>
+                        </ProtectedRoute>
+                    } />
+                    </Routes>
+                </Router>
+                </ConfirmationProvider>
             </FinanceProvider>
-          </AcademyProvider>
+            </AcademyProvider>
         </AuthProvider>
-      </ConfirmationProvider>
-    </ToastProvider>
+        </ToastProvider>
+    </ErrorBoundary>
   );
 };
 

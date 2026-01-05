@@ -1,46 +1,45 @@
-
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
+import { Event } from '../../types';
 
 const StudentDashboard: React.FC = () => {
-  const { currentUser, students, academySettings, events, classes, payments, registerForEvent } = useStore();
+  const { currentUser, students, academySettings, events, classes, registerForEvent } = useStore();
   const { addToast } = useToast();
-  // Using find guarantees getting the latest reactive object from the context array
-  const student = students.find(s => s.id === currentUser?.studentId);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
   
-  // Find current rank configuration
+  const student = students.find(s => s.id === currentUser?.studentId);
+  
+  // -- STATE --
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // -- RANK PROGRESS LOGIC --
   const currentRankConfig = academySettings.ranks.find(r => r.id === student?.rankId) || academySettings.ranks[0];
   const nextRankConfig = academySettings.ranks.find(r => r.order === currentRankConfig.order + 1);
-
-  // Dynamic Progress Calculation
   const required = currentRankConfig.requiredAttendance;
   const current = student?.attendance || 0;
   const progressPercent = Math.min((current / required) * 100, 100);
 
-  // --- UPCOMING EVENTS LOGIC ---
+  // -- EVENT CATEGORIZATION --
   const today = new Date().toISOString().split('T')[0];
-  const upcomingEvents = events
-    .filter(e => e.date >= today)
-    .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // --- FINANCIAL LOGIC ---
-  const totalDebt = student?.balance || 0;
-  
-  // Check for Pending Payments to show alert
-  const hasPendingPayment = payments.some(p => p.studentId === student?.id && p.status === 'pending_approval');
+  // 1. Critical Exams (Assigned by Master)
+  const nextAssignedExam = useMemo(() => {
+      if (!student) return null;
+      return events
+          .filter(e => e.type === 'exam' && e.registrants?.includes(student.id) && e.date >= today)
+          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+  }, [events, student, today]);
 
-  // Pending Charges List (for display details)
-  // Reactive list based on payments context
-  const pendingCharges = payments.filter(p => 
-      p.studentId === student?.id && 
-      p.type === 'charge' && 
-      p.status === 'charged'
-  ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // 2. Marketplace Events (Tournaments & Seminars)
+  const marketplaceEvents = useMemo(() => {
+      return events
+          .filter(e => e.type !== 'exam' && e.date >= today)
+          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [events, today]);
 
-  // --- NEXT CLASS LOGIC (SMART) ---
+  // -- NEXT CLASS LOGIC --
   const todayDate = new Date();
   const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const currentDayName = daysOfWeek[todayDate.getDay()];
@@ -48,315 +47,299 @@ const StudentDashboard: React.FC = () => {
 
   const nextClass = useMemo(() => {
       if (!student) return null;
-      
-      // Get all potential classes for today
-      let todaysClasses = classes.filter(cls => 
-          student.classesId?.includes(cls.id) // Must be enrolled
-      ).filter(cls => {
-          // 1. Is it a regular day for this class?
+      let todaysClasses = classes.filter(cls => student.classesId?.includes(cls.id)).filter(cls => {
           const isRegular = cls.days.includes(currentDayName);
-          
-          // 2. Check exceptions for TODAY
           const modification = cls.modifications.find(m => m.date === todayStr);
           const isMovedHere = cls.modifications.find(m => m.newDate === todayStr && m.type === 'move');
-
-          if (modification?.type === 'cancel') return false; // Explicitly cancelled today
-          if (modification?.type === 'move') return false; // Moved AWAY from today
-
+          if (modification?.type === 'cancel') return false;
+          if (modification?.type === 'move') return false;
           return isRegular || isMovedHere;
       }).map(cls => {
-          // Apply Modifiers (Instructor)
           const modification = cls.modifications.find(m => m.date === todayStr);
-          return {
-              ...cls,
-              instructor: (modification?.type === 'instructor' ? modification.newInstructor : cls.instructor) || cls.instructor
-          };
+          return { ...cls, instructor: (modification?.type === 'instructor' ? modification.newInstructor : cls.instructor) || cls.instructor };
       });
-      
-      // Sort by start time
       todaysClasses.sort((a, b) => a.startTime.localeCompare(b.startTime));
-      
-      // Find first class after current time
-      const currentHours = todayDate.getHours();
-      const currentMinutes = todayDate.getMinutes();
-      const currentTimeVal = currentHours * 60 + currentMinutes;
-
-      const upcoming = todaysClasses.find(c => {
+      const currentMinutes = todayDate.getHours() * 60 + todayDate.getMinutes();
+      return todaysClasses.find(c => {
           const [h, m] = c.startTime.split(':').map(Number);
-          return (h * 60 + m) > currentTimeVal;
+          return (h * 60 + m) > currentMinutes;
       });
-
-      return upcoming || (todaysClasses.length > 0 ? todaysClasses[0] : null); // Show first if all passed, or specific logic
   }, [classes, student, currentDayName, todayStr]);
 
-  const handleRegister = (eventId: string) => {
-      if(student) {
-          registerForEvent(student.id, eventId);
-          addToast('Inscripción exitosa', 'success');
+  // -- ACTIONS --
+  const handleRegister = () => {
+      if(student && selectedEvent) {
+          registerForEvent(student.id, selectedEvent.id);
+          addToast('¡Te has inscrito correctamente!', 'success');
+          setSelectedEvent(null);
       }
   };
 
-  const getEventTypeLabel = (type: string) => {
+  const getEventIcon = (type: string) => {
       switch(type) {
-          case 'exam': return { icon: 'workspace_premium', color: 'text-purple-600', bg: 'bg-purple-50', label: 'Examen' };
-          case 'tournament': return { icon: 'emoji_events', color: 'text-orange-600', bg: 'bg-orange-50', label: 'Torneo' };
-          case 'seminar': return { icon: 'school', color: 'text-blue-600', bg: 'bg-blue-50', label: 'Seminario' };
-          default: return { icon: 'event', color: 'text-gray-600', bg: 'bg-gray-50', label: 'Evento' };
+          case 'exam': return 'stars'; // Cinturón/Rango visual
+          case 'tournament': return 'emoji_events'; // Medalla
+          case 'seminar': return 'menu_book'; // Libro/Aprendizaje
+          default: return 'event';
       }
   };
 
   return (
     <div className="max-w-[1400px] mx-auto p-6 md:p-10 flex flex-col gap-8 relative overflow-hidden">
+      
+      {/* Header */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
         <div className="flex flex-col gap-1">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-text-main">Hola, {student?.name || 'Alumno'}</h2>
-          <p className="text-text-secondary text-base font-normal">Así va tu camino hacia el {nextRankConfig?.name || 'Siguiente Nivel'}.</p>
+          <h2 className="text-3xl md:text-4xl font-black tracking-tight text-text-main">
+              Hola, {student?.name.split(' ')[0]}
+          </h2>
+          <p className="text-text-secondary text-base font-normal">
+              {nextRankConfig ? `Rumbo al ${nextRankConfig.name}` : 'Maestría alcanzada'}
+          </p>
         </div>
       </header>
 
+      {/* --- SECTION 1: CRITICAL ALERTS (EXAMS) --- */}
+      {nextAssignedExam && (
+          <div 
+            onClick={() => setSelectedEvent(nextAssignedExam)}
+            className="cursor-pointer relative overflow-hidden rounded-[2rem] bg-gray-900 text-white shadow-xl shadow-gray-900/20 group hover:scale-[1.01] transition-transform duration-300"
+          >
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-900 to-indigo-900 opacity-90"></div>
+              {/* Animated Background */}
+              <div className="absolute -right-20 -top-20 size-96 bg-white/5 rounded-full blur-3xl group-hover:bg-white/10 transition-colors"></div>
+              
+              <div className="relative z-10 p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  <div className="flex items-start gap-6">
+                      <div className="size-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
+                          <span className="material-symbols-outlined text-4xl text-yellow-400">stars</span>
+                      </div>
+                      <div>
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 text-xs font-bold uppercase tracking-wider mb-2 animate-pulse">
+                              <span className="size-2 rounded-full bg-yellow-400"></span>
+                              Convocatoria Oficial
+                          </div>
+                          <h3 className="text-2xl md:text-3xl font-black leading-tight mb-1">{nextAssignedExam.title}</h3>
+                          <p className="text-white/70 font-medium flex items-center gap-2">
+                              <span className="material-symbols-outlined text-lg">event</span>
+                              {new Date(nextAssignedExam.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                              <span className="w-1 h-1 bg-white/50 rounded-full mx-1"></span>
+                              {nextAssignedExam.time}
+                          </p>
+                      </div>
+                  </div>
+                  <div className="bg-white text-gray-900 px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg group-hover:bg-gray-100 transition-colors">
+                      Ver Instrucciones
+                      <span className="material-symbols-outlined text-lg">visibility</span>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* --- SECTION 2: DASHBOARD GRID --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10">
         
-        {/* Next Class Alert Card */}
-        {nextClass ? (
-            <div className="md:col-span-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl p-8 shadow-lg shadow-blue-500/20 text-white relative overflow-hidden flex items-center justify-between">
-                <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-2 text-blue-100 font-bold text-sm uppercase tracking-wide">
-                        <span className="material-symbols-outlined text-lg">schedule</span>
-                        Tu Próxima Clase Hoy
-                    </div>
-                    <h3 className="text-3xl font-black mb-1">{nextClass.name}</h3>
-                    <p className="text-lg opacity-90">A las {nextClass.startTime} con {nextClass.instructor}</p>
-                </div>
-                <div className="hidden sm:block relative z-10">
-                    <span className="material-symbols-outlined text-8xl opacity-20">sports_martial_arts</span>
-                </div>
-            </div>
-        ) : (
-            <div className="md:col-span-2 bg-white rounded-3xl border border-gray-100 p-8 shadow-card flex items-center justify-between">
-                 <div>
-                    <h3 className="text-xl font-bold text-text-main">No tienes más clases hoy</h3>
-                    <p className="text-text-secondary mt-1">Aprovecha para revisar la biblioteca técnica o descansar.</p>
+        {/* Next Class Widget */}
+        <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-card flex flex-col justify-between h-[300px] relative overflow-hidden group">
+             <div className="relative z-10">
+                 <h3 className="text-lg font-bold text-text-main flex items-center gap-2 mb-6">
+                    <span className="material-symbols-outlined text-blue-500">schedule</span>
+                    Entrenamiento de Hoy
+                 </h3>
+                 
+                 {nextClass ? (
+                     <div className="space-y-4">
+                         <div>
+                             <p className="text-4xl font-black text-text-main tracking-tight">{nextClass.startTime}</p>
+                             <p className="text-text-secondary font-medium mt-1">{nextClass.name}</p>
+                         </div>
+                         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-sm text-text-main font-semibold border border-gray-100">
+                             <div className="size-6 rounded-full bg-gray-200 flex items-center justify-center">
+                                 <span className="material-symbols-outlined text-xs">person</span>
+                             </div>
+                             {nextClass.instructor}
+                         </div>
+                     </div>
+                 ) : (
+                     <div className="flex flex-col items-center justify-center h-40 text-text-secondary">
+                         <span className="material-symbols-outlined text-4xl opacity-20 mb-2">bedtime</span>
+                         <p className="text-sm font-medium">Clases terminadas por hoy</p>
+                     </div>
+                 )}
+             </div>
+             
+             {/* Progress Mini-Bar */}
+             <div className="relative z-10 mt-auto pt-6 border-t border-gray-50">
+                 <div className="flex justify-between text-xs font-bold text-text-secondary mb-2">
+                     <span>Progreso de Rango</span>
+                     <span className={student?.status === 'exam_ready' ? 'text-green-600' : 'text-primary'}>{current} / {required}</span>
                  </div>
-                 <div className="size-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
-                     <span className="material-symbols-outlined text-2xl">weekend</span>
+                 <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                     <div 
+                        className={`h-full rounded-full transition-all duration-1000 ${student?.status === 'exam_ready' ? 'bg-green-500' : 'bg-primary'}`} 
+                        style={{ width: `${progressPercent}%` }}
+                     ></div>
                  </div>
-            </div>
-        )}
-
-        {/* Main Progress Card */}
-        <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-card relative overflow-hidden group">
-             <div className="flex flex-col h-full justify-between relative z-10 gap-6">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-text-secondary text-xs font-bold uppercase tracking-widest mb-1">Meta Actual</p>
-                        <h3 className="text-2xl font-bold text-text-main">{nextRankConfig?.name || 'Maestría'}</h3>
-                    </div>
-                    <div className="h-10 w-10 rounded-full flex items-center justify-center bg-gray-50 border border-gray-100">
-                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: nextRankConfig?.color || 'gray' }}></div>
-                    </div>
-                </div>
-                
-                <div className="flex flex-col gap-2">
-                    <div className="flex justify-between text-xs font-medium text-text-secondary">
-                        <span>Progreso de Asistencia</span>
-                        <span className="text-text-main">{current} / {required} Clases</span>
-                    </div>
-                    <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full shadow-[0_0_15px_rgba(0,122,255,0.4)] transition-all duration-1000 ${student?.status === 'exam_ready' ? 'bg-blue-600' : 'bg-gradient-to-r from-primary to-indigo-500'}`} style={{ width: `${progressPercent}%` }}></div>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                    <div className="flex items-center gap-3">
-                        <div className="h-12 w-20 rounded-lg shadow-sm ring-1 ring-black/5 flex items-center justify-center bg-gray-900">
-                             <div className="h-2 w-12 rounded" style={{ backgroundColor: currentRankConfig.color }}></div>
-                        </div>
-                        <div>
-                            <p className="text-xs text-text-secondary font-semibold uppercase">Cinturón Actual</p>
-                            <p className="text-sm font-bold text-text-main">{currentRankConfig.name}</p>
-                        </div>
-                    </div>
-                    
-                    <button onClick={() => setShowHistoryModal(true)} className="text-primary hover:text-blue-700 text-xs font-bold flex items-center gap-1 transition-colors">
-                        Ver Historial
-                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                    </button>
-                </div>
+                 {student?.status === 'exam_ready' && (
+                     <p className="text-[10px] text-green-600 font-bold mt-2 text-center bg-green-50 py-1 rounded">
+                         ¡LISTO PARA EXAMEN!
+                     </p>
+                 )}
              </div>
         </div>
 
-        {/* Payments Summary Card */}
-        <div className="xl:col-span-1 bg-white rounded-3xl p-6 shadow-card border border-gray-100 flex flex-col">
-            <h3 className="text-lg font-bold text-text-main mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-gray-400">payments</span>
-                Estado de Cuenta
+        {/* --- MARKETPLACE: AVAILABLE EVENTS --- */}
+        <div className="md:col-span-1 xl:col-span-2 flex flex-col gap-4">
+            <h3 className="text-lg font-bold text-text-main flex items-center gap-2 px-2">
+                <span className="material-symbols-outlined text-orange-500">local_activity</span>
+                Eventos Disponibles
             </h3>
             
-            {totalDebt > 0 ? (
-                <div className="flex-1 flex flex-col gap-4">
-                    <div className="p-4 rounded-2xl bg-orange-50 border border-orange-100 flex flex-col gap-1">
-                        <span className="text-xs font-bold text-orange-600 uppercase tracking-wider">Total Pendiente</span>
-                        <span className="text-2xl font-black text-orange-700">${totalDebt.toFixed(2)}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {marketplaceEvents.length > 0 ? (
+                    marketplaceEvents.map(evt => {
+                        const isRegistered = evt.registrants?.includes(student?.id || '');
+                        const icon = getEventIcon(evt.type);
                         
-                        {hasPendingPayment && (
-                            <div className="mt-2 flex items-center gap-2 text-xs font-bold text-blue-600 bg-blue-100 px-3 py-1.5 rounded-lg animate-pulse">
-                                <span className="material-symbols-outlined text-sm">hourglass_top</span>
-                                Pago en revisión por el maestro
-                            </div>
-                        )}
-                    </div>
-                    
-                    <div className="flex-1 overflow-y-auto max-h-[150px] space-y-2 pr-2">
-                        {pendingCharges.map(p => (
-                            <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-                                <div>
-                                    <p className="text-sm font-semibold text-text-main">{p.category}</p>
-                                    <p className="text-xs text-text-secondary">{new Date(p.date).toLocaleDateString()}</p>
-                                </div>
-                                <span className="text-sm font-bold text-text-main">${p.amount}</span>
-                            </div>
-                        ))}
-                    </div>
-                    <Link to="/student/payments" className="w-full py-3 bg-text-main text-white rounded-xl font-bold text-sm text-center hover:bg-black transition-colors">
-                        Gestionar Pagos
-                    </Link>
-                </div>
-            ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-green-50 rounded-2xl border border-green-100">
-                    <div className="size-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-2">
-                        <span className="material-symbols-outlined">verified</span>
-                    </div>
-                    <p className="font-bold text-green-800">¡Todo al día!</p>
-                    <p className="text-xs text-green-700 mt-1">No tienes pagos pendientes.</p>
-                </div>
-            )}
-        </div>
-
-        {/* Notifications / Events Card */}
-        <div className="xl:col-span-2 bg-surface-white rounded-3xl p-6 shadow-card border border-gray-100 flex flex-col h-[350px]">
-            <h3 className="text-lg font-bold text-text-main mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-yellow-500">campaign</span>
-                Próximos Eventos y Torneos
-            </h3>
-            <div className="flex-1 overflow-y-auto flex flex-col gap-3 pr-2">
-                {upcomingEvents.length > 0 ? (
-                    upcomingEvents.map(event => {
-                        const style = getEventTypeLabel(event.type);
-                        const isRegistered = student && event.registrants?.includes(student.id);
-
                         return (
-                            <div key={event.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="flex flex-col items-center justify-center min-w-[60px] h-[60px] bg-gray-50 rounded-2xl border border-gray-200">
-                                        <span className="text-[10px] font-bold text-red-500 uppercase">{new Date(event.date).toLocaleString('es-ES', { month: 'short' })}</span>
-                                        <span className="text-xl font-black text-text-main leading-none">{new Date(event.date).getDate()}</span>
+                            <div key={evt.id} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition-all group flex flex-col">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className={`size-12 rounded-2xl flex items-center justify-center ${
+                                        evt.type === 'tournament' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'
+                                    }`}>
+                                        <span className="material-symbols-outlined text-2xl">{icon}</span>
                                     </div>
-                                    <div>
-                                        <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit mb-1 flex items-center gap-1 ${style.bg} ${style.color}`}>
-                                            <span className="material-symbols-outlined text-[12px]">{style.icon}</span>
-                                            {style.label}
-                                        </div>
-                                        <h4 className="font-bold text-text-main text-lg leading-tight">{event.title}</h4>
-                                        <p className="text-xs text-text-secondary mt-1 flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-[14px]">schedule</span> {event.time}
-                                            <span className="mx-1">•</span>
-                                            {event.description}
-                                        </p>
-                                    </div>
+                                    {isRegistered && (
+                                        <span className="bg-green-100 text-green-700 text-[10px] font-bold uppercase px-2 py-1 rounded-lg flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-xs">check_circle</span>
+                                            Inscrito
+                                        </span>
+                                    )}
                                 </div>
                                 
-                                <button 
-                                    onClick={() => handleRegister(event.id)}
-                                    disabled={!!isRegistered}
-                                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 min-w-[140px] ${
-                                        isRegistered 
-                                        ? 'bg-green-100 text-green-700 cursor-default' 
-                                        : 'bg-primary text-white hover:bg-primary-hover shadow-blue-500/20 active:scale-95'
-                                    }`}
-                                >
-                                    {isRegistered ? (
-                                        <>
-                                            <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                                            Inscrito
-                                        </>
-                                    ) : (
-                                        <>
-                                            Inscribirse
-                                            <span className="material-symbols-outlined text-[18px]">login</span>
-                                        </>
-                                    )}
-                                </button>
+                                <h4 className="text-lg font-bold text-text-main leading-tight mb-1">{evt.title}</h4>
+                                <p className="text-sm text-text-secondary font-medium mb-4">
+                                    {new Date(evt.date).toLocaleDateString()} • {evt.time}
+                                </p>
+                                
+                                <div className="mt-auto">
+                                    <button 
+                                        onClick={() => setSelectedEvent(evt)}
+                                        className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                                            isRegistered 
+                                            ? 'bg-gray-50 text-text-main border border-gray-200 hover:bg-gray-100'
+                                            : 'bg-white text-primary border-2 border-primary hover:bg-primary hover:text-white'
+                                        }`}
+                                    >
+                                        {isRegistered ? 'Ver Detalles' : 'Más Información'}
+                                        {!isRegistered && <span className="material-symbols-outlined text-sm">arrow_forward</span>}
+                                    </button>
+                                </div>
                             </div>
                         );
                     })
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-text-secondary bg-gray-50 rounded-2xl border-dashed border-2 border-gray-200">
-                        <span className="material-symbols-outlined text-4xl opacity-30 mb-2">event_busy</span>
-                        <p className="text-sm font-medium">No hay eventos próximos.</p>
+                    <div className="col-span-full bg-gray-50 rounded-3xl border-dashed border-2 border-gray-200 p-8 flex flex-col items-center justify-center text-center">
+                        <span className="material-symbols-outlined text-gray-300 text-4xl mb-2">event_busy</span>
+                        <p className="text-text-secondary font-medium">No hay eventos próximos.</p>
+                        <p className="text-xs text-gray-400">Revisa más tarde para torneos o seminarios.</p>
                     </div>
                 )}
             </div>
         </div>
       </div>
 
-      {/* --- ATTENDANCE HISTORY MODAL --- */}
-      {showHistoryModal && student && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
-                  <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-[2rem]">
-                      <div>
-                          <h3 className="text-xl font-bold text-text-main">Historial de Asistencia</h3>
-                          <p className="text-sm text-text-secondary">Registro completo de clases.</p>
-                      </div>
-                      <button onClick={() => setShowHistoryModal(false)} className="size-9 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 flex items-center justify-center transition-colors">
-                          <span className="material-symbols-outlined text-sm">close</span>
-                      </button>
-                  </div>
+      {/* --- UNIVERSAL EVENT MODAL --- */}
+      {selectedEvent && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setSelectedEvent(null)}>
+              <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl relative overflow-hidden" onClick={e => e.stopPropagation()}>
                   
-                  <div className="p-0 overflow-y-auto">
-                      {(!student.attendanceHistory || student.attendanceHistory.length === 0) ? (
-                          <div className="p-12 text-center text-gray-400">
-                              <span className="material-symbols-outlined text-4xl mb-2 opacity-50">history</span>
-                              <p>No tienes registros de asistencia aún.</p>
+                  {/* Modal Header with Dynamic Style */}
+                  <div className={`p-8 pb-12 relative ${
+                      selectedEvent.type === 'exam' ? 'bg-gray-900 text-white' : 
+                      selectedEvent.type === 'tournament' ? 'bg-orange-500 text-white' : 
+                      'bg-blue-600 text-white'
+                  }`}>
+                      <button onClick={() => setSelectedEvent(null)} className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full backdrop-blur-md transition-colors">
+                          <span className="material-symbols-outlined">close</span>
+                      </button>
+                      
+                      <div className="flex items-center gap-3 mb-4 opacity-90">
+                          <span className="material-symbols-outlined text-2xl">{getEventIcon(selectedEvent.type)}</span>
+                          <span className="text-sm font-bold uppercase tracking-wider">
+                              {selectedEvent.type === 'exam' ? 'Examen de Grado' : 
+                               selectedEvent.type === 'tournament' ? 'Torneo Oficial' : 'Seminario Técnico'}
+                          </span>
+                      </div>
+                      <h2 className="text-3xl font-black leading-tight">{selectedEvent.title}</h2>
+                  </div>
+
+                  {/* Modal Body */}
+                  <div className="p-8 -mt-6 bg-white rounded-t-[2rem] relative z-10 flex flex-col gap-6">
+                      
+                      {/* Info Grid */}
+                      <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-gray-50 p-4 rounded-2xl">
+                              <p className="text-xs font-bold text-gray-400 uppercase mb-1">Fecha</p>
+                              <p className="font-bold text-text-main">{new Date(selectedEvent.date).toLocaleDateString()}</p>
                           </div>
-                      ) : (
-                          <table className="w-full text-left">
-                              <thead className="bg-gray-50 text-xs uppercase text-gray-400 font-bold sticky top-0">
-                                  <tr>
-                                      <th className="px-6 py-3">Fecha</th>
-                                      <th className="px-6 py-3 text-right">Estado</th>
-                                  </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-50">
-                                  {[...student.attendanceHistory]
-                                    .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                                    .map((record, idx) => (
-                                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                          <td className="px-6 py-4">
-                                              <span className="block font-bold text-text-main text-sm">
-                                                  {new Date(record.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          <div className="bg-gray-50 p-4 rounded-2xl">
+                              <p className="text-xs font-bold text-gray-400 uppercase mb-1">Horario</p>
+                              <p className="font-bold text-text-main">{selectedEvent.time}</p>
+                          </div>
+                      </div>
+
+                      {/* Description */}
+                      <div>
+                          <h4 className="text-sm font-bold text-text-main mb-2">Detalles del Evento</h4>
+                          <p className="text-text-secondary text-sm leading-relaxed whitespace-pre-wrap">
+                              {selectedEvent.description}
+                          </p>
+                      </div>
+
+                      {/* Action Area */}
+                      <div className="pt-4 border-t border-gray-100">
+                          {selectedEvent.type === 'exam' ? (
+                              <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 flex items-start gap-3">
+                                  <span className="material-symbols-outlined text-yellow-600">info</span>
+                                  <div>
+                                      <p className="text-sm font-bold text-yellow-800">Inscripción Controlada</p>
+                                      <p className="text-xs text-yellow-700 mt-1">
+                                          Tu maestro gestiona la lista de este examen. Si tienes dudas sobre tu participación, contáctalo directamente.
+                                      </p>
+                                  </div>
+                              </div>
+                          ) : (
+                              // MARKETPLACE ACTIONS
+                              <>
+                                  {selectedEvent.registrants?.includes(student?.id || '') ? (
+                                      <div className="flex flex-col gap-3 items-center">
+                                          <div className="flex items-center gap-2 text-green-600 font-bold bg-green-50 px-4 py-2 rounded-full">
+                                              <span className="material-symbols-outlined">check_circle</span>
+                                              Ya estás inscrito
+                                          </div>
+                                          <p className="text-xs text-gray-400">Preséntate con tu uniforme limpio 15 minutos antes.</p>
+                                      </div>
+                                  ) : (
+                                      <div className="flex flex-col gap-3">
+                                          <div className="flex items-center justify-between text-sm text-text-secondary mb-2">
+                                              <span>Cupos disponibles</span>
+                                              <span className="font-bold text-text-main">
+                                                  {(selectedEvent.capacity || 0) - (selectedEvent.registrants?.length || 0)}
                                               </span>
-                                              <span className="text-xs text-gray-400">
-                                                  {new Date(record.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                              </span>
-                                          </td>
-                                          <td className="px-6 py-4 text-right">
-                                              <span className={`text-[10px] font-bold uppercase px-3 py-1 rounded-full border ${
-                                                  record.status === 'present' ? 'bg-green-50 text-green-600 border-green-200' :
-                                                  record.status === 'late' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
-                                                  record.status === 'excused' ? 'bg-blue-50 text-blue-600 border-blue-200' :
-                                                  'bg-red-50 text-red-600 border-red-200'
-                                              }`}>
-                                                  {record.status === 'present' ? 'Presente' :
-                                                   record.status === 'late' ? 'Retardo' :
-                                                   record.status === 'excused' ? 'Justificado' : 'Falta'}
-                                              </span>
-                                          </td>
-                                      </tr>
-                                  ))}
-                              </tbody>
-                          </table>
-                      )}
+                                          </div>
+                                          <button 
+                                              onClick={handleRegister}
+                                              className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl shadow-lg shadow-primary/30 flex items-center justify-center gap-2 transition-all active:scale-95"
+                                          >
+                                              <span>Confirmar Inscripción</span>
+                                              <span className="material-symbols-outlined">how_to_reg</span>
+                                          </button>
+                                      </div>
+                                  )}
+                              </>
+                          )}
+                      </div>
                   </div>
               </div>
           </div>

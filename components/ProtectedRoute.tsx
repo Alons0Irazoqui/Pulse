@@ -1,7 +1,6 @@
-
-import React from 'react';
+import React, { memo } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useStore } from '../context/StoreContext';
+import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -9,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { currentUser } = useStore();
+  const { currentUser } = useAuth();
 
   if (!currentUser) {
     return <Navigate to="/" replace />;
@@ -22,4 +21,4 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   return <>{children}</>;
 };
 
-export default ProtectedRoute;
+export default memo(ProtectedRoute);
