@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -5,6 +6,7 @@ import { useForm, SubmitHandler, UseFormRegister, FieldErrors } from 'react-hook
 import { zodResolver } from '@hookform/resolvers/zod';
 import { studentRegistrationSchema, StudentRegistrationForm } from '../../schemas/authSchemas';
 import { useToast } from '../../context/ToastContext';
+import { PulseService } from '../../services/pulseService';
 
 // --- SUB-COMPONENTS (DEFINED OUTSIDE TO PREVENT RE-RENDER FOCUS LOSS) ---
 
@@ -73,6 +75,7 @@ const StudentRegistration: React.FC = () => {
     register,
     handleSubmit,
     trigger,
+    setError,
     formState: { errors },
     watch
   } = useForm<StudentRegistrationForm>({
@@ -97,6 +100,17 @@ const StudentRegistration: React.FC = () => {
     }
 
     const isStepValid = await trigger(fieldsToValidate);
+    
+    // Additional Step 1 Validation: Check email strictly before moving to Step 2
+    if (currentStep === 1 && isStepValid) {
+        const email = watch('email');
+        if (PulseService.checkEmailExists(email)) {
+            setError('email', { type: 'manual', message: 'Este correo electrónico ya está registrado en la plataforma.' });
+            addToast('El correo ya está en uso por otro usuario.', 'error');
+            return;
+        }
+    }
+
     if (isStepValid) {
       setCurrentStep((prev) => prev + 1);
     }
@@ -109,6 +123,16 @@ const StudentRegistration: React.FC = () => {
   const onSubmit: SubmitHandler<StudentRegistrationForm> = async (data) => {
     setIsSubmitting(true);
     
+    // Security Check: Final verification before submission
+    if (PulseService.checkEmailExists(data.email)) {
+        setIsSubmitting(false);
+        setError('email', { type: 'manual', message: 'Este correo electrónico ya está registrado en la plataforma.' });
+        addToast('Error de seguridad: Correo duplicado.', 'error');
+        // If we were on step 3, user might be confused why nothing happens, so we might want to navigate back or just show toast.
+        // Usually UI should have caught it at Step 1, but this is a fail-safe.
+        return;
+    }
+
     try {
         const success = await registerStudent({
             academyCode: data.academyCode,
@@ -128,7 +152,7 @@ const StudentRegistration: React.FC = () => {
         }
     } catch (error) {
         console.error(error);
-        addToast('Ocurrió un error inesperado', 'error');
+        addToast(error instanceof Error ? error.message : 'Ocurrió un error inesperado', 'error');
     } finally {
         setIsSubmitting(false);
     }

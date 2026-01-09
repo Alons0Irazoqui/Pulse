@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import EmptyState from '../../components/ui/EmptyState';
 import EmergencyCard from '../../components/ui/EmergencyCard';
+import { PulseService } from '../../services/pulseService';
 
 const StudentsList: React.FC = () => {
   const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, payments, isLoading } = useStore();
@@ -165,6 +166,15 @@ const StudentsList: React.FC = () => {
       if (!formData.name || !formData.email || !formData.cellPhone || !formData.guardian.fullName || !formData.guardian.phones.main) {
           addToast("Por favor completa los campos obligatorios (*)", 'error');
           return;
+      }
+
+      // SECURITY CHECK: Email Uniqueness
+      // If Creating OR If Editing AND Email Changed
+      if (!editingStudent || (editingStudent && editingStudent.email !== formData.email)) {
+          if (PulseService.checkEmailExists(formData.email)) {
+              addToast("Este correo electrónico ya está registrado en la plataforma (Maestro o Alumno).", 'error');
+              return;
+          }
       }
 
       if (editingStudent) {

@@ -1,9 +1,11 @@
+
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { masterRegistrationSchema, MasterRegistrationForm } from '../../schemas/authSchemas';
+import { PulseService } from '../../services/pulseService';
 
 const MasterRegistration: React.FC = () => {
   const { registerMaster } = useStore();
@@ -22,6 +24,12 @@ const MasterRegistration: React.FC = () => {
   });
 
   const onSubmit = async (data: MasterRegistrationForm) => {
+    // SECURITY CHECK: Global Email Uniqueness
+    if (PulseService.checkEmailExists(data.email)) {
+        setError("email", { type: "manual", message: "Este correo electrónico ya está registrado en la plataforma." });
+        return;
+    }
+
     const success = await registerMaster({
         name: data.name,
         email: data.email,

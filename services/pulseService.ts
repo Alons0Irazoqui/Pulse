@@ -1,3 +1,4 @@
+
 import { Student, ClassCategory, FinancialRecord, UserProfile, LibraryResource, Event, AcademySettings } from '../types';
 import { mockStudents, mockLibraryResources, defaultAcademySettings } from '../mockData';
 
@@ -19,15 +20,28 @@ const uuid = () => {
 };
 
 export const PulseService = {
+    // --- SECURITY & VALIDATION LAYER ---
+
+    /**
+     * Checks if an email already exists in the system (Students or Masters).
+     * Case insensitive.
+     */
+    checkEmailExists: (email: string): boolean => {
+        const users = PulseService.getUsersDB();
+        const normalizedEmail = email.toLowerCase().trim();
+        return users.some(u => u.email.toLowerCase().trim() === normalizedEmail);
+    },
+
     // --- AUTHENTICATION LAYER ---
 
     registerMaster: (data: { name: string; email: string; password: string; academyName: string }) => {
+        // Double check internally even if UI checked it
+        if (PulseService.checkEmailExists(data.email)) {
+            throw new Error("El correo electrónico ya está registrado en la plataforma.");
+        }
+
         const users = PulseService.getUsersDB();
         const academies = PulseService.getAcademiesDB();
-
-        if (users.find(u => u.email === data.email)) {
-            throw new Error("El correo electrónico ya está registrado.");
-        }
 
         // 1. Create Academy
         const academyId = uuid();
@@ -65,14 +79,15 @@ export const PulseService = {
     },
 
     registerStudent: (data: { name: string; email: string; phone: string; password: string; academyCode: string }) => {
+        // Double check internally
+        if (PulseService.checkEmailExists(data.email)) {
+            throw new Error("El correo electrónico ya está registrado en la plataforma.");
+        }
+
         const users = PulseService.getUsersDB();
         const academies = PulseService.getAcademiesDB();
         const students = PulseService.getStudents();
         const payments = PulseService.getPayments(); // Fetch existing records
-
-        if (users.find(u => u.email === data.email)) {
-            throw new Error("El correo electrónico ya está registrado.");
-        }
 
         const academy = academies.find(a => a.code === data.academyCode || a.id === data.academyCode);
         if (!academy) {
@@ -162,9 +177,15 @@ export const PulseService = {
     createStudentAccountFromMaster: (studentData: Student, defaultPassword = 'Pulse123!') => {
         const users = PulseService.getUsersDB();
         
-        // If user already exists, just link
-        const existingUser = users.find(u => u.email === studentData.email);
-        if (existingUser) return existingUser;
+        // Check if email exists (excluding the user we might be trying to link if logic allowed linking)
+        // But for creation, it must be unique.
+        if (PulseService.checkEmailExists(studentData.email)) {
+             // In a real app we might want to link existing user, but for security in this demo, we block duplicates.
+             // However, the caller (AcademyContext) might have already checked.
+             // We return existing user if found to be safe, or throw.
+             const existing = users.find(u => u.email.toLowerCase() === studentData.email.toLowerCase());
+             if (existing) return existing; 
+        }
 
         const userId = studentData.id; // Ensure IDs match
         const newUser: UserProfile = {

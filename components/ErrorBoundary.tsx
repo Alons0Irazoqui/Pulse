@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children?: ReactNode;
@@ -9,7 +9,7 @@ interface State {
   error: Error | null;
 }
 
-class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundary extends React.Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null
@@ -22,6 +22,10 @@ class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
   }
+
+  private handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
 
   public render() {
     if (this.state.hasError) {
@@ -43,7 +47,7 @@ class ErrorBoundary extends Component<Props, State> {
                     Recargar Aplicación
                 </button>
                 <button 
-                    onClick={() => this.setState({ hasError: false, error: null })} 
+                    onClick={this.handleRetry} 
                     className="bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all active:scale-95"
                 >
                     Intentar de nuevo
