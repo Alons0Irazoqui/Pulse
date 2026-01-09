@@ -5,6 +5,7 @@ import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { Student } from '../../types';
 import { getLocalDate, formatDateDisplay } from '../../utils/dateUtils';
+import DateNavigator from '../../components/ui/DateNavigator';
 
 const MasterAttendanceDetail: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
@@ -28,6 +29,19 @@ const MasterAttendanceDetail: React.FC = () => {
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [enrollSearchQuery, setEnrollSearchQuery] = useState('');
+
+  // --- DATE ADAPTERS FOR DateNavigator ---
+  const handleDateChange = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      setSelectedDate(`${year}-${month}-${day}`);
+  };
+
+  const currentDateObj = useMemo(() => {
+      const [y, m, d] = selectedDate.split('-').map(Number);
+      return new Date(y, m - 1, d);
+  }, [selectedDate]);
 
   // Derived Data
   const enrolledStudents = useMemo(() => {
@@ -121,15 +135,15 @@ const MasterAttendanceDetail: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-              <input 
-                  type="date" 
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="rounded-xl border-gray-200 text-sm font-bold text-text-main shadow-sm focus:border-primary focus:ring-primary py-2.5 px-4 cursor-pointer hover:bg-gray-50 transition-colors"
+              <DateNavigator 
+                  currentDate={currentDateObj}
+                  onDateChange={handleDateChange}
+                  className="w-full md:w-64"
               />
+              
               <button 
                   onClick={handleMarkAllPresent}
-                  className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-green-600/20 transition-all flex items-center gap-2 active:scale-95"
+                  className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-green-600/20 transition-all flex items-center gap-2 active:scale-95 h-12 md:h-auto"
               >
                   <span className="material-symbols-outlined text-[18px]">done_all</span>
                   <span className="hidden sm:inline">Poner Presente a Todos</span>

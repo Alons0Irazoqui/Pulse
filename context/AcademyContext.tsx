@@ -1,7 +1,8 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Student, ClassCategory, Event, LibraryResource, AcademySettings, Message, AttendanceRecord, SessionModification, ClassException, PromotionHistoryItem } from '../types';
+import { Student, ClassCategory, Event, LibraryResource, AcademySettings, Message, AttendanceRecord, SessionModification, ClassException, PromotionHistoryItem, CalendarEvent } from '../types';
 import { PulseService } from '../services/pulseService';
-import { mockMessages } from '../mockData';
+import { mockMessages, mockCalendarEvents } from '../mockData';
 import { getLocalDate, formatDateDisplay } from '../utils/dateUtils';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
@@ -18,6 +19,7 @@ interface AcademyContextType {
   students: Student[];
   classes: ClassCategory[];
   events: Event[];
+  scheduleEvents: CalendarEvent[]; // NEW: Real Calendar State
   libraryResources: LibraryResource[];
   academySettings: AcademySettings;
   messages: Message[];
@@ -47,6 +49,11 @@ interface AcademyContextType {
   addEvent: (event: Event) => void;
   updateEvent: (event: Event) => void;
   deleteEvent: (id: string) => void;
+  
+  // NEW: Calendar Actions
+  updateCalendarEvent: (id: string, updates: Partial<CalendarEvent>) => void;
+  addCalendarEvent: (event: CalendarEvent) => void;
+
   registerForEvent: (studentId: string, eventId: string) => void;
   updateEventRegistrants: (eventId: string, studentIds: string[]) => void;
   
@@ -72,6 +79,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassCategory[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [scheduleEvents, setScheduleEvents] = useState<CalendarEvent[]>([]); // NEW
   const [libraryResources, setLibraryResources] = useState<LibraryResource[]>([]);
   const [academySettings, setAcademySettings] = useState<AcademySettings>(PulseService.getAcademySettings(academyId));
   const [messages, setMessages] = useState<Message[]>([]);
@@ -85,6 +93,21 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
               setStudents(PulseService.getStudents(currentUser.academyId));
               setClasses(PulseService.getClasses(currentUser.academyId));
               setEvents(PulseService.getEvents(currentUser.academyId));
+              
+              // HYDRATION LOGIC FOR CALENDAR EVENTS
+              // Check local storage first, else seed with mockData
+              const storedEvents = localStorage.getItem('pulse_calendar_events');
+              if (storedEvents) {
+                  const parsed = JSON.parse(storedEvents).map((e: any) => ({
+                      ...e,
+                      start: new Date(e.start), // Convert ISO string back to Date
+                      end: new Date(e.end)
+                  }));
+                  setScheduleEvents(parsed);
+              } else {
+                  setScheduleEvents(mockCalendarEvents);
+              }
+
               setLibraryResources(PulseService.getLibrary(currentUser.academyId));
               const storedMsgs = localStorage.getItem('pulse_messages');
               setMessages(storedMsgs ? JSON.parse(storedMsgs) : mockMessages.map(m => ({...m, academyId: currentUser.academyId, recipientId: 'all', recipientName: 'Todos'}))); 
@@ -103,6 +126,14 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveStudents(students); }, [students, currentUser, isLoading]);
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveClasses(classes); }, [classes, currentUser, isLoading]);
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveEvents(events); }, [events, currentUser, isLoading]);
+  
+  // NEW: Persist Calendar Events
+  useEffect(() => { 
+      if(currentUser && !isLoading && scheduleEvents.length > 0) {
+          localStorage.setItem('pulse_calendar_events', JSON.stringify(scheduleEvents));
+      }
+  }, [scheduleEvents, currentUser, isLoading]);
+
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveLibrary(libraryResources); }, [libraryResources, currentUser, isLoading]);
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveAcademySettings(academySettings); }, [academySettings, currentUser, isLoading]);
   useEffect(() => { if(currentUser && !isLoading) localStorage.setItem('pulse_messages', JSON.stringify(messages)); }, [messages, currentUser, isLoading]);
@@ -329,6 +360,23 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast('Alumno dado de baja de la clase', 'info');
   };
 
+  // --- NEW CALENDAR ACTIONS ---
+  
+  const addCalendarEvent = (event: CalendarEvent) => {
+      if (currentUser?.role !== 'master') return;
+      const newEvent = { ...event, id: event.id || generateId('cal_evt') };
+      setScheduleEvents(prev => [...prev, newEvent]);
+      addToast('Evento agregado al calendario', 'success');
+  };
+
+  const updateCalendarEvent = (id: string, updates: Partial<CalendarEvent>) => {
+      if (currentUser?.role !== 'master') return;
+      setScheduleEvents(prev => prev.map(evt => 
+          evt.id === id ? { ...evt, ...updates } : evt
+      ));
+      addToast('Horario actualizado en tiempo real', 'success');
+  };
+
   const addEvent = (event: Event) => {
       if (currentUser?.role !== 'master') return;
       
@@ -337,7 +385,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // AUTOMATION: If event is exam, automatically add 'exam_ready' students
       if (event.type === 'exam') {
           const readyStudents = students.filter(s => s.status === 'exam_ready').map(s => s.id);
-          // Combine keeping uniques, just in case
           initialRegistrants = Array.from(new Set([...initialRegistrants, ...readyStudents]));
       }
 
@@ -373,7 +420,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const registerForEvent = (studentId: string, eventId: string) => {
       const event = events.find(e => e.id === eventId);
       
-      // RESTRICTION: Students cannot auto-register for exams
       if (event && event.type === 'exam') {
           addToast('La inscripción a exámenes es gestionada exclusivamente por el maestro.', 'error');
           return;
@@ -452,12 +498,13 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   return (
     <AcademyContext.Provider value={{ 
-        students, classes, events, libraryResources, academySettings, messages, isLoading,
+        students, classes, events, scheduleEvents, libraryResources, academySettings, messages, isLoading,
         refreshData: loadData,
         addStudent, updateStudent, deleteStudent, updateStudentStatus, batchUpdateStudents,
         markAttendance, bulkMarkPresent, promoteStudent, 
         addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
         addEvent, updateEvent, deleteEvent, registerForEvent, updateEventRegistrants,
+        addCalendarEvent, updateCalendarEvent, // Exposed Calendar Actions
         addLibraryResource, deleteLibraryResource, toggleResourceCompletion, 
         updateAcademySettings, updatePaymentDates,
         sendMessage, markMessageRead

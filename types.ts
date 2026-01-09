@@ -139,6 +139,7 @@ export interface ClassException extends SessionModification {
     reason?: string;
 }
 
+// Legacy Interface (kept for compatibility during refactor, but CalendarEvent is preferred)
 export interface ClassCategory {
     id: string;
     academyId: string;
@@ -153,18 +154,36 @@ export interface ClassCategory {
     modifications: ClassException[];
 }
 
-export interface Event {
+// --- NEW ARCHITECTURE: REAL CALENDAR ---
+export interface CalendarEvent {
     id: string;
     academyId: string;
     title: string;
-    date: string;
-    time: string;
-    type: 'seminar' | 'exam' | 'tournament';
-    description: string;
+    start: Date; // Real Date object for logic
+    end: Date;   // Real Date object for logic
+    instructorId?: string;
+    instructorName?: string;
+    resourceId?: string; // e.g., 'Mat A', 'Mat B'
+    color: string;
+    type: 'class' | 'workshop' | 'exam' | 'tournament' | 'private' | 'seminar';
+    description?: string;
+    
+    // Relations
+    relatedClassId?: string; // If generated from a recurring ClassCategory
+    attendees?: string[]; // List of Student IDs registered for this specific session
+    maxCapacity?: number;
+    isCancelled?: boolean;
+}
+
+export interface Event extends CalendarEvent {
+    // Keeping this alias for backward compatibility with existing components
+    // but extending it to ensure it matches the new structure
+    date: string; // Legacy support string YYYY-MM-DD
+    time: string; // Legacy support string HH:MM
+    registrants?: string[];
     registeredCount: number;
     capacity: number;
     eligibleRanks?: string[];
-    registrants?: string[];
 }
 
 export type PaymentCategory = 'Mensualidad' | 'Torneo' | 'Examen/Promoción' | 'Equipo/Uniforme' | 'Otro' | 'Late Fee';

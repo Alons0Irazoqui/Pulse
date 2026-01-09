@@ -1,8 +1,10 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { getLocalDate, formatDateDisplay } from '../../utils/dateUtils';
 import { Student } from '../../types';
+import DateNavigator from '../../components/ui/DateNavigator';
 
 const AttendanceTracker: React.FC = () => {
   const { classes, students, markAttendance, bulkMarkPresent } = useStore();
@@ -67,6 +69,19 @@ const AttendanceTracker: React.FC = () => {
       addToast(`Se marcaron ${stats.unmarked} alumnos como presentes`, 'success');
   };
 
+  // Date conversion helpers for DateNavigator
+  const handleDateChange = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      setSelectedDate(`${year}-${month}-${day}`);
+  };
+
+  const currentDateObj = useMemo(() => {
+      const [y, m, d] = selectedDate.split('-').map(Number);
+      return new Date(y, m - 1, d);
+  }, [selectedDate]);
+
   // --- RENDER HELPERS ---
 
   const getRowBackground = (student: Student, currentStatus?: string) => {
@@ -93,11 +108,11 @@ const AttendanceTracker: React.FC = () => {
                 
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                     <div className="w-full md:flex-1 flex flex-col gap-1">
-                        <label className="text-xs font-bold text-text-secondary uppercase tracking-wider">Clase</label>
+                        <label className="text-xs font-bold text-text-secondary uppercase tracking-wider pl-1">Clase</label>
                         <select 
                             value={selectedClassId}
                             onChange={(e) => setSelectedClassId(e.target.value)}
-                            className="w-full text-lg font-bold text-text-main border-gray-200 rounded-xl focus:ring-primary focus:border-primary py-2.5"
+                            className="w-full text-lg font-bold text-text-main border-gray-200 rounded-2xl focus:ring-primary focus:border-primary py-3 pl-4 bg-gray-50/50"
                         >
                             {classes.map(c => (
                                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -106,12 +121,11 @@ const AttendanceTracker: React.FC = () => {
                     </div>
                     
                     <div className="w-full md:w-auto flex flex-col gap-1">
-                        <label className="text-xs font-bold text-text-secondary uppercase tracking-wider">Fecha</label>
-                        <input 
-                            type="date" 
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="w-full md:w-48 text-lg font-bold text-text-main border-gray-200 rounded-xl focus:ring-primary focus:border-primary py-2.5"
+                        <label className="text-xs font-bold text-text-secondary uppercase tracking-wider pl-1">Fecha de Asistencia</label>
+                        <DateNavigator 
+                            currentDate={currentDateObj}
+                            onDateChange={handleDateChange}
+                            className="w-full md:w-72"
                         />
                     </div>
                 </div>
