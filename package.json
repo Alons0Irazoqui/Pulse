@@ -16,7 +16,9 @@
     "zod": "^4.3.5",
     "@hookform/resolvers": "^5.2.2",
     "react-hook-form": "^7.70.0",
-    "framer-motion": "11.18.2"
+    "framer-motion": "11.18.2",
+    "date-fns": "^4.1.0",
+    "react-big-calendar": "^1.19.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

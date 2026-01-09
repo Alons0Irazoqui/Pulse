@@ -93,12 +93,12 @@ export interface Student {
     
     // Auth & Identity
     email: string;
-    password?: string; // Optional in state, required in DB/Registration
+    password?: string;
     
     // Alumno Profile
     name: string;
     age: number;
-    birthDate: string; // ISO Date YYYY-MM-DD
+    birthDate: string;
     cellPhone: string;
     avatarUrl?: string;
     
@@ -139,7 +139,7 @@ export interface ClassException extends SessionModification {
     reason?: string;
 }
 
-// Legacy Interface (kept for compatibility during refactor, but CalendarEvent is preferred)
+// Legacy Interface
 export interface ClassCategory {
     id: string;
     academyId: string;
@@ -154,32 +154,38 @@ export interface ClassCategory {
     modifications: ClassException[];
 }
 
-// --- NEW ARCHITECTURE: REAL CALENDAR ---
+// --- NEW ARCHITECTURE: REAL CALENDAR (Standardized) ---
 export interface CalendarEvent {
     id: string;
     academyId: string;
     title: string;
-    start: Date; // Real Date object for logic
-    end: Date;   // Real Date object for logic
-    instructorId?: string;
-    instructorName?: string;
-    resourceId?: string; // e.g., 'Mat A', 'Mat B'
+    start: Date; // ISO Date Object
+    end: Date;   // ISO Date Object
+    
+    // Core Props
+    instructor: string;
+    status: 'active' | 'cancelled' | 'rescheduled';
     color: string;
-    type: 'class' | 'workshop' | 'exam' | 'tournament' | 'private' | 'seminar';
     description?: string;
     
-    // Relations
-    relatedClassId?: string; // If generated from a recurring ClassCategory
-    attendees?: string[]; // List of Student IDs registered for this specific session
+    // Legacy / Extended Support
+    instructorName?: string; // Optional for backward compatibility, mapped to instructor
+    resourceId?: string;
+    type: 'class' | 'workshop' | 'exam' | 'tournament' | 'private' | 'seminar';
+    relatedClassId?: string;
+    attendees?: string[];
     maxCapacity?: number;
-    isCancelled?: boolean;
+    isCancelled?: boolean; // Legacy flag, mapped to status === 'cancelled'
+    
+    // UI Helpers (Optional)
+    isRegistered?: boolean;
+    icon?: string;
 }
 
 export interface Event extends CalendarEvent {
-    // Keeping this alias for backward compatibility with existing components
-    // but extending it to ensure it matches the new structure
-    date: string; // Legacy support string YYYY-MM-DD
-    time: string; // Legacy support string HH:MM
+    // Extended Interface for Marketplace Events (legacy compatibility)
+    date: string; // string YYYY-MM-DD
+    time: string; // string HH:MM
     registrants?: string[];
     registeredCount: number;
     capacity: number;

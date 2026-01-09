@@ -151,7 +151,9 @@ const ClassesManager: React.FC = () => {
           start,
           end,
           color,
-          instructorName: 'Evento' // Optional/Default
+          instructorName: 'Evento', // Optional/Default
+          instructor: 'Evento',
+          status: 'active'
       });
       
       setEventForm({ title: '', date: '', time: '', type: 'exam', description: '', capacity: 50 });

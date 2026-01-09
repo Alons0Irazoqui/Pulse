@@ -203,88 +203,110 @@ export const mockMessages: Message[] = [
 ];
 
 // --- DYNAMIC CALENDAR GENERATION ---
-const generateMonthEvents = (): CalendarEvent[] => {
+const generateDynamicEvents = (): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
+    const today = new Date();
     
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    // Helper to set time
-    const setTime = (date: Date, hours: number, minutes: number) => {
-        const d = new Date(date);
+    // Helper to generate dates relative to today
+    const getDate = (dayOffset: number, hours: number, minutes: number) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() + dayOffset);
         d.setHours(hours, minutes, 0, 0);
         return d;
     };
 
-    // Recurring Patterns
-    for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month, day);
+    // Generate events for the current week (from 2 days ago to 12 days ahead)
+    for (let i = -2; i <= 12; i++) {
+        const date = getDate(i, 0, 0);
         const dayOfWeek = date.getDay(); // 0 = Sun, 1 = Mon...
 
         // Mon/Wed/Fri: Fundamentals (17:00 - 18:00)
         if (dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5) {
             events.push({
-                id: `evt-fund-${day}`,
+                id: `evt-fund-${i}`,
                 academyId: 'acad-1',
                 title: 'BJJ Fundamentals',
-                start: setTime(date, 17, 0),
-                end: setTime(date, 18, 0),
-                instructorName: 'Sensei Miguel',
-                color: '#2563eb', // Blue
+                start: getDate(i, 17, 0),
+                end: getDate(i, 18, 0),
+                instructor: 'Sensei Miguel',
+                instructorName: 'Sensei Miguel', // Legacy support
+                color: '#3b82f6', // Blue
                 type: 'class',
-                description: 'Técnicas básicas para cinta blanca.'
+                status: 'active',
+                description: 'Técnicas básicas y drills de posición.'
             });
         }
 
         // Tue/Thu: Advanced (19:00 - 20:30)
         if (dayOfWeek === 2 || dayOfWeek === 4) {
             events.push({
-                id: `evt-adv-${day}`,
+                id: `evt-adv-${i}`,
                 academyId: 'acad-1',
                 title: 'Advanced Gi',
-                start: setTime(date, 19, 0),
-                end: setTime(date, 20, 30),
+                start: getDate(i, 19, 0),
+                end: getDate(i, 20, 30),
+                instructor: 'Master Kenji',
                 instructorName: 'Master Kenji',
-                color: '#7c3aed', // Purple
+                color: '#8b5cf6', // Purple
                 type: 'class',
-                description: 'Sparring intenso y técnica avanzada.'
+                status: 'active',
+                description: 'Sparring específico y técnicas avanzadas.'
             });
         }
 
         // Sat: Open Mat (10:00 - 12:00)
         if (dayOfWeek === 6) {
             events.push({
-                id: `evt-open-${day}`,
+                id: `evt-open-${i}`,
                 academyId: 'acad-1',
                 title: 'Open Mat',
-                start: setTime(date, 10, 0),
-                end: setTime(date, 12, 0),
+                start: getDate(i, 10, 0),
+                end: getDate(i, 12, 0),
+                instructor: 'All Instructors',
                 instructorName: 'All Instructors',
-                color: '#059669', // Green
+                color: '#10b981', // Emerald
                 type: 'class',
-                description: 'Entrenamiento libre.'
+                status: 'active',
+                description: 'Entrenamiento libre supervisado.'
             });
         }
     }
 
-    // Add one Special Event (e.g., Seminar) on the 20th or closest Saturday
-    const specialDate = new Date(year, month, 20);
+    // Add a Special Tournament next Saturday
+    const nextSaturdayOffset = 6 - today.getDay() + 7;
     events.push({
-        id: 'evt-seminar-1',
+        id: 'evt-tournament-1',
         academyId: 'acad-1',
-        title: 'Seminario Defensa Personal',
-        start: setTime(specialDate, 12, 0),
-        end: setTime(specialDate, 15, 0),
-        instructorName: 'Guest Master',
+        title: 'Torneo Interno Verano',
+        start: getDate(nextSaturdayOffset, 9, 0),
+        end: getDate(nextSaturdayOffset, 14, 0),
+        instructor: 'Staff',
+        instructorName: 'Staff',
+        color: '#f97316', // Orange
+        type: 'tournament',
+        status: 'active',
+        description: 'Torneo interno para todos los cinturones.',
+        maxCapacity: 100
+    });
+
+    // Add an Exam this Friday
+    const fridayOffset = 5 - today.getDay();
+    events.push({
+        id: 'evt-exam-1',
+        academyId: 'acad-1',
+        title: 'Examen de Grado',
+        start: getDate(fridayOffset > 0 ? fridayOffset : fridayOffset + 7, 18, 0),
+        end: getDate(fridayOffset > 0 ? fridayOffset : fridayOffset + 7, 20, 0),
+        instructor: 'Grand Master',
+        instructorName: 'Grand Master',
         color: '#db2777', // Pink
-        type: 'workshop',
-        description: 'Taller especial para todos los niveles.',
-        maxCapacity: 40
+        type: 'exam',
+        status: 'active',
+        description: 'Examen de promoción de cintas.',
+        maxCapacity: 20
     });
 
     return events;
 };
 
-export const mockCalendarEvents: CalendarEvent[] = generateMonthEvents();
+export const mockCalendarEvents: CalendarEvent[] = generateDynamicEvents();

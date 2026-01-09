@@ -19,7 +19,7 @@ interface AcademyContextType {
   students: Student[];
   classes: ClassCategory[];
   events: Event[];
-  scheduleEvents: CalendarEvent[]; // NEW: Real Calendar State
+  scheduleEvents: CalendarEvent[]; // REAL CALENDAR STATE
   libraryResources: LibraryResource[];
   academySettings: AcademySettings;
   messages: Message[];
@@ -32,7 +32,6 @@ interface AcademyContextType {
   deleteStudent: (id: string) => void;
   updateStudentStatus: (id: string, status: Student['status']) => void;
   
-  // Specialized setter for Finance Context to avoid circular dependency logic
   batchUpdateStudents: (updatedStudents: Student[]) => void;
 
   markAttendance: (studentId: string, classId: string, date: string, status: 'present' | 'late' | 'excused' | 'absent' | undefined, reason?: string) => void;
@@ -46,13 +45,15 @@ interface AcademyContextType {
   enrollStudent: (studentId: string, classId: string) => void;
   unenrollStudent: (studentId: string, classId: string) => void;
   
+  // Marketplace Events (Legacy)
   addEvent: (event: Event) => void;
   updateEvent: (event: Event) => void;
   deleteEvent: (id: string) => void;
   
-  // NEW: Calendar Actions
-  updateCalendarEvent: (id: string, updates: Partial<CalendarEvent>) => void;
+  // --- REAL CALENDAR ACTIONS ---
   addCalendarEvent: (event: CalendarEvent) => void;
+  updateCalendarEvent: (id: string, updates: Partial<CalendarEvent>) => void;
+  deleteCalendarEvent: (id: string) => void;
 
   registerForEvent: (studentId: string, eventId: string) => void;
   updateEventRegistrants: (eventId: string, studentIds: string[]) => void;
@@ -79,7 +80,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassCategory[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [scheduleEvents, setScheduleEvents] = useState<CalendarEvent[]>([]); // NEW
+  const [scheduleEvents, setScheduleEvents] = useState<CalendarEvent[]>([]); // Calendar State
   const [libraryResources, setLibraryResources] = useState<LibraryResource[]>([]);
   const [academySettings, setAcademySettings] = useState<AcademySettings>(PulseService.getAcademySettings(academyId));
   const [messages, setMessages] = useState<Message[]>([]);
@@ -87,23 +88,27 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const loadData = () => {
       setIsLoading(true);
       if (currentUser?.academyId) {
-          // Simulate network delay for better UX and Skeleton testing
           setTimeout(() => {
               setAcademySettings(PulseService.getAcademySettings(currentUser.academyId));
               setStudents(PulseService.getStudents(currentUser.academyId));
               setClasses(PulseService.getClasses(currentUser.academyId));
               setEvents(PulseService.getEvents(currentUser.academyId));
               
-              // HYDRATION LOGIC FOR CALENDAR EVENTS
-              // Check local storage first, else seed with mockData
+              // HYDRATION & MOCK INIT FOR CALENDAR
               const storedEvents = localStorage.getItem('pulse_calendar_events');
               if (storedEvents) {
-                  const parsed = JSON.parse(storedEvents).map((e: any) => ({
-                      ...e,
-                      start: new Date(e.start), // Convert ISO string back to Date
-                      end: new Date(e.end)
-                  }));
-                  setScheduleEvents(parsed);
+                  try {
+                      // Revive Date objects from JSON strings
+                      const parsed = JSON.parse(storedEvents).map((e: any) => ({
+                          ...e,
+                          start: new Date(e.start), 
+                          end: new Date(e.end)
+                      }));
+                      setScheduleEvents(parsed);
+                  } catch (e) {
+                      console.error("Failed to parse calendar events", e);
+                      setScheduleEvents(mockCalendarEvents);
+                  }
               } else {
                   setScheduleEvents(mockCalendarEvents);
               }
@@ -122,12 +127,12 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       loadData();
   }, [currentUser]);
 
-  // Persistence Effects
+  // Persistence
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveStudents(students); }, [students, currentUser, isLoading]);
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveClasses(classes); }, [classes, currentUser, isLoading]);
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveEvents(events); }, [events, currentUser, isLoading]);
   
-  // NEW: Persist Calendar Events
+  // Persist Calendar Events
   useEffect(() => { 
       if(currentUser && !isLoading && scheduleEvents.length > 0) {
           localStorage.setItem('pulse_calendar_events', JSON.stringify(scheduleEvents));
@@ -168,7 +173,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const updateStudent = (updatedStudent: Student) => {
       if (currentUser?.role !== 'master') return;
       setStudents(prev => prev.map(s => s.id === updatedStudent.id ? { ...updatedStudent, balance: s.balance } : s));
-      // Update User DB mirror
       const userDB = PulseService.getUsersDB();
       const updatedDB = userDB.map(u => u.id === updatedStudent.userId ? { ...u, name: updatedStudent.name, email: updatedStudent.email } : u);
       localStorage.setItem('pulse_users_db', JSON.stringify(updatedDB));
@@ -360,12 +364,13 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast('Alumno dado de baja de la clase', 'info');
   };
 
-  // --- NEW CALENDAR ACTIONS ---
+  // --- CALENDAR CRUD OPERATIONS ---
   
   const addCalendarEvent = (event: CalendarEvent) => {
       if (currentUser?.role !== 'master') return;
       const newEvent = { ...event, id: event.id || generateId('cal_evt') };
       setScheduleEvents(prev => [...prev, newEvent]);
+      // Optional: Sync with Legacy "Events" if needed, but keeping separate for clear architecture
       addToast('Evento agregado al calendario', 'success');
   };
 
@@ -377,12 +382,18 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast('Horario actualizado en tiempo real', 'success');
   };
 
+  const deleteCalendarEvent = (id: string) => {
+      if (currentUser?.role !== 'master') return;
+      setScheduleEvents(prev => prev.filter(evt => evt.id !== id));
+      addToast('Evento eliminado del calendario', 'success');
+  };
+
+  // --- MARKETPLACE EVENTS (LEGACY) ---
+
   const addEvent = (event: Event) => {
       if (currentUser?.role !== 'master') return;
       
       let initialRegistrants = event.registrants || [];
-      
-      // AUTOMATION: If event is exam, automatically add 'exam_ready' students
       if (event.type === 'exam') {
           const readyStudents = students.filter(s => s.status === 'exam_ready').map(s => s.id);
           initialRegistrants = Array.from(new Set([...initialRegistrants, ...readyStudents]));
@@ -397,12 +408,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       };
       
       setEvents(prev => [...prev, newEvent]);
-      
-      if (event.type === 'exam' && initialRegistrants.length > 0) {
-          addToast(`Evento creado con ${initialRegistrants.length} alumnos asignados automáticamente.`, 'success');
-      } else {
-          addToast('Evento creado', 'success');
-      }
+      addToast('Evento creado', 'success');
   };
 
   const updateEvent = (updatedEvent: Event) => {
@@ -504,7 +510,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         markAttendance, bulkMarkPresent, promoteStudent, 
         addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
         addEvent, updateEvent, deleteEvent, registerForEvent, updateEventRegistrants,
-        addCalendarEvent, updateCalendarEvent, // Exposed Calendar Actions
+        addCalendarEvent, updateCalendarEvent, deleteCalendarEvent, // NEW EXPORTS
         addLibraryResource, deleteLibraryResource, toggleResourceCompletion, 
         updateAcademySettings, updatePaymentDates,
         sendMessage, markMessageRead
