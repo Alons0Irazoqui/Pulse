@@ -100,7 +100,21 @@ export const PulseService = {
             academyId: academy.id,
             name: data.name,
             email: data.email,
-            phone: data.phone,
+            cellPhone: data.phone,
+            age: 0, 
+            birthDate: new Date().toISOString().split('T')[0],
+            guardian: {
+                fullName: 'N/A',
+                email: 'N/A',
+                phones: { main: 'N/A' },
+                relationship: 'Otro',
+                address: {
+                    street: 'N/A',
+                    exteriorNumber: 'N/A',
+                    colony: 'N/A',
+                    zipCode: '00000'
+                }
+            },
             rank: 'White Belt',
             rankId: academy.ranks[0].id,
             rankColor: 'white',

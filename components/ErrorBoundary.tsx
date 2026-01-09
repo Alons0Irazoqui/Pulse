@@ -1,7 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 interface State {
@@ -43,7 +43,7 @@ class ErrorBoundary extends Component<Props, State> {
                     Recargar Aplicación
                 </button>
                 <button 
-                    onClick={() => this.setState({ hasError: false })} 
+                    onClick={() => this.setState({ hasError: false, error: null })} 
                     className="bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all active:scale-95"
                 >
                     Intentar de nuevo

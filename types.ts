@@ -53,29 +53,30 @@ export interface AttendanceRecord {
     reason?: string;
 }
 
-export interface Student {
-    id: string;
-    userId: string;
-    academyId: string;
-    name: string;
+// --- EXTENDED DATA STRUCTURES ---
+
+export interface Address {
+    street: string;
+    exteriorNumber: string;
+    interiorNumber?: string;
+    colony: string;
+    zipCode: string;
+    city?: string;
+    state?: string;
+}
+
+export interface ContactPhones {
+    main: string;
+    secondary?: string;
+    tertiary?: string;
+}
+
+export interface GuardianProfile {
+    fullName: string;
     email: string;
-    phone?: string;
-    rank: string;
-    rankId: string;
-    rankColor: RankColor;
-    stripes: number;
-    status: StudentStatus;
-    program: string;
-    attendance: number;
-    totalAttendance: number;
-    lastAttendance?: string;
-    attendanceHistory: AttendanceRecord[];
-    joinDate: string;
-    avatarUrl?: string;
-    balance: number; // Derived state (Charges - Paid Payments)
-    classesId: string[];
-    promotionHistory?: PromotionHistoryItem[];
-    notes?: Note[];
+    phones: ContactPhones;
+    relationship: 'Padre' | 'Madre' | 'Tutor Legal' | 'Familiar' | 'Otro';
+    address: Address;
 }
 
 export interface Note {
@@ -83,6 +84,45 @@ export interface Note {
     date: string;
     content: string;
     author: string;
+}
+
+export interface Student {
+    id: string;
+    userId: string;
+    academyId: string;
+    
+    // Auth & Identity
+    email: string;
+    password?: string; // Optional in state, required in DB/Registration
+    
+    // Alumno Profile
+    name: string;
+    age: number;
+    birthDate: string; // ISO Date YYYY-MM-DD
+    cellPhone: string;
+    avatarUrl?: string;
+    
+    // Guardian / Responsible Party
+    guardian: GuardianProfile;
+
+    // Academic Data
+    rank: string;
+    rankId: string;
+    rankColor: RankColor;
+    stripes: number;
+    status: StudentStatus;
+    program: string;
+    
+    // Computed / Activity Data
+    attendance: number;
+    totalAttendance: number;
+    lastAttendance?: string;
+    attendanceHistory: AttendanceRecord[];
+    joinDate: string;
+    balance: number; 
+    classesId: string[];
+    promotionHistory?: PromotionHistoryItem[];
+    notes?: Note[];
 }
 
 export interface SessionModification {
@@ -129,10 +169,7 @@ export interface Event {
 
 export type PaymentCategory = 'Mensualidad' | 'Torneo' | 'Examen/Promoción' | 'Equipo/Uniforme' | 'Otro' | 'Late Fee';
 
-// --- FINANCIAL CORE ---
 export type TransactionType = 'charge' | 'payment';
-// Charge: A debt created by the system/master. Always 'charged'.
-// Payment: A money transfer attempt by student. Can be pending, paid, or rejected.
 export type TransactionStatus = 'charged' | 'pending_approval' | 'paid' | 'rejected';
 
 export interface FinancialRecord {
@@ -141,26 +178,18 @@ export interface FinancialRecord {
     studentId: string;
     studentName?: string;
     amount: number;
-    date: string; // ISO YYYY-MM-DD
-    
-    // Strict typing based on architecture requirements
+    date: string; 
     type: TransactionType;
     status: TransactionStatus;
-    
     description: string;
     category: PaymentCategory;
     method?: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'System';
-    
-    // Proof for payments
     proofUrl?: string; 
     proofType?: string; 
-    
-    // Audit
     processedBy?: string;
     processedAt?: string;
 }
 
-// Alias for backward compatibility during refactor if needed, ensuring new code uses FinancialRecord
 export type Payment = FinancialRecord; 
 
 export interface UserProfile {

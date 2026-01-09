@@ -1,3 +1,4 @@
+
 import { Student, ClassSession, FinanceStat, ScheduleItem, Invoice, Message, LibraryResource, AcademySettings } from './types';
 
 export const defaultRanks = [
@@ -41,8 +42,11 @@ export const mockStudents: Student[] = [
         userId: 'u-8821',
         academyId: 'acad-1',
         name: 'Mateo Silva',
-        email: 'mateo@example.com',
-        phone: '+1 (555) 123-4567',
+        age: 8,
+        birthDate: '2015-05-10',
+        email: 'mateo.student@example.com',
+        cellPhone: '5551234567',
+        password: 'password123',
         rank: 'White Belt',
         rankId: 'rank-1',
         rankColor: 'white',
@@ -58,22 +62,41 @@ export const mockStudents: Student[] = [
         attendanceHistory: [],
         promotionHistory: [
             { rank: 'White Belt', date: 'Aug 15, 2023', notes: 'Joined Academy' }
-        ]
+        ],
+        guardian: {
+            fullName: 'Roberto Silva',
+            email: 'roberto.padre@example.com',
+            relationship: 'Padre',
+            phones: {
+                main: '5559876543',
+                secondary: '5551112222'
+            },
+            address: {
+                street: 'Av. Reforma',
+                exteriorNumber: '123',
+                colony: 'Centro',
+                zipCode: '06600',
+                city: 'CDMX'
+            }
+        }
     },
     {
         id: '7442',
         userId: 'u-7442',
         academyId: 'acad-1',
         name: 'Lucia Mendez',
+        age: 24,
+        birthDate: '1999-11-22',
         email: 'lucia@example.com',
-        phone: '+1 (555) 987-6543',
+        cellPhone: '5559876543',
+        password: 'password123',
         rank: 'Blue Belt',
         rankId: 'rank-2',
         rankColor: 'blue',
         status: 'debtor',
         program: 'Adults',
         attendance: 45,
-        totalAttendance: 165, // Previous ranks included
+        totalAttendance: 165,
         joinDate: 'Jan 10, 2022',
         avatarUrl: 'https://i.pravatar.cc/150?u=lucia',
         stripes: 1,
@@ -83,7 +106,23 @@ export const mockStudents: Student[] = [
         promotionHistory: [
             { rank: 'White Belt', date: 'Jan 10, 2022', notes: 'Joined Academy' },
             { rank: 'Blue Belt', date: 'Dec 05, 2022', notes: 'Exceptional performance in Guard Passing' }
-        ]
+        ],
+        guardian: {
+            fullName: 'Lucia Mendez (Self)',
+            email: 'lucia@example.com',
+            relationship: 'Otro', // Self-responsible
+            phones: {
+                main: '5559876543'
+            },
+            address: {
+                street: 'Calle Pino',
+                exteriorNumber: '45',
+                interiorNumber: '3B',
+                colony: 'Del Valle',
+                zipCode: '03100',
+                city: 'CDMX'
+            }
+        }
     }
 ];
 
@@ -97,7 +136,7 @@ export const mockLibraryResources: LibraryResource[] = [
         duration: '12:45',
         category: 'Technique',
         level: 'White Belt',
-        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Mock
+        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 
         completedBy: []
     },
     {
@@ -109,7 +148,7 @@ export const mockLibraryResources: LibraryResource[] = [
         duration: '18:20',
         category: 'Technique',
         level: 'Blue Belt',
-        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Mock
+        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 
         completedBy: ['8821']
     }
 ];
