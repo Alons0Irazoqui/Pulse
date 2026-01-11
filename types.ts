@@ -126,8 +126,8 @@ export interface Student {
 }
 
 export interface SessionModification {
-    date: string;
-    type: 'cancel' | 'move' | 'instructor' | 'time';
+    date: string; // YYYY-MM-DD
+    type: 'cancel' | 'move' | 'instructor' | 'time' | 'rescheduled';
     newDate?: string;
     newStartTime?: string;
     newEndTime?: string;
@@ -145,9 +145,9 @@ export interface ClassCategory {
     academyId: string;
     name: string;
     schedule: string;
-    days: string[];
-    startTime: string;
-    endTime: string;
+    days: string[]; // e.g. ['Monday', 'Wednesday']
+    startTime: string; // "19:00"
+    endTime: string; // "20:30"
     instructor: string;
     studentCount: number;
     studentIds: string[];
@@ -167,6 +167,10 @@ export interface CalendarEvent {
     status: 'active' | 'cancelled' | 'rescheduled';
     color: string;
     description?: string;
+    
+    // Linking to Class System
+    classId?: string; // ID of the ClassCategory if this is a generated class instance
+    isRecurring?: boolean; 
     
     // Legacy / Extended Support
     instructorName?: string; // Optional for backward compatibility, mapped to instructor
@@ -190,6 +194,7 @@ export interface Event extends CalendarEvent {
     registeredCount: number;
     capacity: number;
     eligibleRanks?: string[];
+    isVisibleToStudents?: boolean; // Control visibility in student dashboard
 }
 
 export type PaymentCategory = 'Mensualidad' | 'Torneo' | 'Examen/Promoción' | 'Equipo/Uniforme' | 'Otro' | 'Late Fee';

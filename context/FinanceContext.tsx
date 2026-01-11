@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { FinancialRecord } from '../types';
 import { PulseService } from '../services/pulseService';
@@ -148,6 +149,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       let newRecord = { ...record };
       if (!newRecord.id) newRecord.id = generateId('tx');
       if (!newRecord.academyId) newRecord.academyId = currentUser!.academyId;
+      // CRITICAL FIX: Use getLocalDate() instead of new Date().toISOString()
       if (!newRecord.date) newRecord.date = getLocalDate();
 
       if (newRecord.type === 'charge') {
@@ -182,7 +184,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const generateMonthlyBilling = () => {
       if (currentUser?.role !== 'master') return;
-      const today = getLocalDate();
+      const today = getLocalDate(); // Fixed Date
       const monthlyAmount = academySettings.paymentSettings.monthlyTuition || 800;
       const newCharges: FinancialRecord[] = [];
       const activeStudents = students.filter(s => s.status !== 'inactive');
@@ -216,7 +218,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const applyLateFees = () => {
       if (currentUser?.role !== 'master') return;
       const { lateFeeAmount } = academySettings.paymentSettings;
-      const today = getLocalDate();
+      const today = getLocalDate(); // Fixed Date
       const fees: FinancialRecord[] = [];
 
       students.forEach(s => {
@@ -254,9 +256,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
       payments.forEach(p => {
           if (p.type === 'payment' && p.status === 'paid') {
-              const date = new Date(p.date);
-              if (!isNaN(date.getTime())) {
-                  const key = months[date.getMonth()];
+              const [y, m, d] = p.date.split('-').map(Number);
+              const key = months[m - 1]; // m is 1-12
+              if (key) {
                   if (revenueByMonth[key] === undefined) revenueByMonth[key] = 0;
                   revenueByMonth[key] += p.amount;
               }

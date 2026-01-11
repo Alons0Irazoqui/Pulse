@@ -1,11 +1,8 @@
 
 import React, { useState, useCallback } from 'react';
 import { Calendar, dateFnsLocalizer, Views, View } from 'react-big-calendar';
-import format from 'date-fns/format';
-import parse from 'date-fns/parse';
-import startOfWeek from 'date-fns/startOfWeek';
-import getDay from 'date-fns/getDay';
-import es from 'date-fns/locale/es';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useAcademy } from '../../context/AcademyContext';
 import { CalendarEvent } from '../../types';
 import { useToast } from '../../context/ToastContext';
@@ -216,11 +213,13 @@ const EventModal: React.FC<{
                         <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">Título de la Clase</label>
                         <input 
                             required
+                            disabled={!!event.classId} // If recurring class instance, disable title editing here
                             value={formData.title} 
                             onChange={e => setFormData({...formData, title: e.target.value})}
-                            className="w-full rounded-xl border-gray-200 bg-gray-50/50 p-3 text-sm focus:border-primary focus:ring-primary font-semibold" 
+                            className="w-full rounded-xl border-gray-200 bg-gray-50/50 p-3 text-sm focus:border-primary focus:ring-primary font-semibold disabled:text-gray-500 disabled:bg-gray-100" 
                             placeholder="Ej. Jiu-Jitsu Fundamentals"
                         />
+                        {event.classId && <p className="text-[10px] text-gray-400 mt-1">* Título definido en configuración de clase.</p>}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -305,7 +304,7 @@ const EventModal: React.FC<{
                                 type="button" 
                                 onClick={() => onDelete(event.id!)}
                                 className="p-3 rounded-xl border border-red-100 text-red-500 hover:bg-red-50 transition-colors"
-                                title="Eliminar permanentemente"
+                                title="Eliminar / Cancelar"
                             >
                                 <span className="material-symbols-outlined">delete</span>
                             </button>
@@ -379,7 +378,7 @@ const ScheduleManager: React.FC = () => {
     const handleSaveEvent = (evt: Partial<CalendarEvent>) => {
         if (evt.id) {
             updateCalendarEvent(evt.id, evt);
-            addToast('Evento actualizado', 'success');
+            addToast('Calendario actualizado', 'success');
         } else {
             addCalendarEvent({
                 ...evt,
@@ -387,21 +386,21 @@ const ScheduleManager: React.FC = () => {
                 academyId: '', // Context assigns Academy
                 type: 'class'
             } as CalendarEvent);
-            addToast('Evento creado en el calendario', 'success');
+            addToast('Evento creado', 'success');
         }
         setIsModalOpen(false);
     };
 
     const handleDeleteEvent = (id: string) => {
         confirm({
-            title: 'Eliminar Evento',
-            message: '¿Estás seguro? Esta acción eliminará el evento permanentemente. Si solo quieres cancelarlo, cambia el estado a "Cancelado".',
+            title: 'Eliminar/Cancelar Evento',
+            message: '¿Estás seguro? Si es una clase recurrente, se cancelará solo esta sesión.',
             type: 'danger',
-            confirmText: 'Eliminar',
+            confirmText: 'Proceder',
             onConfirm: () => {
                 deleteCalendarEvent(id);
                 setIsModalOpen(false);
-                addToast('Evento eliminado', 'info');
+                addToast('Evento actualizado', 'info');
             }
         });
     };

@@ -357,7 +357,12 @@ export const PulseService = {
     getEvents: (academyId?: string): Event[] => {
         const data = localStorage.getItem(STORAGE_KEYS.EVENTS);
         let events: Event[] = data ? JSON.parse(data) : [];
-        events = events.map(e => ({...e, registrants: e.registrants || [], academyId: e.academyId || 'acad-1'}));
+        events = events.map(e => ({
+            ...e, 
+            registrants: e.registrants || [], 
+            academyId: e.academyId || 'acad-1',
+            isVisibleToStudents: e.isVisibleToStudents !== undefined ? e.isVisibleToStudents : true // Default legacy to true
+        }));
         if (academyId) return events.filter(e => e.academyId === academyId);
         return events;
     },

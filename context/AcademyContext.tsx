@@ -1,11 +1,12 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Student, ClassCategory, Event, LibraryResource, AcademySettings, Message, AttendanceRecord, SessionModification, ClassException, PromotionHistoryItem, CalendarEvent } from '../types';
 import { PulseService } from '../services/pulseService';
 import { mockMessages, mockCalendarEvents } from '../mockData';
 import { getLocalDate, formatDateDisplay } from '../utils/dateUtils';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
+import { format } from 'date-fns';
 
 // Helper for ID generation
 const generateId = (prefix: string = 'id') => {
@@ -19,7 +20,7 @@ interface AcademyContextType {
   students: Student[];
   classes: ClassCategory[];
   events: Event[];
-  scheduleEvents: CalendarEvent[]; // REAL CALENDAR STATE
+  scheduleEvents: CalendarEvent[]; // REAL CALENDAR STATE (Derived)
   libraryResources: LibraryResource[];
   academySettings: AcademySettings;
   messages: Message[];
@@ -80,10 +81,111 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassCategory[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [scheduleEvents, setScheduleEvents] = useState<CalendarEvent[]>([]); // Calendar State
+  const [scheduleEvents, setScheduleEvents] = useState<CalendarEvent[]>([]); // This is now derived + explicit events
   const [libraryResources, setLibraryResources] = useState<LibraryResource[]>([]);
   const [academySettings, setAcademySettings] = useState<AcademySettings>(PulseService.getAcademySettings(academyId));
   const [messages, setMessages] = useState<Message[]>([]);
+
+  // --- CALENDAR ENGINE ---
+  // Calculates events dynamically based on recurring classes and their modifications.
+  const calculateCalendarEvents = useCallback((currentClasses: ClassCategory[], currentEvents: Event[]) => {
+      const generatedEvents: CalendarEvent[] = [];
+      
+      // 1. Process One-time Events (Marketplace)
+      currentEvents.forEach(evt => {
+          generatedEvents.push({
+              ...evt,
+              start: new Date(`${evt.date}T${evt.time}`),
+              end: new Date(new Date(`${evt.date}T${evt.time}`).getTime() + 60*60*1000), // Default 1h if not spec
+              color: evt.type === 'exam' ? '#db2777' : evt.type === 'tournament' ? '#f97316' : '#3b82f6',
+              isRecurring: false
+          });
+      });
+
+      // 2. Generate Recurring Class Instances
+      // Generate for a 12-month window (-2 month to +10 months) to cover reasonable viewing
+      const today = new Date();
+      const startWindow = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+      const endWindow = new Date(today.getFullYear(), today.getMonth() + 10, 0);
+      
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+      currentClasses.forEach(cls => {
+          const loopDate = new Date(startWindow);
+          
+          while (loopDate <= endWindow) {
+              const dayName = dayNames[loopDate.getDay()];
+              // CRITICAL FIX: Use local format yyyy-MM-dd to match modification keys exactly
+              const dateStr = format(loopDate, 'yyyy-MM-dd');
+              
+              // Check if class occurs on this day OR if it was moved TO this day
+              const modification = cls.modifications.find(m => m.date === dateStr);
+              const movedHere = cls.modifications.find(m => m.newDate === dateStr && m.type === 'move');
+              
+              let shouldRender = false;
+              let currentMod: SessionModification | undefined = undefined;
+
+              if (movedHere) {
+                  shouldRender = true;
+                  currentMod = movedHere;
+              } else if (cls.days.includes(dayName)) {
+                  // It's a regular day
+                  if (modification?.type === 'move') {
+                      // Moved AWAY from here -> Don't render
+                      shouldRender = false; 
+                  } else {
+                      shouldRender = true;
+                      currentMod = modification;
+                  }
+              }
+
+              if (shouldRender) {
+                  const startTime = currentMod?.newStartTime || cls.startTime;
+                  const endTime = currentMod?.newEndTime || cls.endTime;
+                  const instructor = currentMod?.newInstructor || cls.instructor;
+                  const status = currentMod?.type === 'cancel' ? 'cancelled' : (currentMod?.type === 'rescheduled' ? 'rescheduled' : 'active');
+
+                  const [sh, sm] = startTime.split(':').map(Number);
+                  const [eh, em] = endTime.split(':').map(Number);
+
+                  const start = new Date(loopDate);
+                  start.setHours(sh, sm, 0);
+                  
+                  const end = new Date(loopDate);
+                  end.setHours(eh, em, 0);
+
+                  generatedEvents.push({
+                      id: `${cls.id}-${dateStr}`,
+                      academyId: cls.academyId,
+                      classId: cls.id, // CRITICAL FOR FILTERING
+                      title: cls.name,
+                      start,
+                      end,
+                      instructor,
+                      instructorName: instructor,
+                      status: status,
+                      type: 'class',
+                      color: status === 'cancelled' ? '#ef4444' : '#3b82f6', 
+                      isRecurring: true,
+                      description: status === 'cancelled' ? 'Clase Cancelada' : `Instructor: ${instructor}`
+                  });
+              }
+
+              loopDate.setDate(loopDate.getDate() + 1);
+          }
+      });
+
+      return generatedEvents;
+  }, []);
+
+  // Refresh calendar when classes or events change
+  useEffect(() => {
+      if (!isLoading) {
+          const newEvents = calculateCalendarEvents(classes, events);
+          setScheduleEvents(newEvents);
+      }
+  }, [classes, events, isLoading, calculateCalendarEvents]);
+
 
   const loadData = () => {
       setIsLoading(true);
@@ -91,27 +193,14 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setTimeout(() => {
               setAcademySettings(PulseService.getAcademySettings(currentUser.academyId));
               setStudents(PulseService.getStudents(currentUser.academyId));
-              setClasses(PulseService.getClasses(currentUser.academyId));
-              setEvents(PulseService.getEvents(currentUser.academyId));
+              const loadedClasses = PulseService.getClasses(currentUser.academyId);
+              setClasses(loadedClasses);
+              const loadedEvents = PulseService.getEvents(currentUser.academyId);
+              setEvents(loadedEvents);
               
-              // HYDRATION & MOCK INIT FOR CALENDAR
-              const storedEvents = localStorage.getItem('pulse_calendar_events');
-              if (storedEvents) {
-                  try {
-                      // Revive Date objects from JSON strings
-                      const parsed = JSON.parse(storedEvents).map((e: any) => ({
-                          ...e,
-                          start: new Date(e.start), 
-                          end: new Date(e.end)
-                      }));
-                      setScheduleEvents(parsed);
-                  } catch (e) {
-                      console.error("Failed to parse calendar events", e);
-                      setScheduleEvents(mockCalendarEvents);
-                  }
-              } else {
-                  setScheduleEvents(mockCalendarEvents);
-              }
+              // Initial Calc
+              const calculated = calculateCalendarEvents(loadedClasses, loadedEvents);
+              setScheduleEvents(calculated);
 
               setLibraryResources(PulseService.getLibrary(currentUser.academyId));
               const storedMsgs = localStorage.getItem('pulse_messages');
@@ -131,14 +220,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveStudents(students); }, [students, currentUser, isLoading]);
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveClasses(classes); }, [classes, currentUser, isLoading]);
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveEvents(events); }, [events, currentUser, isLoading]);
-  
-  // Persist Calendar Events
-  useEffect(() => { 
-      if(currentUser && !isLoading && scheduleEvents.length > 0) {
-          localStorage.setItem('pulse_calendar_events', JSON.stringify(scheduleEvents));
-      }
-  }, [scheduleEvents, currentUser, isLoading]);
-
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveLibrary(libraryResources); }, [libraryResources, currentUser, isLoading]);
   useEffect(() => { if(currentUser && !isLoading) PulseService.saveAcademySettings(academySettings); }, [academySettings, currentUser, isLoading]);
   useEffect(() => { if(currentUser && !isLoading) localStorage.setItem('pulse_messages', JSON.stringify(messages)); }, [messages, currentUser, isLoading]);
@@ -307,16 +388,20 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addToast('Clase actualizada', 'success');
   };
 
+  // --- CRITICAL: Updates the class exceptions, triggering calendar regeneration ---
   const modifyClassSession = (classId: string, modification: SessionModification) => {
     if (currentUser?.role !== 'master') return;
     setClasses(prev => prev.map(c => {
         if (c.id === classId) {
+            // Remove existing mod for this date if exists
             const newModifications = c.modifications.filter(m => m.date !== modification.date);
+            // Add new mod
             newModifications.push(modification);
             return { ...c, modifications: newModifications };
         }
         return c;
     }));
+    // Note: useEffect[classes] will trigger recalculation of scheduleEvents automatically
     addToast('Sesión modificada', 'success');
   };
 
@@ -364,28 +449,51 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast('Alumno dado de baja de la clase', 'info');
   };
 
-  // --- CALENDAR CRUD OPERATIONS ---
+  // --- CALENDAR CRUD OPERATIONS (Wrapper) ---
   
   const addCalendarEvent = (event: CalendarEvent) => {
-      if (currentUser?.role !== 'master') return;
-      const newEvent = { ...event, id: event.id || generateId('cal_evt') };
-      setScheduleEvents(prev => [...prev, newEvent]);
-      // Optional: Sync with Legacy "Events" if needed, but keeping separate for clear architecture
-      addToast('Evento agregado al calendario', 'success');
+      if (event.type !== 'class') {
+          addEvent(event as Event);
+      }
   };
 
   const updateCalendarEvent = (id: string, updates: Partial<CalendarEvent>) => {
       if (currentUser?.role !== 'master') return;
-      setScheduleEvents(prev => prev.map(evt => 
-          evt.id === id ? { ...evt, ...updates } : evt
-      ));
-      addToast('Horario actualizado en tiempo real', 'success');
+      
+      // CRITICAL FIX: If it's a recurring class instance, ensure DATE key matches formatting
+      if (updates.classId && updates.start) {
+          // Use format from date-fns to avoid timezone shifts (UTC vs Local)
+          const dateStr = format(updates.start, 'yyyy-MM-dd');
+          
+          const modification: SessionModification = {
+              date: dateStr,
+              type: updates.status === 'cancelled' ? 'cancel' : 'instructor',
+              newInstructor: updates.instructor,
+              newStartTime: updates.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}),
+              newEndTime: updates.end?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})
+          };
+          if (updates.status === 'rescheduled') modification.type = 'rescheduled';
+          
+          modifyClassSession(updates.classId, modification);
+      } 
+      // Else, update legacy event
+      else {
+          setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+      }
   };
 
   const deleteCalendarEvent = (id: string) => {
-      if (currentUser?.role !== 'master') return;
-      setScheduleEvents(prev => prev.filter(evt => evt.id !== id));
-      addToast('Evento eliminado del calendario', 'success');
+      // Find if it's an Event or Class Instance
+      const evt = events.find(e => e.id === id);
+      if (evt) {
+          deleteEvent(id);
+      } else {
+          // It's likely a generated class instance ID like "classId-date"
+          const [classId, dateStr] = id.split(/-(?=\d{4}-\d{2}-\d{2})/); // split on last dash before date
+          if (classId && dateStr) {
+              modifyClassSession(classId, { date: dateStr, type: 'cancel' });
+          }
+      }
   };
 
   // --- MARKETPLACE EVENTS (LEGACY) ---

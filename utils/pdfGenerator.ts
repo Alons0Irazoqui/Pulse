@@ -8,6 +8,11 @@ export const generateReceipt = (payment: Payment, academy: AcademySettings, user
         return;
     }
 
+    // CRITICAL FIX: Manually parse date string YYYY-MM-DD to avoid UTC shift
+    const [year, month, day] = payment.date.split('-').map(Number);
+    const localDate = new Date(year, month - 1, day);
+    const displayDate = localDate.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+
     const html = `
     <!DOCTYPE html>
     <html>
@@ -96,7 +101,7 @@ export const generateReceipt = (payment: Payment, academy: AcademySettings, user
                 </div>
                 <div class="info-col" style="text-align: right;">
                     <h3>Detalles</h3>
-                    <p>Fecha: ${new Date(payment.date).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <p>Fecha: ${displayDate}</p>
                     <p>Método: ${payment.method || 'No especificado'}</p>
                 </div>
             </div>

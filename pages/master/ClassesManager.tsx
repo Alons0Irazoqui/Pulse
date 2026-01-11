@@ -5,10 +5,10 @@ import { ClassCategory, SessionModification, Event } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useConfirmation } from '../../context/ConfirmationContext';
 import { useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const ClassesManager: React.FC = () => {
-  const { classes, events, students, addClass, updateClass, deleteClass, modifyClassSession, addEvent, updateEvent, deleteEvent, updateEventRegistrants } = useStore();
+  const { classes, events, addClass, updateClass, deleteClass, modifyClassSession, addEvent } = useStore();
   const { addToast } = useToast();
   const { confirm } = useConfirmation();
   const navigate = useNavigate();
@@ -22,7 +22,6 @@ const ClassesManager: React.FC = () => {
 
   // -- EVENT MANAGEMENT STATES --
   const [showEventModal, setShowEventModal] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   
   // -- CALENDAR MANAGER STATES --
   const [managingClassId, setManagingClassId] = useState<string | null>(null);
@@ -47,14 +46,14 @@ const ClassesManager: React.FC = () => {
 
   // Forms - Event
   const [eventForm, setEventForm] = useState({
-      title: '', date: '', time: '', type: 'exam' as Event['type'], description: '', capacity: 50
+      title: '', 
+      date: '', 
+      time: '', 
+      type: 'exam' as Event['type'], 
+      description: '', 
+      capacity: 50,
+      isVisibleToStudents: true // Default to true
   });
-
-  // Event Side Panel States
-  const [activeEventId, setActiveEventId] = useState<string | null>(null);
-  const activeEvent = events.find(e => e.id === activeEventId);
-  const [attendeeSearch, setAttendeeSearch] = useState('');
-  const [eventPanelTab, setEventPanelTab] = useState<'info' | 'attendees'>('info');
 
   const daysOptions = [
       { key: 'Monday', label: 'Lun', full: 'Lunes' },
@@ -147,6 +146,7 @@ const ClassesManager: React.FC = () => {
           description: eventForm.description,
           registeredCount: 0,
           capacity: eventForm.capacity,
+          isVisibleToStudents: eventForm.isVisibleToStudents, // Pass visibility
           // Missing props from Event (extends CalendarEvent)
           start,
           end,
@@ -156,7 +156,7 @@ const ClassesManager: React.FC = () => {
           status: 'active'
       });
       
-      setEventForm({ title: '', date: '', time: '', type: 'exam', description: '', capacity: 50 });
+      setEventForm({ title: '', date: '', time: '', type: 'exam', description: '', capacity: 50, isVisibleToStudents: true });
       setShowEventModal(false);
   };
 
@@ -168,77 +168,6 @@ const ClassesManager: React.FC = () => {
           onConfirm: () => deleteClass(id)
       });
   };
-
-  const handleDeleteEvent = (id: string) => {
-      confirm({
-          title: 'Eliminar Evento',
-          message: '¿Estás seguro de eliminar este evento?',
-          type: 'danger',
-          onConfirm: () => {
-              deleteEvent(id);
-              setActiveEventId(null);
-          }
-      });
-  };
-
-  const handleUpdateEventDetails = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (activeEvent) {
-          // Here we assume activeEvent is linked to state via eventForm logic or we update directly
-          // For simplicity in this panel, we'll implement a direct update via form binding if needed
-          // But for now, let's just trigger a toast as strict update logic usually binds to a form state
-          // Re-using addEvent/updateEvent logic:
-          updateEvent(activeEvent); 
-          // Note: In a real app, inputs would be controlled. 
-          // For this demo, let's assume direct mutation via inputs in the drawer updating a local state
-          addToast('Evento actualizado', 'success');
-      }
-  };
-
-  // --- ATTENDEE MANAGEMENT LOGIC ---
-  const handleToggleAttendee = (studentId: string) => {
-      if (!activeEvent) return;
-      const currentRegistrants = activeEvent.registrants || [];
-      let newRegistrants;
-      
-      if (currentRegistrants.includes(studentId)) {
-          newRegistrants = currentRegistrants.filter(id => id !== studentId);
-      } else {
-          // Check capacity
-          if (currentRegistrants.length >= activeEvent.capacity) {
-              addToast('Cupo lleno', 'error');
-              return;
-          }
-          newRegistrants = [...currentRegistrants, studentId];
-      }
-      
-      updateEventRegistrants(activeEvent.id, newRegistrants);
-  };
-
-  const sortedStudentsForEvent = useMemo(() => {
-      if (!activeEvent) return [];
-      
-      return students.filter(s => 
-          s.status !== 'inactive' && 
-          s.name.toLowerCase().includes(attendeeSearch.toLowerCase())
-      ).sort((a, b) => {
-          // Priority 1: Already Registered
-          const aReg = activeEvent.registrants?.includes(a.id) ? 1 : 0;
-          const bReg = activeEvent.registrants?.includes(b.id) ? 1 : 0;
-          if (aReg !== bReg) return bReg - aReg; // Registered first
-
-          // Priority 2: Exam Ready (only if event is exam)
-          if (activeEvent.type === 'exam') {
-              const aReady = a.status === 'exam_ready' ? 1 : 0;
-              const bReady = b.status === 'exam_ready' ? 1 : 0;
-              if (aReady !== bReady) return bReady - aReady;
-          }
-
-          // Priority 3: Alphabetical
-          return a.name.localeCompare(b.name);
-      });
-  }, [students, activeEvent, attendeeSearch]);
-
 
   // --- CALENDAR LOGIC ---
 
@@ -489,6 +418,15 @@ const ClassesManager: React.FC = () => {
                                                 </p>
                                             </div>
                                         </div>
+                                        
+                                        {/* Privacy Badge */}
+                                        {event.isVisibleToStudents === false && (
+                                            <div className="absolute top-6 right-6" title="Evento Privado (Solo Invitación)">
+                                                <span className="bg-gray-100 text-gray-500 p-1.5 rounded-full flex items-center justify-center border border-gray-200">
+                                                    <span className="material-symbols-outlined text-sm">visibility_off</span>
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Capacity Progress */}
@@ -505,12 +443,13 @@ const ClassesManager: React.FC = () => {
                                         </div>
                                     </div>
 
+                                    {/* Updated: Button Navigates to Full Page */}
                                     <button 
-                                        onClick={() => { setActiveEventId(event.id); setEventPanelTab('info'); }}
+                                        onClick={() => navigate(`/master/event/${event.id}`)}
                                         className="mt-auto w-full py-3 rounded-xl border border-gray-200 bg-white text-text-main font-bold hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                                     >
                                         <span className="material-symbols-outlined">settings</span>
-                                        Gestionar Inscritos
+                                        Gestionar Evento
                                     </button>
                                 </div>
                             );
@@ -519,186 +458,6 @@ const ClassesManager: React.FC = () => {
                  </div>
             </div>
         )}
-
-        {/* --- SIDE PANEL: EVENT MANAGEMENT --- */}
-        <AnimatePresence>
-            {activeEvent && (
-                <>
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setActiveEventId(null)}
-                        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-                    />
-                    <motion.div 
-                        initial={{ x: '100%' }}
-                        animate={{ x: 0 }}
-                        exit={{ x: '100%' }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl border-l border-gray-100 flex flex-col"
-                    >
-                        {/* Panel Header */}
-                        <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-start">
-                            <div>
-                                <h2 className="text-2xl font-bold text-text-main">{activeEvent.title}</h2>
-                                <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm">event</span>
-                                    {new Date(activeEvent.date).toLocaleDateString()} a las {activeEvent.time}
-                                </p>
-                            </div>
-                            <button onClick={() => setActiveEventId(null)} className="p-2 hover:bg-gray-200 rounded-full text-text-secondary transition-colors">
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-
-                        {/* Tabs */}
-                        <div className="flex border-b border-gray-200 px-6">
-                            <button 
-                                onClick={() => setEventPanelTab('info')}
-                                className={`py-4 px-4 text-sm font-bold border-b-2 transition-colors ${eventPanelTab === 'info' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-main'}`}
-                            >
-                                Editar Detalles
-                            </button>
-                            <button 
-                                onClick={() => setEventPanelTab('attendees')}
-                                className={`py-4 px-4 text-sm font-bold border-b-2 transition-colors ${eventPanelTab === 'attendees' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-main'}`}
-                            >
-                                Inscritos ({activeEvent.registeredCount})
-                            </button>
-                        </div>
-
-                        {/* Panel Content */}
-                        <div className="flex-1 overflow-y-auto p-6">
-                            {eventPanelTab === 'info' ? (
-                                <form onSubmit={(e) => { e.preventDefault(); updateEvent(activeEvent); addToast('Cambios guardados', 'success'); }} className="flex flex-col gap-5">
-                                    <div>
-                                        <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Nombre del Evento</label>
-                                        <input 
-                                            value={activeEvent.title} 
-                                            onChange={e => updateEvent({...activeEvent, title: e.target.value})}
-                                            className="w-full rounded-xl border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary" 
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Fecha</label>
-                                            <input 
-                                                type="date"
-                                                value={activeEvent.date} 
-                                                onChange={e => updateEvent({...activeEvent, date: e.target.value})}
-                                                className="w-full rounded-xl border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary" 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Hora</label>
-                                            <input 
-                                                type="time"
-                                                value={activeEvent.time} 
-                                                onChange={e => updateEvent({...activeEvent, time: e.target.value})}
-                                                className="w-full rounded-xl border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary" 
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Descripción</label>
-                                        <textarea 
-                                            value={activeEvent.description} 
-                                            onChange={e => updateEvent({...activeEvent, description: e.target.value})}
-                                            rows={4}
-                                            className="w-full rounded-xl border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary" 
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-text-secondary uppercase mb-2 block">Capacidad</label>
-                                        <input 
-                                            type="number"
-                                            value={activeEvent.capacity} 
-                                            onChange={e => updateEvent({...activeEvent, capacity: parseInt(e.target.value)})}
-                                            className="w-full rounded-xl border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary" 
-                                        />
-                                    </div>
-                                    
-                                    <div className="pt-6 mt-auto flex flex-col gap-3">
-                                        <button className="w-full py-3 rounded-xl bg-black text-white font-bold hover:opacity-90 transition-all">
-                                            Guardar Cambios
-                                        </button>
-                                        <button 
-                                            type="button"
-                                            onClick={() => handleDeleteEvent(activeEvent.id)}
-                                            className="w-full py-3 rounded-xl border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-all"
-                                        >
-                                            Eliminar Evento
-                                        </button>
-                                    </div>
-                                </form>
-                            ) : (
-                                <div className="flex flex-col gap-4 h-full">
-                                    <div className="relative">
-                                        <span className="material-symbols-outlined absolute left-3 top-3 text-gray-400">search</span>
-                                        <input 
-                                            placeholder="Buscar alumno para inscribir..." 
-                                            value={attendeeSearch}
-                                            onChange={e => setAttendeeSearch(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-3 rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:border-primary transition-all text-sm"
-                                        />
-                                    </div>
-
-                                    <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                                        {sortedStudentsForEvent.map(student => {
-                                            const isRegistered = activeEvent.registrants?.includes(student.id);
-                                            const isReady = student.status === 'exam_ready';
-                                            
-                                            return (
-                                                <div 
-                                                    key={student.id} 
-                                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                                        isRegistered 
-                                                        ? 'bg-blue-50 border-blue-200' 
-                                                        : isReady && activeEvent.type === 'exam'
-                                                            ? 'bg-yellow-50 border-yellow-200'
-                                                            : 'bg-white border-gray-100 hover:border-gray-300'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <img src={student.avatarUrl} className="size-10 rounded-full bg-gray-200 object-cover" />
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <p className="text-sm font-bold text-text-main">{student.name}</p>
-                                                                {isReady && activeEvent.type === 'exam' && (
-                                                                    <span className="text-[9px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold uppercase">Listo</span>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-xs text-text-secondary">{student.rank}</p>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <button 
-                                                        onClick={() => handleToggleAttendee(student.id)}
-                                                        className={`size-8 rounded-full flex items-center justify-center transition-all ${
-                                                            isRegistered 
-                                                            ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                                                            : 'bg-gray-100 text-gray-400 hover:bg-green-100 hover:text-green-600'
-                                                        }`}
-                                                    >
-                                                        <span className="material-symbols-outlined text-lg">
-                                                            {isRegistered ? 'remove' : 'add'}
-                                                        </span>
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                        {sortedStudentsForEvent.length === 0 && (
-                                            <p className="text-center text-gray-400 text-sm py-4">No se encontraron alumnos.</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </motion.div>
-                </>
-            )}
-        </AnimatePresence>
 
         {/* --- FULL SCREEN CALENDAR OVERLAY (Apple Style) --- */}
         {managingClass && (
@@ -926,6 +685,23 @@ const ClassesManager: React.FC = () => {
                         </div>
 
                         <textarea required value={eventForm.description} onChange={e => setEventForm({...eventForm, description: e.target.value})} className="w-full rounded-xl border-gray-300 p-3 text-sm" placeholder="Detalles del evento, requisitos, ubicación..." rows={3} />
+
+                        {/* VISIBILITY TOGGLE */}
+                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between">
+                            <div>
+                                <span className="block text-sm font-bold text-text-main">Visible para Alumnos</span>
+                                <span className="text-xs text-gray-500">Permitir que los alumnos se inscriban desde su dashboard.</span>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    className="sr-only peer"
+                                    checked={eventForm.isVisibleToStudents}
+                                    onChange={e => setEventForm({...eventForm, isVisibleToStudents: e.target.checked})}
+                                />
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
 
                         <div className="flex gap-3 mt-4">
                             <button type="button" onClick={() => setShowEventModal(false)} className="flex-1 py-3 rounded-xl border border-gray-300 font-bold text-text-secondary">Cancelar</button>

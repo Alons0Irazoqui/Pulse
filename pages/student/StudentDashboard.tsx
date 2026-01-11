@@ -1,18 +1,21 @@
+
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
-import { Event } from '../../types';
+import { Event, CalendarEvent } from '../../types';
+import { useAcademy } from '../../context/AcademyContext';
+import { getLocalDate } from '../../utils/dateUtils'; // Importar dateUtils
 
 const StudentDashboard: React.FC = () => {
-  const { currentUser, students, academySettings, events, classes, registerForEvent } = useStore();
+  const { currentUser, students, academySettings, events, registerForEvent } = useStore();
+  const { scheduleEvents } = useAcademy(); 
   const { addToast } = useToast();
   
   const student = students.find(s => s.id === currentUser?.studentId);
   
   // -- STATE --
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // -- RANK PROGRESS LOGIC --
   const currentRankConfig = academySettings.ranks.find(r => r.id === student?.rankId) || academySettings.ranks[0];
@@ -22,49 +25,58 @@ const StudentDashboard: React.FC = () => {
   const progressPercent = Math.min((current / required) * 100, 100);
 
   // -- EVENT CATEGORIZATION --
-  const today = new Date().toISOString().split('T')[0];
+  // FIXED: Usar getLocalDate() en lugar de toISOString() para evitar desfase de zona horaria
+  const todayStr = getLocalDate();
 
-  // 1. Critical Exams (Assigned by Master)
+  // 1. Critical Exams (Assigned by Master) - Show ONLY if registered
   const nextAssignedExam = useMemo(() => {
       if (!student) return null;
       return events
-          .filter(e => e.type === 'exam' && e.registrants?.includes(student.id) && e.date >= today)
+          .filter(e => e.type === 'exam' && e.registrants?.includes(student.id) && e.date >= todayStr)
           .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
-  }, [events, student, today]);
+  }, [events, student, todayStr]);
 
-  // 2. Marketplace Events (Tournaments & Seminars)
+  // 2. Marketplace Events (Everything else + Exams I'm NOT registered for yet but are public)
   const marketplaceEvents = useMemo(() => {
       return events
-          .filter(e => e.type !== 'exam' && e.date >= today)
+          .filter(e => {
+              // Rule 1: Must be in future
+              if (e.date < todayStr) return false;
+              
+              // Rule 2: If it's the specific assigned exam above, don't duplicate
+              if (nextAssignedExam && e.id === nextAssignedExam.id) return false;
+
+              // Rule 3: VISIBILITY LOGIC
+              // Show if:
+              // - Explicitly Public (isVisibleToStudents !== false)
+              // - OR I am already registered (even if private)
+              const isPublic = e.isVisibleToStudents !== false;
+              const isRegistered = student && e.registrants?.includes(student.id);
+
+              return isPublic || isRegistered;
+          })
           .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [events, today]);
+  }, [events, todayStr, student, nextAssignedExam]);
 
-  // -- NEXT CLASS LOGIC --
-  const todayDate = new Date();
-  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const currentDayName = daysOfWeek[todayDate.getDay()];
-  const todayStr = todayDate.toISOString().split('T')[0];
-
+  // -- NEXT CLASS LOGIC (UPDATED to use Generated Calendar) --
   const nextClass = useMemo(() => {
       if (!student) return null;
-      let todaysClasses = classes.filter(cls => student.classesId?.includes(cls.id)).filter(cls => {
-          const isRegular = cls.days.includes(currentDayName);
-          const modification = cls.modifications.find(m => m.date === todayStr);
-          const isMovedHere = cls.modifications.find(m => m.newDate === todayStr && m.type === 'move');
-          if (modification?.type === 'cancel') return false;
-          if (modification?.type === 'move') return false;
-          return isRegular || isMovedHere;
-      }).map(cls => {
-          const modification = cls.modifications.find(m => m.date === todayStr);
-          return { ...cls, instructor: (modification?.type === 'instructor' ? modification.newInstructor : cls.instructor) || cls.instructor };
+      
+      const now = new Date();
+      
+      const upcomingClasses = scheduleEvents.filter(evt => {
+          if (evt.type !== 'class' || !evt.classId) return false;
+          if (!student.classesId?.includes(evt.classId)) return false;
+          if (evt.status === 'cancelled') return false;
+          return evt.end > now;
       });
-      todaysClasses.sort((a, b) => a.startTime.localeCompare(b.startTime));
-      const currentMinutes = todayDate.getHours() * 60 + todayDate.getMinutes();
-      return todaysClasses.find(c => {
-          const [h, m] = c.startTime.split(':').map(Number);
-          return (h * 60 + m) > currentMinutes;
-      });
-  }, [classes, student, currentDayName, todayStr]);
+
+      // Sort by start time ascending
+      upcomingClasses.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+      // Return the first one
+      return upcomingClasses[0] || null;
+  }, [scheduleEvents, student]);
 
   // -- ACTIONS --
   const handleRegister = () => {
@@ -144,14 +156,21 @@ const StudentDashboard: React.FC = () => {
              <div className="relative z-10">
                  <h3 className="text-lg font-bold text-text-main flex items-center gap-2 mb-6">
                     <span className="material-symbols-outlined text-blue-500">schedule</span>
-                    Entrenamiento de Hoy
+                    Próximo Entrenamiento
                  </h3>
                  
                  {nextClass ? (
                      <div className="space-y-4">
                          <div>
-                             <p className="text-4xl font-black text-text-main tracking-tight">{nextClass.startTime}</p>
-                             <p className="text-text-secondary font-medium mt-1">{nextClass.name}</p>
+                             <p className="text-4xl font-black text-text-main tracking-tight">
+                                 {nextClass.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
+                             </p>
+                             <div className="flex flex-col mt-1">
+                                <p className="text-text-secondary font-medium">{nextClass.title}</p>
+                                <p className="text-xs text-primary font-bold uppercase mt-1">
+                                    {nextClass.start.toLocaleDateString('es-ES', { weekday: 'long' })}
+                                </p>
+                             </div>
                          </div>
                          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-sm text-text-main font-semibold border border-gray-100">
                              <div className="size-6 rounded-full bg-gray-200 flex items-center justify-center">
@@ -163,7 +182,7 @@ const StudentDashboard: React.FC = () => {
                  ) : (
                      <div className="flex flex-col items-center justify-center h-40 text-text-secondary">
                          <span className="material-symbols-outlined text-4xl opacity-20 mb-2">bedtime</span>
-                         <p className="text-sm font-medium">Clases terminadas por hoy</p>
+                         <p className="text-sm font-medium">No hay clases próximas</p>
                      </div>
                  )}
              </div>
@@ -209,17 +228,26 @@ const StudentDashboard: React.FC = () => {
                                     }`}>
                                         <span className="material-symbols-outlined text-2xl">{icon}</span>
                                     </div>
-                                    {isRegistered && (
+                                    {isRegistered ? (
                                         <span className="bg-green-100 text-green-700 text-[10px] font-bold uppercase px-2 py-1 rounded-lg flex items-center gap-1">
                                             <span className="material-symbols-outlined text-xs">check_circle</span>
                                             Inscrito
                                         </span>
-                                    )}
+                                    ) : evt.isVisibleToStudents === false ? (
+                                        // This implies student was manually registered to private event, 
+                                        // OR logic change allows seeing private events.
+                                        // Current logic: only see private if registered.
+                                        <span className="bg-gray-100 text-gray-600 text-[10px] font-bold uppercase px-2 py-1 rounded-lg flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-xs">lock</span>
+                                            Privado
+                                        </span>
+                                    ) : null}
                                 </div>
                                 
                                 <h4 className="text-lg font-bold text-text-main leading-tight mb-1">{evt.title}</h4>
                                 <p className="text-sm text-text-secondary font-medium mb-4">
-                                    {new Date(evt.date).toLocaleDateString()} • {evt.time}
+                                    {/* FIXED DATE PARSING */}
+                                    {new Date(evt.date + 'T12:00:00').toLocaleDateString()} • {evt.time}
                                 </p>
                                 
                                 <div className="mt-auto">
@@ -281,7 +309,8 @@ const StudentDashboard: React.FC = () => {
                       <div className="grid grid-cols-2 gap-4">
                           <div className="bg-gray-50 p-4 rounded-2xl">
                               <p className="text-xs font-bold text-gray-400 uppercase mb-1">Fecha</p>
-                              <p className="font-bold text-text-main">{new Date(selectedEvent.date).toLocaleDateString()}</p>
+                              {/* FIXED DATE PARSING */}
+                              <p className="font-bold text-text-main">{new Date(selectedEvent.date + 'T12:00:00').toLocaleDateString()}</p>
                           </div>
                           <div className="bg-gray-50 p-4 rounded-2xl">
                               <p className="text-xs font-bold text-gray-400 uppercase mb-1">Horario</p>
@@ -299,18 +328,19 @@ const StudentDashboard: React.FC = () => {
 
                       {/* Action Area */}
                       <div className="pt-4 border-t border-gray-100">
-                          {selectedEvent.type === 'exam' ? (
+                          {selectedEvent.type === 'exam' && !selectedEvent.registrants?.includes(student?.id || '') ? (
+                              // Unregistered Exam logic: Usually strictly controlled, but if public, allow request or show info
                               <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 flex items-start gap-3">
                                   <span className="material-symbols-outlined text-yellow-600">info</span>
                                   <div>
                                       <p className="text-sm font-bold text-yellow-800">Inscripción Controlada</p>
                                       <p className="text-xs text-yellow-700 mt-1">
-                                          Tu maestro gestiona la lista de este examen. Si tienes dudas sobre tu participación, contáctalo directamente.
+                                          Este es un evento de examen. Si es público, contacta a tu maestro para confirmar tu elegibilidad antes del día.
                                       </p>
                                   </div>
                               </div>
                           ) : (
-                              // MARKETPLACE ACTIONS
+                              // MARKETPLACE ACTIONS (Standard & Registered Exams)
                               <>
                                   {selectedEvent.registrants?.includes(student?.id || '') ? (
                                       <div className="flex flex-col gap-3 items-center">

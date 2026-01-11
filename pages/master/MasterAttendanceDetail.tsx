@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
+import { useConfirmation } from '../../context/ConfirmationContext'; // Importar ConfirmationContext
 import { Student } from '../../types';
 import { getLocalDate, formatDateDisplay } from '../../utils/dateUtils';
 import DateNavigator from '../../components/ui/DateNavigator';
@@ -12,6 +13,7 @@ const MasterAttendanceDetail: React.FC = () => {
   const navigate = useNavigate();
   const { classes, students, markAttendance, bulkMarkPresent, enrollStudent, unenrollStudent } = useStore();
   const { addToast } = useToast();
+  const { confirm } = useConfirmation(); // Hook de confirmación
 
   const currentClass = classes.find(c => c.id === classId);
 
@@ -106,11 +108,21 @@ const MasterAttendanceDetail: React.FC = () => {
       addToast('Todos marcados como presentes', 'success');
   };
 
-  const handleUnenroll = (studentId: string) => {
-      if (confirm('¿Desinscribir al alumno de esta clase? Desaparecerá de su lista de "Mis Clases".')) {
-          unenrollStudent(studentId, classId!);
-          addToast('Alumno eliminado de la clase', 'info');
-      }
+  // --- NUEVA LÓGICA DE ELIMINACIÓN CON CONFIRMACIÓN ---
+  const handleUnenroll = (student: Student) => {
+      confirm({
+          title: 'Eliminar Alumno de Clase',
+          message: `¿Estás seguro que deseas eliminar a ${student.name} de la clase de ${currentClass?.name}?`,
+          type: 'danger',
+          confirmText: 'Eliminar',
+          cancelText: 'Cancelar',
+          onConfirm: () => {
+              if (classId) {
+                  unenrollStudent(student.id, classId);
+                  // El toast ya lo maneja el context, pero podemos añadir uno específico si quieres
+              }
+          }
+      });
   };
 
   const openHistory = (student: Student) => {
@@ -245,7 +257,7 @@ const MasterAttendanceDetail: React.FC = () => {
                                               <button onClick={() => openHistory(student)} className="p-2 rounded-lg text-gray-400 hover:text-primary hover:bg-blue-50 transition-colors" title="Ver Historial">
                                                   <span className="material-symbols-outlined text-[20px]">history</span>
                                               </button>
-                                              <button onClick={() => handleUnenroll(student.id)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Eliminar de Clase">
+                                              <button onClick={() => handleUnenroll(student)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Eliminar de Clase">
                                                   <span className="material-symbols-outlined text-[20px]">person_remove</span>
                                               </button>
                                           </div>

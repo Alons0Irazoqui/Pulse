@@ -4,6 +4,7 @@ import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { PaymentCategory, FinancialRecord } from '../../types';
 import { generateReceipt } from '../../utils/pdfGenerator';
+import { getLocalDate } from '../../utils/dateUtils'; // Use Local Date
 
 const StudentPayments: React.FC = () => {
   const { currentUser, students, recordPayment, academySettings, payments } = useStore();
@@ -43,6 +44,8 @@ const StudentPayments: React.FC = () => {
         ? paymentForm.otherDescription 
         : paymentForm.description || paymentForm.category;
 
+      const todayLocal = getLocalDate(); // CRITICAL: Use local date
+
       if (paymentMethod === 'transfer') {
           // TRANSFER FLOW
           if (!paymentForm.proofFile) {
@@ -57,7 +60,7 @@ const StudentPayments: React.FC = () => {
               studentId: student.id,
               studentName: student.name,
               amount: parseFloat(paymentForm.amount),
-              date: new Date().toISOString().split('T')[0],
+              date: todayLocal, // Fixed
               status: 'pending_approval', 
               type: 'payment', // Strict Type
               description: finalDescription,
@@ -76,7 +79,7 @@ const StudentPayments: React.FC = () => {
               studentId: student.id,
               studentName: student.name,
               amount: parseFloat(paymentForm.amount),
-              date: new Date().toISOString().split('T')[0],
+              date: todayLocal, // Fixed
               status: 'pending_approval',
               type: 'payment',
               description: finalDescription,

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
@@ -11,6 +12,7 @@ import { financeTransactionSchema, FinanceTransactionForm } from '../../schemas/
 import StudentSearch from '../../components/ui/StudentSearch';
 import { motion } from 'framer-motion';
 import EmptyState from '../../components/ui/EmptyState';
+import { getLocalDate } from '../../utils/dateUtils'; // Use specific local date
 
 const Finance: React.FC = () => {
   const { payments, recordPayment, approvePayment, rejectPayment, students, academySettings, currentUser, generateMonthlyBilling } = useStore();
@@ -54,7 +56,7 @@ const Finance: React.FC = () => {
     resolver: zodResolver(financeTransactionSchema),
     defaultValues: {
       type: 'charge',
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDate(), // CRITICAL: Use local date
       category: 'Mensualidad',
       amount: undefined, // Empty by default
       method: 'Efectivo'
@@ -77,7 +79,8 @@ const Finance: React.FC = () => {
 
           // Time (Simple logic)
           let matchesTime = true;
-          const txDate = new Date(p.date);
+          // Note: Here we are comparing strings/objects loosely which is fine for filtering as long as date input is consistent
+          const txDate = new Date(p.date + 'T12:00:00'); // Force noon to avoid shift
           const now = new Date();
           if (filterTime === 'month') {
               matchesTime = txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
@@ -126,7 +129,7 @@ const Finance: React.FC = () => {
   const handleOpenModal = () => {
       reset({
           type: 'charge',
-          date: new Date().toISOString().split('T')[0],
+          date: getLocalDate(), // Use Local Date
           category: 'Mensualidad',
           method: 'Efectivo',
           studentId: '',
