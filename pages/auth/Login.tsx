@@ -1,8 +1,6 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
-import { motion } from 'framer-motion';
 
 const Login: React.FC = () => {
   const { login } = useStore();
@@ -16,6 +14,7 @@ const Login: React.FC = () => {
       
       const success = await login(formData.email, formData.password);
       if (success) {
+          // Retrieve user directly for instant redirect logic
           const user = JSON.parse(localStorage.getItem('pulse_current_session') || '{}');
           if (user.role === 'master') navigate('/master/dashboard');
           else navigate('/student/dashboard');
@@ -24,73 +23,48 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#000000] flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden text-white selection:bg-primary/30">
-      
-      {/* Botón Volver Minimalista */}
-      <Link 
-        to="/" 
-        className="absolute top-8 left-8 z-50 flex items-center justify-center size-10 rounded-full bg-zinc-900/50 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-all group backdrop-blur-md border border-white/5"
-      >
-        <span className="material-symbols-outlined text-xl group-hover:-translate-x-0.5 transition-transform">arrow_back_ios_new</span>
-      </Link>
+    <div className="min-h-screen bg-[#F5F5F7] flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
+      {/* Background Ambience */}
+      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-200/40 rounded-full blur-[100px] pointer-events-none"></div>
+      <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-indigo-200/40 rounded-full blur-[100px] pointer-events-none"></div>
 
-      {/* Ambient Background */}
-      <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-primary/20 rounded-full blur-[150px] mix-blend-screen opacity-40"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-purple-900/20 rounded-full blur-[150px] mix-blend-screen opacity-40"></div>
-      </div>
-
-      {/* Login Card - Apple Glass */}
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-[420px] apple-glass p-10 relative z-10 rounded-3xl shadow-2xl"
-      >
-        
-        <div className="flex flex-col items-center mb-10 text-center">
-            <div className="size-14 rounded-2xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center mb-6 shadow-lg shadow-primary/30">
-                <span className="font-bold text-white text-2xl">A</span>
+      <div className="w-full max-w-md glass-card rounded-3xl p-10 relative z-10 animate-in fade-in zoom-in-95 duration-500">
+        <div className="flex flex-col items-center mb-8">
+            <div className="size-14 bg-gradient-to-br from-primary to-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 mb-5">
+                <span className="material-symbols-outlined text-3xl">ecg_heart</span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Bienvenido</h1>
-            <p className="text-zinc-400 text-sm mt-2 font-medium">Ingresa tus credenciales para continuar.</p>
+            <h1 className="text-3xl font-bold text-text-main tracking-tight">Bienvenido</h1>
+            <p className="text-text-secondary mt-1">Inicia sesión en tu cuenta Pulse</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Correo Electrónico</label>
-                <div className="relative group">
-                    <span className="absolute left-4 top-3.5 text-zinc-500 group-focus-within:text-primary transition-colors material-symbols-outlined text-[20px]">mail</span>
-                    <input 
-                        type="email" 
-                        required 
-                        className="w-full rounded-xl bg-black/40 border border-zinc-800 py-3.5 pl-12 pr-4 text-sm text-white transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-1 focus:ring-primary outline-none" 
-                        placeholder="usuario@academy.pro"
-                        value={formData.email}
-                        onChange={e => setFormData({...formData, email: e.target.value})}
-                    />
-                </div>
+                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider ml-1">Correo Electrónico</label>
+                <input 
+                    type="email" 
+                    required 
+                    className="w-full rounded-2xl border-gray-200 bg-white/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 px-5 py-3.5 text-sm transition-all" 
+                    placeholder="usuario@ejemplo.com"
+                    value={formData.email}
+                    onChange={e => setFormData({...formData, email: e.target.value})}
+                />
             </div>
-            
             <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Contraseña</label>
-                <div className="relative group">
-                    <span className="absolute left-4 top-3.5 text-zinc-500 group-focus-within:text-primary transition-colors material-symbols-outlined text-[20px]">lock_open</span>
-                    <input 
-                        type="password" 
-                        required 
-                        className="w-full rounded-xl bg-black/40 border border-zinc-800 py-3.5 pl-12 pr-4 text-sm text-white transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-1 focus:ring-primary outline-none" 
-                        placeholder="••••••••"
-                        value={formData.password}
-                        onChange={e => setFormData({...formData, password: e.target.value})}
-                    />
-                </div>
+                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider ml-1">Contraseña</label>
+                <input 
+                    type="password" 
+                    required 
+                    className="w-full rounded-2xl border-gray-200 bg-white/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 px-5 py-3.5 text-sm transition-all" 
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={e => setFormData({...formData, password: e.target.value})}
+                />
             </div>
 
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3.5 rounded-xl shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2 mt-6 disabled:opacity-50 disabled:cursor-not-allowed text-sm active:scale-[0.98]"
+                className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-500/25 transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 mt-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
                 {loading ? (
                     <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -103,18 +77,12 @@ const Login: React.FC = () => {
             </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-white/5 text-center">
-            <Link to="/role-selection" className="text-zinc-500 text-xs font-medium hover:text-white transition-colors flex items-center justify-center gap-1.5 group">
-                ¿No tienes cuenta? <span className="text-primary group-hover:underline">Regístrate aquí</span>
-            </Link>
+        <div className="mt-8 text-center text-sm text-text-secondary">
+            ¿No tienes cuenta? <Link to="/role-selection" className="text-primary font-bold hover:text-blue-700 transition-colors">Regístrate gratis</Link>
         </div>
-      </motion.div>
-      
-      <div className="absolute bottom-8 text-[10px] font-bold text-zinc-800 uppercase tracking-widest flex gap-4 pointer-events-none">
-          <span>Secured by Pulse</span>
-          <span>•</span>
-          <span>AcademyPro v2.0</span>
       </div>
+      
+      <p className="mt-8 text-xs text-text-secondary/50 relative z-10">© 2024 Pulse Academy Systems. Secure Login.</p>
     </div>
   );
 };

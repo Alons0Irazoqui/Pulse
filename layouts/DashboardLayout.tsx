@@ -13,34 +13,31 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full bg-[#09090b] overflow-hidden text-[#f5f5f7] font-sans selection:bg-blue-500/30">
-      
-      {/* Sidebar Component with Glass Effect handled internally */}
+    <div className="flex h-screen w-full bg-background-light overflow-hidden">
       <Sidebar 
         role={role} 
         isOpen={isMobileMenuOpen} 
         onClose={() => setIsMobileMenuOpen(false)} 
       />
       
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10 bg-[#09090b]">
-        {/* Mobile Header - Glassy */}
-        <header className="md:hidden flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#09090b]/80 backdrop-blur-md sticky top-0 z-30">
-            <div className="flex items-center gap-3">
-                 <div className="flex items-center justify-center size-7 rounded-lg bg-primary text-white shadow-[0_2px_8px_rgba(10,132,255,0.3)]">
-                    <span className="font-bold text-xs">A</span>
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {/* Mobile Header with Overlay Control */}
+        <header className="md:hidden flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-md border-b border-gray-200 z-30 sticky top-0">
+            <div className="flex items-center gap-2">
+                 <div className="flex items-center justify-center size-8 rounded-lg bg-primary text-white shadow-lg shadow-primary/30">
+                    <span className="material-symbols-outlined text-lg">ecg_heart</span>
                  </div>
-                 <span className="font-semibold text-sm text-white tracking-wide">AcademyPro</span>
+                 <span className="font-bold text-lg text-text-main">Pulse</span>
             </div>
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
-              className="text-gray-400 p-2 hover:bg-white/5 rounded-lg transition-colors focus:outline-none"
+              className="text-text-main p-2 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none active:scale-95"
             >
-                <span className="material-symbols-outlined text-xl">menu</span>
+                <span className="material-symbols-outlined text-2xl">menu</span>
             </button>
         </header>
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+        <main className="flex-1 overflow-y-auto scrollbar-hide">
             {children}
         </main>
       </div>

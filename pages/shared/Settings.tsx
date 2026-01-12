@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
-import { RankColor, Rank } from '../../types';
+import { RankColor, Rank, Student } from '../../types';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import EmergencyCard from '../../components/ui/EmergencyCard';
 import Avatar from '../../components/ui/Avatar';
@@ -11,12 +11,14 @@ const Settings: React.FC = () => {
   const { currentUser, students, academySettings, updateAcademySettings, updateUserProfile, changePassword } = useStore();
   const { addToast } = useToast();
   
-  // --- STATE ---
-  const [activeTab, setActiveTab] = useState<'profile' | 'academy'>('profile');
+  // --- TABS & NAVIGATION ---
+  const [activeTab, setActiveTab] = useState<'profile' | 'academy' | 'emergency'>('profile');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // --- DATA LOADING ---
   const student = students.find(s => s.id === currentUser?.studentId);
 
+  // --- LOCAL STATE: PROFILE ---
   const [profileData, setProfileData] = useState({
       name: currentUser?.name || '',
       email: currentUser?.email || '',
@@ -24,32 +26,40 @@ const Settings: React.FC = () => {
   });
 
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+
+  // --- LOCAL STATE: ACADEMY (MASTER ONLY) ---
   const [academyData, setAcademyData] = useState(academySettings);
   
   useEffect(() => {
       setAcademyData(academySettings);
   }, [academySettings]);
 
+  // --- LOCAL STATE: MODALS ---
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void}>({
       isOpen: false, title: '', message: '', action: () => {}
   });
 
-  // --- HANDLERS ---
+  // --- HANDLERS: PROFILE ---
 
   const handleProfileSave = (e: React.FormEvent) => {
       e.preventDefault();
       updateUserProfile({ name: profileData.name, avatarUrl: profileData.avatarUrl });
-      addToast('Perfil actualizado', 'success');
+      addToast('Perfil actualizado correctamente', 'success');
   };
 
   const handlePasswordChange = (e: React.FormEvent) => {
       e.preventDefault();
-      if (passwords.new !== passwords.confirm) return addToast('Las contraseñas no coinciden', 'error');
-      if (passwords.new.length < 6) return addToast('Mínimo 6 caracteres', 'error');
-      
+      if (passwords.new !== passwords.confirm) {
+          addToast('Las contraseñas nuevas no coinciden', 'error');
+          return;
+      }
+      if (passwords.new.length < 6) {
+          addToast('La contraseña es muy corta', 'error');
+          return;
+      }
       changePassword(passwords.new);
       setPasswords({ current: '', new: '', confirm: '' });
-      addToast('Contraseña actualizada', 'success');
+      addToast('Contraseña actualizada con éxito', 'success');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,21 +68,36 @@ const Settings: React.FC = () => {
           const reader = new FileReader();
           reader.onloadend = () => {
               setProfileData(prev => ({ ...prev, avatarUrl: reader.result as string }));
+              // Auto-save image on select for better UX, or wait for save button. 
+              // Keeping consistent with existing logic: wait for save button or just local state?
+              // The original logic saved immediately.
               updateUserProfile({ avatarUrl: reader.result as string });
-              addToast('Foto actualizada', 'success');
+              addToast('Foto de perfil actualizada', 'success');
           };
           reader.readAsDataURL(file);
       }
   };
+  const triggerFileInput = () => fileInputRef.current?.click();
 
-  // Academy Handlers
+  // --- HANDLERS: ACADEMY CONFIGURATION ---
+
   const isValidBillingDates = academyData.paymentSettings.lateFeeDay > academyData.paymentSettings.billingDay;
 
   const handleAcademySave = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!isValidBillingDates) return addToast('Fecha de recargo inválida', 'error');
+      
+      if (!isValidBillingDates) {
+          addToast('Error: El día de recargo debe ser posterior al día de corte.', 'error');
+          return;
+      }
+
+      if (academyData.ranks.length === 0) {
+          addToast('Error: La academia debe tener al menos un grado.', 'error');
+          return;
+      }
+
       updateAcademySettings(academyData);
-      addToast('Configuración guardada', 'success');
+      addToast('Configuración de la academia guardada exitosamente', 'success');
   };
 
   const handleRankChange = (id: string, field: keyof Rank, value: any) => {
@@ -83,25 +108,40 @@ const Settings: React.FC = () => {
   };
 
   const handleAddRank = () => {
-      const nextOrder = academyData.ranks.length > 0 ? Math.max(...academyData.ranks.map(r => r.order)) + 1 : 1;
+      const currentRanks = academyData.ranks;
+      const nextOrder = currentRanks.length > 0 
+          ? Math.max(...currentRanks.map(r => r.order)) + 1 
+          : 1;
+      
       const newRank: Rank = {
           id: `rank-${Date.now()}`,
-          name: `Nuevo Grado`,
+          name: `Nuevo Grado ${nextOrder}`,
           color: 'white',
           order: nextOrder,
           requiredAttendance: 50
       };
-      setAcademyData(prev => ({ ...prev, ranks: [...prev.ranks, newRank] }));
+
+      setAcademyData(prev => ({
+          ...prev,
+          ranks: [...prev.ranks, newRank]
+      }));
   };
 
   const handleDeleteRank = (id: string) => {
-      if (academyData.ranks.length <= 1) return addToast('Debe haber al menos un grado', 'error');
+      if (academyData.ranks.length <= 1) {
+          addToast('No puedes eliminar el único grado existente.', 'error');
+          return;
+      }
+
       setConfirmModal({
           isOpen: true,
           title: 'Eliminar Grado',
-          message: 'Los alumnos en este grado quedarán desasignados.',
+          message: '¿Estás seguro? Los alumnos en este grado deberán ser reasignados manualmente. Esta acción se guardará al confirmar la configuración global.',
           action: () => {
-              setAcademyData(prev => ({ ...prev, ranks: prev.ranks.filter(r => r.id !== id) }));
+              setAcademyData(prev => ({
+                  ...prev,
+                  ranks: prev.ranks.filter(r => r.id !== id)
+              }));
               setConfirmModal(prev => ({...prev, isOpen: false}));
           }
       });
@@ -109,22 +149,24 @@ const Settings: React.FC = () => {
 
   const copyCode = () => {
     navigator.clipboard.writeText(academySettings.code);
-    addToast('Código copiado', 'success');
+    addToast('Código copiado al portapapeles', 'success');
   };
 
-  const beltColors: { value: RankColor; label: string }[] = [
-      { value: 'white', label: 'Blanco' },
-      { value: 'yellow', label: 'Amarillo' },
-      { value: 'orange', label: 'Naranja' },
-      { value: 'green', label: 'Verde' },
-      { value: 'blue', label: 'Azul' },
-      { value: 'purple', label: 'Morado' },
-      { value: 'brown', label: 'Marrón' },
-      { value: 'black', label: 'Negro' },
+  const beltColors: { value: RankColor; label: string; bg: string }[] = [
+      { value: 'white', label: 'Blanco', bg: 'bg-gray-100' },
+      { value: 'yellow', label: 'Amarillo', bg: 'bg-yellow-400' },
+      { value: 'orange', label: 'Naranja', bg: 'bg-orange-500' },
+      { value: 'green', label: 'Verde', bg: 'bg-green-600' },
+      { value: 'blue', label: 'Azul', bg: 'bg-blue-600' },
+      { value: 'purple', label: 'Morado', bg: 'bg-purple-600' },
+      { value: 'brown', label: 'Marrón', bg: 'bg-amber-800' },
+      { value: 'black', label: 'Negro', bg: 'bg-gray-900' },
   ];
 
+  const billingDays = Array.from({ length: 28 }, (_, i) => i + 1);
+
   return (
-    <div className="max-w-5xl mx-auto p-6 md:p-10 pb-24 text-zinc-200">
+    <div className="max-w-5xl mx-auto p-6 md:p-10 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
       <ConfirmationModal 
         isOpen={confirmModal.isOpen}
         title={confirmModal.title}
@@ -134,227 +176,334 @@ const Settings: React.FC = () => {
         type="danger"
       />
 
-      <div className="flex flex-col md:flex-row gap-12">
-          {/* Sidebar Nav (iOS Style) */}
-          <div className="w-full md:w-64 shrink-0 flex flex-col gap-2">
-              <h2 className="text-2xl font-bold text-white px-2 mb-6 tracking-tight">Ajustes</h2>
-              
-              <nav className="flex flex-col gap-1">
+      <header className="mb-10">
+          <h1 className="text-3xl font-bold tracking-tight text-text-main">Configuración</h1>
+          <p className="text-text-secondary mt-2">Gestiona tu perfil, preferencias y seguridad.</p>
+      </header>
+
+      <div className="flex flex-col lg:flex-row gap-8">
+          {/* Sidebar Navigation */}
+          <nav className="lg:w-64 flex flex-col gap-1">
+              {[
+                  { id: 'profile', label: 'Perfil y Seguridad', icon: 'security' },
+                  ...(currentUser?.role === 'master' ? [{ id: 'academy', label: 'Academia & Pagos', icon: 'domain' }] : []),
+                  ...(student ? [{ id: 'emergency', label: 'Contacto Emergencia', icon: 'contact_emergency' }] : []),
+              ].map(item => (
                   <button 
-                    onClick={() => setActiveTab('profile')} 
-                    className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-3 ${
-                        activeTab === 'profile' 
-                        ? 'bg-zinc-800 text-white shadow-lg shadow-black/20' 
-                        : 'text-zinc-500 hover:text-white hover:bg-zinc-900'
+                    key={item.id} 
+                    onClick={() => setActiveTab(item.id as any)} 
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                        activeTab === item.id 
+                        ? 'bg-white text-primary shadow-sm ring-1 ring-black/5 font-bold' 
+                        : 'text-text-secondary hover:bg-white/50 hover:text-text-main'
                     }`}
                   >
-                      <span className="material-symbols-outlined text-[20px]">person</span>
-                      Perfil y Seguridad
+                      <span className={`material-symbols-outlined text-[20px] ${activeTab === item.id ? 'filled' : ''}`}>{item.icon}</span>
+                      {item.label}
                   </button>
-                  
-                  {student && (
-                      <button 
-                        onClick={() => setActiveTab('emergency')} 
-                        className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-3 ${
-                            activeTab === 'emergency' 
-                            ? 'bg-zinc-800 text-white shadow-lg shadow-black/20' 
-                            : 'text-zinc-500 hover:text-white hover:bg-zinc-900'
-                        }`}
-                      >
-                          <span className="material-symbols-outlined text-[20px]">emergency</span>
-                          Contacto Emergencia
-                      </button>
-                  )}
+              ))}
+          </nav>
 
-                  {currentUser?.role === 'master' && (
-                      <button 
-                        onClick={() => setActiveTab('academy')} 
-                        className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-3 ${
-                            activeTab === 'academy' 
-                            ? 'bg-zinc-800 text-white shadow-lg shadow-black/20' 
-                            : 'text-zinc-500 hover:text-white hover:bg-zinc-900'
-                        }`}
-                      >
-                          <span className="material-symbols-outlined text-[20px]">settings_suggest</span>
-                          Academia y Pagos
-                      </button>
-                  )}
-              </nav>
-          </div>
-
-          <div className="flex-1 min-w-0 space-y-12">
-              
-              {/* --- PROFILE TAB --- */}
+          <div className="flex-1">
+              {/* --- TAB: PROFILE --- */}
               {activeTab === 'profile' && (
-                  <>
-                      {/* Identity Section */}
-                      <section>
-                          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 ml-1">Identidad</h3>
-                          <div className="bg-[#121212] rounded-3xl p-8 border border-white/5 flex flex-col md:flex-row items-center md:items-start gap-8 shadow-inner">
-                              <div className="relative group cursor-pointer shrink-0" onClick={() => fileInputRef.current?.click()}>
-                                  <Avatar src={profileData.avatarUrl} name={profileData.name} className="size-24 rounded-full text-3xl bg-zinc-800 ring-4 ring-black/50 shadow-2xl" />
-                                  <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                                      <span className="material-symbols-outlined text-white text-lg">photo_camera</span>
-                                  </div>
-                                  <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+                  <div className="flex flex-col gap-8">
+                       <form onSubmit={handleProfileSave} className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
+                           <h3 className="text-lg font-bold text-text-main mb-6">Información Básica</h3>
+                           <div className="flex items-center gap-6 mb-8">
+                               <div className="relative group cursor-pointer" onClick={triggerFileInput}>
+                                   <Avatar 
+                                        src={profileData.avatarUrl} 
+                                        name={profileData.name} 
+                                        className="size-24 rounded-full ring-4 ring-gray-50 text-2xl" 
+                                   />
+                                   <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-[2px]">
+                                       <span className="material-symbols-outlined text-white">photo_camera</span>
+                                   </div>
+                               </div>
+                               <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+                               <button type="button" onClick={triggerFileInput} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors">Cambiar Foto</button>
+                           </div>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-semibold text-text-main">Nombre</label>
+                                    <input value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} className="w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary focus:ring-primary" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-semibold text-text-main">Email (Login)</label>
+                                    <input value={profileData.email} disabled className="w-full rounded-xl border-gray-200 bg-gray-100 px-4 py-2.5 text-sm text-gray-500 cursor-not-allowed" />
+                                </div>
+                           </div>
+                           <div className="mt-8 flex justify-end">
+                                <button type="submit" className="px-6 py-2.5 rounded-xl bg-primary text-white text-sm font-bold shadow-lg hover:bg-primary-hover">Guardar Cambios</button>
+                           </div>
+                      </form>
+
+                      <form onSubmit={handlePasswordChange} className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
+                          <h3 className="text-lg font-bold text-text-main mb-6">Seguridad</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-2">
+                                  <label className="text-sm font-semibold text-text-main">Nueva Contraseña</label>
+                                  <input type="password" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-sm focus:border-primary focus:ring-primary" />
                               </div>
-                              <form onSubmit={handleProfileSave} className="flex-1 grid grid-cols-1 gap-6 w-full">
-                                  <div className="space-y-1.5">
-                                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Nombre Público</label>
-                                      <input value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder-zinc-700" />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Email (Login)</label>
-                                      <input value={profileData.email} disabled className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-3 text-sm text-zinc-500 cursor-not-allowed" />
-                                  </div>
-                                  <div className="flex justify-end pt-2">
-                                      <button type="submit" className="bg-white text-black text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl hover:bg-zinc-200 transition-all shadow-lg active:scale-95">Guardar Perfil</button>
-                                  </div>
-                              </form>
+                              <div className="space-y-2">
+                                  <label className="text-sm font-semibold text-text-main">Confirmar Contraseña</label>
+                                  <input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-sm focus:border-primary focus:ring-primary" />
+                              </div>
                           </div>
-                      </section>
-
-                      {/* Security Section */}
-                      <section>
-                          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 ml-1">Seguridad</h3>
-                          <div className="bg-[#121212] rounded-3xl p-8 border border-white/5 shadow-inner">
-                              <form onSubmit={handlePasswordChange} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <div className="space-y-1.5">
-                                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Nueva Contraseña</label>
-                                      <input type="password" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder-zinc-700" placeholder="••••••••" />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Confirmar</label>
-                                      <input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder-zinc-700" placeholder="••••••••" />
-                                  </div>
-                                  <div className="md:col-span-2 flex justify-end mt-2">
-                                      <button type="submit" className="bg-zinc-800 border border-white/5 text-zinc-300 text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl hover:bg-zinc-700 hover:text-white transition-all active:scale-95">Actualizar Password</button>
-                                  </div>
-                              </form>
-                          </div>
-                      </section>
-                  </>
+                          <div className="mt-8 flex justify-end">
+                                <button type="submit" className="px-6 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold shadow-lg hover:bg-black">Actualizar Contraseña</button>
+                           </div>
+                      </form>
+                  </div>
               )}
 
-              {/* --- EMERGENCY TAB --- */}
-              {activeTab === 'emergency' && student && (
-                  <section>
-                      <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 ml-1">Información de Contacto</h3>
-                      {/* Emergency Card Wrapper with Dark Style Override */}
-                      <div className="bg-[#121212] border border-white/5 rounded-3xl overflow-hidden shadow-inner">
-                          <EmergencyCard student={student} />
-                      </div>
-                      <p className="text-xs text-zinc-600 mt-4 text-center">Para actualizar estos datos, contacta a la administración.</p>
-                  </section>
-              )}
-
-              {/* --- ACADEMY TAB (MASTER) --- */}
+              {/* --- TAB: ACADEMY (MASTER ONLY) --- */}
               {activeTab === 'academy' && currentUser?.role === 'master' && (
-                  <form onSubmit={handleAcademySave} className="space-y-12">
+                  <form onSubmit={handleAcademySave} className="flex flex-col gap-8">
                       
-                      {/* Academy Code Card */}
-                      <div className="relative overflow-hidden bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-3xl p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl">
-                          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none"></div>
-                          <div className="relative z-10">
-                              <h3 className="text-white font-bold text-2xl mb-1">{academySettings.name}</h3>
-                              <p className="text-zinc-500 text-sm font-medium">Código de Vinculación</p>
+                      {/* 1. ACADEMY INFO & LINK CODE */}
+                      <div className="bg-gradient-to-r from-primary to-blue-600 rounded-3xl p-8 text-white shadow-lg relative overflow-hidden">
+                        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                            <div>
+                                <h3 className="text-blue-100 font-bold text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">vpn_key</span>
+                                    Código de Vinculación
+                                </h3>
+                                <div className="flex items-center gap-4 bg-white/10 p-2 pr-4 rounded-xl border border-white/20 backdrop-blur-sm">
+                                    <span className="text-4xl font-black tracking-widest font-mono pl-2">{academySettings.code}</span>
+                                    <button type="button" onClick={copyCode} className="size-10 bg-white text-primary rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors shadow-sm"><span className="material-symbols-outlined">content_copy</span></button>
+                                </div>
+                            </div>
+                            
+                            <div className="w-full md:w-1/2">
+                                <label className="text-blue-100 text-xs font-bold uppercase mb-2 block">Nombre de la Academia</label>
+                                <input 
+                                    value={academyData.name} 
+                                    onChange={e => setAcademyData({...academyData, name: e.target.value})} 
+                                    className="w-full rounded-xl border-white/30 bg-white/10 px-4 py-3 text-white placeholder-white/50 focus:bg-white/20 focus:border-white focus:ring-0 font-bold text-lg"
+                                />
+                            </div>
+                        </div>
+                      </div>
+
+                      {/* 2. PAYMENT CONFIGURATION */}
+                      <div className={`bg-white rounded-3xl p-8 shadow-card border transition-colors ${!isValidBillingDates ? 'border-red-200 bg-red-50/20' : 'border-gray-100'}`}>
+                          <div className="flex justify-between items-end mb-6">
+                              <div>
+                                  <h3 className="text-lg font-bold text-text-main flex items-center gap-2">
+                                      <span className="material-symbols-outlined text-green-600">payments</span>
+                                      Reglas de Cobro
+                                  </h3>
+                                  <p className="text-xs text-text-secondary mt-1">Define los montos y fechas automáticas para la facturación.</p>
+                              </div>
                           </div>
-                          <div className="relative z-10 flex items-center gap-4 bg-white/5 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 shadow-lg group cursor-pointer hover:bg-white/10 transition-all" onClick={copyCode}>
-                              <span className="font-mono text-2xl text-primary tracking-widest font-black">{academySettings.code}</span>
-                              <span className="material-symbols-outlined text-zinc-500 group-hover:text-white transition-colors">content_copy</span>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {/* Amounts */}
+                              <div className="space-y-2">
+                                  <label className="text-sm font-semibold text-text-main">Mensualidad Estándar ($)</label>
+                                  <input 
+                                    type="number" 
+                                    value={academyData.paymentSettings.monthlyTuition} 
+                                    onChange={e => setAcademyData({...academyData, paymentSettings: {...academyData.paymentSettings, monthlyTuition: parseFloat(e.target.value)}})} 
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary focus:ring-primary font-bold" 
+                                  />
+                              </div>
+                              <div className="space-y-2">
+                                  <label className="text-sm font-semibold text-text-main">Recargo por Mora ($)</label>
+                                  <input 
+                                    type="number" 
+                                    value={academyData.paymentSettings.lateFeeAmount} 
+                                    onChange={e => setAcademyData({...academyData, paymentSettings: {...academyData.paymentSettings, lateFeeAmount: parseFloat(e.target.value)}})} 
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary focus:ring-primary font-bold text-red-500" 
+                                  />
+                              </div>
+
+                              {/* Dates */}
+                              <div className="space-y-2">
+                                  <label className="text-sm font-semibold text-text-main">Día de Corte (Generación de Recibo)</label>
+                                  <select 
+                                      value={academyData.paymentSettings.billingDay} 
+                                      onChange={e => setAcademyData({...academyData, paymentSettings: {...academyData.paymentSettings, billingDay: parseInt(e.target.value)}})}
+                                      className="w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary focus:ring-primary"
+                                  >
+                                      {billingDays.map(day => <option key={`bill-${day}`} value={day}>Día {day} del mes</option>)}
+                                  </select>
+                              </div>
+
+                              <div className="space-y-2">
+                                  <label className="text-sm font-semibold text-text-main">Día Límite (Aplicación Recargo)</label>
+                                  <select 
+                                      value={academyData.paymentSettings.lateFeeDay} 
+                                      onChange={e => setAcademyData({...academyData, paymentSettings: {...academyData.paymentSettings, lateFeeDay: parseInt(e.target.value)}})}
+                                      className={`w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary focus:ring-primary ${!isValidBillingDates ? 'border-red-300 text-red-600 bg-red-50' : ''}`}
+                                  >
+                                      {billingDays.map(day => <option key={`late-${day}`} value={day}>Día {day} del mes</option>)}
+                                  </select>
+                              </div>
+                          </div>
+
+                          {!isValidBillingDates && (
+                              <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-xl flex items-center gap-2 text-red-700 text-xs font-bold">
+                                  <span className="material-symbols-outlined text-sm">error</span>
+                                  El día límite debe ser posterior al día de corte.
+                              </div>
+                          )}
+                      </div>
+
+                      {/* 3. BANK DETAILS */}
+                      <div className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
+                          <h3 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
+                              <span className="material-symbols-outlined text-blue-600">account_balance</span>
+                              Datos Bancarios
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-2">
+                                  <label className="text-sm font-semibold text-text-main">Banco</label>
+                                  <input 
+                                    value={academyData.bankDetails?.bankName || ''} 
+                                    onChange={e => setAcademyData({...academyData, bankDetails: {...academyData.bankDetails!, bankName: e.target.value}})} 
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary" 
+                                    placeholder="Ej. BBVA" 
+                                  />
+                              </div>
+                              <div className="space-y-2">
+                                  <label className="text-sm font-semibold text-text-main">Titular</label>
+                                  <input 
+                                    value={academyData.bankDetails?.accountHolder || ''} 
+                                    onChange={e => setAcademyData({...academyData, bankDetails: {...academyData.bankDetails!, accountHolder: e.target.value}})} 
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary" 
+                                  />
+                              </div>
+                              <div className="space-y-2 md:col-span-2">
+                                  <label className="text-sm font-semibold text-text-main">CLABE / Cuenta</label>
+                                  <input 
+                                    value={academyData.bankDetails?.clabe || ''} 
+                                    onChange={e => setAcademyData({...academyData, bankDetails: {...academyData.bankDetails!, clabe: e.target.value}})} 
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary font-mono" 
+                                    placeholder="18 dígitos" 
+                                  />
+                              </div>
+                              <div className="space-y-2 md:col-span-2">
+                                  <label className="text-sm font-semibold text-text-main">Instrucciones de Pago</label>
+                                  <textarea 
+                                    value={academyData.bankDetails?.instructions || ''} 
+                                    onChange={e => setAcademyData({...academyData, bankDetails: {...academyData.bankDetails!, instructions: e.target.value}})} 
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:bg-white focus:border-primary" 
+                                    placeholder="Ej. Enviar comprobante por WhatsApp..." 
+                                    rows={2} 
+                                  />
+                              </div>
                           </div>
                       </div>
 
-                      {/* Payment Config */}
-                      <section>
-                          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 ml-1">Configuración Financiera</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#121212] p-8 rounded-3xl border border-white/5 shadow-inner">
-                              <div className="space-y-1.5">
-                                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Costo Mensualidad ($)</label>
-                                  <div className="relative">
-                                      <span className="absolute left-4 top-3 text-zinc-500 font-mono">$</span>
-                                      <input type="number" value={academyData.paymentSettings.monthlyTuition} onChange={e => setAcademyData({...academyData, paymentSettings: {...academyData.paymentSettings, monthlyTuition: parseFloat(e.target.value)}})} className="w-full bg-zinc-900 border border-white/5 rounded-xl py-3 pl-8 pr-4 text-white font-mono focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" />
-                                  </div>
-                              </div>
-                              <div className="space-y-1.5">
-                                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Recargo Mora ($)</label>
-                                  <div className="relative">
-                                      <span className="absolute left-4 top-3 text-red-500/50 font-mono">$</span>
-                                      <input type="number" value={academyData.paymentSettings.lateFeeAmount} onChange={e => setAcademyData({...academyData, paymentSettings: {...academyData.paymentSettings, lateFeeAmount: parseFloat(e.target.value)}})} className="w-full bg-zinc-900 border border-white/5 rounded-xl py-3 pl-8 pr-4 text-red-400 font-mono focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-all" />
-                                  </div>
-                              </div>
-                              <div className="space-y-1.5">
-                                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Día Corte (Cargo)</label>
-                                  <select value={academyData.paymentSettings.billingDay} onChange={e => setAcademyData({...academyData, paymentSettings: {...academyData.paymentSettings, billingDay: parseInt(e.target.value)}})} className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white text-sm focus:border-primary outline-none appearance-none">
-                                      {Array.from({length: 28}, (_, i) => i + 1).map(d => <option key={d} value={d}>Día {d} del mes</option>)}
-                                  </select>
-                              </div>
-                              <div className="space-y-1.5">
-                                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Día Límite (Multa)</label>
-                                  <select value={academyData.paymentSettings.lateFeeDay} onChange={e => setAcademyData({...academyData, paymentSettings: {...academyData.paymentSettings, lateFeeDay: parseInt(e.target.value)}})} className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white text-sm focus:border-primary outline-none appearance-none">
-                                      {Array.from({length: 28}, (_, i) => i + 1).map(d => <option key={d} value={d}>Día {d} del mes</option>)}
-                                  </select>
-                              </div>
-                          </div>
-                      </section>
-
-                      {/* Rank System */}
-                      <section>
-                          <div className="flex justify-between items-end mb-6 ml-1">
-                              <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Sistema de Grados</h3>
-                              <button type="button" onClick={handleAddRank} className="text-primary text-xs font-bold hover:text-blue-400 uppercase tracking-wide flex items-center gap-1 transition-colors">
-                                  <span className="material-symbols-outlined text-sm">add_circle</span> Nuevo Grado
-                              </button>
+                      {/* 4. RANK MANAGEMENT (CRITICAL) */}
+                      <div className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
+                          <div className="flex justify-between items-end mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-text-main flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-purple-600">workspace_premium</span>
+                                    Gestión de Grados
+                                </h3>
+                                <p className="text-xs text-text-secondary mt-1">Define la jerarquía de cinturones y requisitos.</p>
+                            </div>
                           </div>
                           
                           <div className="space-y-3">
-                              {academyData.ranks.sort((a,b) => a.order - b.order).map((rank, idx) => (
-                                  <div key={rank.id} className="flex items-center gap-4 bg-[#121212] p-4 rounded-2xl border border-white/5 hover:border-white/10 transition-all group shadow-sm">
-                                      <div className="size-8 rounded-xl bg-zinc-900 text-zinc-500 flex items-center justify-center text-xs font-mono font-bold border border-white/5">{idx + 1}</div>
+                              {/* Table Header */}
+                              <div className="grid grid-cols-12 gap-4 pb-2 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                                  <div className="col-span-1 text-center">#</div>
+                                  <div className="col-span-4">Nombre del Grado</div>
+                                  <div className="col-span-3">Color</div>
+                                  <div className="col-span-3">Clases Req.</div>
+                                  <div className="col-span-1 text-right"></div>
+                              </div>
+
+                              {/* Rank Rows */}
+                              {academyData.ranks
+                                .sort((a,b) => a.order - b.order)
+                                .map((rank, idx) => (
+                                  <div key={rank.id} className="grid grid-cols-12 gap-4 items-center group animate-in fade-in slide-in-from-left-2 duration-300">
+                                      <div className="col-span-1 flex justify-center">
+                                          <div className="size-8 rounded-full bg-gray-50 font-bold text-gray-500 flex items-center justify-center text-sm shadow-sm border border-gray-100">
+                                              {idx + 1}
+                                          </div>
+                                      </div>
                                       
-                                      <div className="flex-1">
+                                      <div className="col-span-4">
                                           <input 
-                                              value={rank.name} 
-                                              onChange={(e) => handleRankChange(rank.id, 'name', e.target.value)}
-                                              className="bg-transparent border-none text-sm text-white font-bold focus:ring-0 placeholder-zinc-700 w-full p-0"
-                                              placeholder="Nombre Grado"
+                                            value={rank.name} 
+                                            onChange={(e) => handleRankChange(rank.id, 'name', e.target.value)}
+                                            className="w-full rounded-lg border-gray-200 bg-gray-50/50 px-3 py-2 text-sm focus:bg-white focus:border-primary transition-all font-semibold"
+                                            placeholder="Ej. Cinta Blanca"
                                           />
                                       </div>
-
-                                      <select 
-                                          value={rank.color}
-                                          onChange={(e) => handleRankChange(rank.id, 'color', e.target.value)}
-                                          className="bg-zinc-900 text-zinc-300 text-xs border border-white/10 rounded-lg px-3 py-2 focus:border-primary outline-none appearance-none font-medium"
-                                      >
-                                          {beltColors.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                                      </select>
-
-                                      <div className="flex items-center gap-2 bg-zinc-900 px-3 py-2 rounded-lg border border-white/10">
-                                          <input 
-                                              type="number" 
-                                              value={rank.requiredAttendance} 
-                                              onChange={(e) => handleRankChange(rank.id, 'requiredAttendance', parseInt(e.target.value))}
-                                              className="w-10 bg-transparent text-right text-xs text-white border-none focus:ring-0 p-0 font-mono"
-                                          />
-                                          <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wide">Clases</span>
+                                      
+                                      <div className="col-span-3">
+                                          <select 
+                                            value={rank.color}
+                                            onChange={(e) => handleRankChange(rank.id, 'color', e.target.value)}
+                                            className="w-full rounded-lg border-gray-200 bg-gray-50/50 px-2 py-2 text-sm focus:bg-white focus:border-primary transition-all"
+                                          >
+                                              {beltColors.map(c => (
+                                                  <option key={c.value} value={c.value}>{c.label}</option>
+                                              ))}
+                                          </select>
                                       </div>
-
-                                      <button type="button" onClick={() => handleDeleteRank(rank.id)} className="text-zinc-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1">
-                                          <span className="material-symbols-outlined text-lg">delete</span>
-                                      </button>
+                                      
+                                      <div className="col-span-3 relative">
+                                          <input 
+                                            type="number"
+                                            min="0"
+                                            value={rank.requiredAttendance} 
+                                            onChange={(e) => handleRankChange(rank.id, 'requiredAttendance', parseInt(e.target.value))}
+                                            className="w-full rounded-lg border-gray-200 bg-gray-50/50 px-3 py-2 text-sm focus:bg-white focus:border-primary text-center font-mono transition-all"
+                                          />
+                                          <span className="absolute right-3 top-2.5 text-[10px] text-gray-400 pointer-events-none uppercase font-bold">Clases</span>
+                                      </div>
+                                      
+                                      <div className="col-span-1 flex justify-end">
+                                          <button 
+                                            type="button" 
+                                            onClick={() => handleDeleteRank(rank.id)}
+                                            className="size-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+                                            title="Eliminar grado"
+                                          >
+                                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                                          </button>
+                                      </div>
                                   </div>
                               ))}
                           </div>
-                      </section>
 
-                      {/* Save Button */}
-                      <div className="sticky bottom-6 flex justify-end">
-                          <button type="submit" className="bg-white text-black px-8 py-3.5 rounded-xl font-bold shadow-2xl hover:bg-zinc-200 transition-all active:scale-95 text-xs uppercase tracking-wide flex items-center gap-2">
-                              <span className="material-symbols-outlined text-lg">save</span>
-                              Guardar Cambios
+                          <button 
+                            type="button" 
+                            onClick={handleAddRank}
+                            className="mt-6 w-full py-3 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-2 text-text-secondary hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                          >
+                              <span className="material-symbols-outlined group-hover:scale-110 transition-transform">add_circle</span>
+                              <span className="font-semibold text-sm">Agregar Nuevo Grado</span>
+                          </button>
+                      </div>
+
+                      {/* GLOBAL SAVE BUTTON */}
+                      <div className="sticky bottom-6 flex justify-end pt-4 bg-gradient-to-t from-[#F5F5F7] via-[#F5F5F7] to-transparent pb-4 -mx-6 px-6 md:-mx-10 md:px-10">
+                          <button 
+                            type="submit" 
+                            disabled={!isValidBillingDates}
+                            className={`px-8 py-4 rounded-2xl text-white font-bold shadow-xl transform transition-all active:scale-95 flex items-center gap-2 ${!isValidBillingDates ? 'bg-gray-400 cursor-not-allowed shadow-none' : 'bg-black hover:bg-gray-900 shadow-black/20'}`}
+                          >
+                              <span className="material-symbols-outlined">save</span>
+                              Guardar Configuración Completa
                           </button>
                       </div>
                   </form>
+              )}
+
+              {/* --- TAB: EMERGENCY (STUDENT) --- */}
+              {activeTab === 'emergency' && student && (
+                  <EmergencyCard student={student} />
               )}
           </div>
       </div>

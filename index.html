@@ -1,11 +1,10 @@
-
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AcademyPro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+    <title>Pulse Academy</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script>
@@ -15,46 +14,72 @@
           extend: {
             colors: {
               primary: {
-                DEFAULT: "#0A84FF", // Apple Blue (System Blue Dark Mode)
-                hover: "#0071e3",   // Slightly darker blue
-                glass: "rgba(10, 132, 255, 0.15)"
+                DEFAULT: "#007AFF", // iOS Blue
+                hover: "#0062CC",
+                light: "#F2F8FF",
               },
               background: {
-                DEFAULT: "#09090b", // Zinc 950 (Deep Background)
-                paper: "#1c1c1e",   // Zinc 900 (Apple Surfaces)
-                subtle: "#2c2c2e",  // Zinc 800 (Elevated/Inputs)
-                elevated: "#3a3a3c" // Zinc 700 (Modals/Popovers)
+                light: "#F5F5F7", // Apple Light Grey
+                dark: "#000000",
               },
               text: {
-                main: "#f5f5f7",      // Off-white standard
-                secondary: "#86868b", // Apple Grey Text
-                muted: "#6e6e73",     // Darker Grey
-                inverted: "#000000"
+                main: "#1D1D1F",
+                secondary: "#86868B",
               },
-              border: {
-                DEFAULT: "rgba(255, 255, 255, 0.08)", // Ultra subtle
-                hover: "rgba(255, 255, 255, 0.12)"
-              }
+              success: "#34C759",
+              warning: "#FF9F0A",
+              danger: "#FF3B30",
             },
             fontFamily: {
-              sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
-              mono: ["JetBrains Mono", "monospace"],
+              sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
             },
             boxShadow: {
-              glow: "0 0 20px -5px rgba(10, 132, 255, 0.3)",
-              card: "0 4px 24px -1px rgba(0, 0, 0, 0.2)",
-              glass: "0 8px 32px 0 rgba(0, 0, 0, 0.5)",
+              soft: "0 4px 24px -1px rgba(0, 0, 0, 0.04)",
+              card: "0 1px 3px rgba(0,0,0,0.05), 0 10px 30px -10px rgba(0,0,0,0.03)",
+              glass: "0 8px 32px 0 rgba(0, 0, 0, 0.04)",
+              glow: "0 0 20px rgba(0, 122, 255, 0.25)",
             },
             borderRadius: {
-              'lg': '0.5rem',   // 8px
-              'xl': '0.75rem',  // 12px (Standard Apple)
-              '2xl': '1rem',    // 16px
-              '3xl': '1.5rem',  // 24px
+              xl: "1rem",
+              "2xl": "1.25rem",
+              "3xl": "1.75rem",
             }
           },
         },
       }
     </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #F5F5F7;
+        -webkit-font-smoothing: antialiased;
+      }
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .material-symbols-outlined.filled {
+        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      
+      /* Premium Glass Effect */
+      .glass-panel {
+          background: rgba(255, 255, 255, 0.65);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.5);
+      }
+      
+      .glass-card {
+          background: rgba(255, 255, 255, 0.8);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.6);
+          box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.04);
+      }
+
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
   <script type="importmap">
 {
   "imports": {
@@ -74,7 +99,7 @@
 }
 </script>
 </head>
-  <body class="bg-background text-text-main antialiased selection:bg-primary/30 selection:text-white">
+  <body class="text-text-main antialiased selection:bg-primary/20 selection:text-primary">
     <div id="root"></div>
   </body>
 </html>

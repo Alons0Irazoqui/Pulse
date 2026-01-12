@@ -19,24 +19,26 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
   const masterLinks = [
     { name: 'Dashboard', icon: 'grid_view', path: '/master/dashboard' },
-    { name: 'Alumnos', icon: 'groups', path: '/master/students' },
-    { name: 'Calendario', icon: 'calendar_month', path: '/master/schedule' },
-    { name: 'Biblioteca', icon: 'video_library', path: '/master/library' },
-    { name: 'Finanzas', icon: 'account_balance_wallet', path: '/master/finance' },
-    { name: 'Configuración', icon: 'settings', path: '/master/settings' },
+    { name: 'Students', icon: 'groups', path: '/master/students' },
+    { name: 'Schedule', icon: 'calendar_month', path: '/master/schedule' },
+    { name: 'Library', icon: 'video_library', path: '/master/library' },
+    { name: 'Finance', icon: 'account_balance_wallet', path: '/master/finance' },
+    { name: 'Settings', icon: 'settings', path: '/master/settings' },
   ];
 
   const studentLinks = [
-    { name: 'Mi Progreso', icon: 'dashboard', path: '/student/dashboard' },
+    { name: 'Progress Profile', icon: 'dashboard', path: '/student/dashboard' },
     { name: 'Mis Clases', icon: 'class', path: '/student/classes' },
-    ...(academySettings.modules.library ? [{ name: 'Biblioteca', icon: 'school', path: '/student/library' }] : []),
-    { name: 'Calendario', icon: 'calendar_today', path: '/student/schedule' },
-    ...(academySettings.modules.payments ? [{ name: 'Pagos', icon: 'credit_card', path: '/student/payments' }] : []),
-    { name: 'Ajustes', icon: 'settings', path: '/student/settings' },
+    ...(academySettings.modules.library ? [{ name: 'Library', icon: 'school', path: '/student/library' }] : []),
+    { name: 'Schedule', icon: 'calendar_today', path: '/student/schedule' },
+    ...(academySettings.modules.payments ? [{ name: 'Payments', icon: 'credit_card', path: '/student/payments' }] : []),
+    { name: 'Settings', icon: 'settings', path: '/student/settings' },
   ];
 
   const links = role === 'master' ? masterLinks : studentLinks;
+
   const displayName = currentUser?.name || (role === 'master' ? 'Sensei' : 'Alumno');
+  const displaySubtext = role === 'master' ? academySettings.name : 'Estudiante';
   
   const handleLogout = () => {
       logout();
@@ -45,53 +47,52 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
   return (
     <>
-      {/* Mobile Overlay */}
+      {/* Mobile Backdrop - Overlay */}
       <div 
         className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
-      {/* Sidebar Content - Apple Pro Glass */}
+      {/* Sidebar Container - Drawer */}
       <aside 
         className={`
           fixed md:static inset-y-0 left-0 z-50
-          flex flex-col w-64 h-full
-          apple-glass
-          transform transition-transform duration-300 ease-out
+          flex flex-col w-72 h-full glassmorphism border-r border-gray-200 bg-white/95 md:bg-white/50 backdrop-blur-xl
+          transform transition-transform duration-300 ease-out shadow-2xl md:shadow-none
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
-        {/* LOGO */}
-        <div className="h-16 flex items-center px-6 border-b border-white/5">
-            <div className="flex items-center gap-3">
-                <div className="size-7 rounded-lg bg-gradient-to-b from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-[0_2px_10px_rgba(10,132,255,0.4)]">
-                    <span className="font-bold text-sm leading-none">A</span>
-                </div>
-                <h1 className="text-sm font-semibold tracking-wide text-white">
-                    Academy<span className="text-blue-500">Pro</span>
-                </h1>
-            </div>
-        </div>
-
-        <div className="flex flex-col h-full justify-between overflow-y-auto px-4 py-6">
-          <div className="flex flex-col gap-6">
-            
-            {/* User Info - Card */}
-            <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-white/5 border border-white/5 shadow-inner">
+        <div className="flex flex-col h-full p-6 justify-between overflow-y-auto">
+          <div className="flex flex-col gap-8">
+            {/* Header */}
+            <div className="flex justify-between items-center px-2 pt-2">
+              <div className="flex gap-4 items-center">
                 <Avatar 
                     src={currentUser?.avatarUrl} 
                     name={displayName} 
-                    className="size-8 rounded-full ring-2 ring-white/10" 
+                    className="size-12 rounded-full shadow-sm ring-2 ring-white" 
                 />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-semibold text-gray-200 truncate">{displayName}</span>
-                  <span className="text-[10px] text-gray-500 truncate font-medium uppercase tracking-wide">{role}</span>
+                <div className="flex flex-col">
+                  <h1 className="text-text-main text-lg font-bold leading-tight truncate max-w-[140px]">
+                      {displayName}
+                  </h1>
+                  <p className="text-text-secondary text-xs font-medium truncate max-w-[140px]">
+                      {displaySubtext}
+                  </p>
                 </div>
+              </div>
+              
+              {/* Close Button (Mobile Only) */}
+              <button 
+                onClick={onClose} 
+                className="md:hidden size-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-text-secondary rounded-full transition-colors active:scale-90"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
             </div>
 
             {/* Navigation */}
-            <nav className="flex flex-col gap-1.5 w-full">
-              <p className="px-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 pl-1">Menu</p>
+            <nav className="flex flex-col gap-2">
               {links.map((link) => {
                 const isActive = location.pathname.startsWith(link.path);
                 return (
@@ -99,34 +100,33 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
                     key={link.path}
                     to={link.path}
                     onClick={onClose}
-                    className={`
-                        flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative
-                        ${isActive
-                            ? 'bg-[#0A84FF] text-white shadow-[0_4px_12px_rgba(10,132,255,0.3)]'
-                            : 'text-gray-400 hover:text-gray-100 hover:bg-white/5'
-                        }
-                    `}
+                    className={`flex items-center gap-4 px-4 py-3 rounded-2xl transition-all group relative overflow-hidden ${
+                        isActive
+                            ? 'bg-primary/10 text-primary shadow-sm'
+                            : 'hover:bg-gray-50 text-text-secondary hover:text-text-main'
+                        }`}
                     >
-                        <span className={`material-symbols-outlined text-[20px] ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>
+                        <span className={`material-symbols-outlined ${isActive ? 'filled' : ''} ${isActive ? 'text-primary' : 'text-text-secondary group-hover:text-primary transition-colors'}`}>
                             {link.icon}
                         </span>
-                        <span>{link.name}</span>
+                        <span className={`font-medium text-sm ${isActive ? 'text-primary font-bold' : 'transition-colors'}`}>
+                            {link.name}
+                        </span>
+                        {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full"></div>}
                     </Link>
                 );
               })}
             </nav>
           </div>
 
-          {/* Footer */}
-          <div className="pt-4 border-t border-white/5">
-              <button 
-                  onClick={handleLogout}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-left text-gray-500 hover:text-white hover:bg-white/5 transition-all group"
-              >
-                <span className="material-symbols-outlined text-[20px] group-hover:text-red-400 transition-colors">logout</span>
-                <span className="font-medium text-xs">Cerrar Sesión</span>
-              </button>
-          </div>
+          {/* Footer Action */}
+          <button 
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 text-text-secondary hover:text-red-500 cursor-pointer transition-colors group mt-8 w-full text-left"
+          >
+            <span className="material-symbols-outlined group-hover:text-red-500 transition-colors">logout</span>
+            <span className="font-medium text-sm transition-colors">Cerrar Sesión</span>
+          </button>
         </div>
       </aside>
     </>

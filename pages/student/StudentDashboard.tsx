@@ -3,9 +3,10 @@ import React, { useMemo, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
-import { Event } from '../../types';
+import { Event, CalendarEvent } from '../../types';
 import { useAcademy } from '../../context/AcademyContext';
 import { getLocalDate } from '../../utils/dateUtils';
+import Avatar from '../../components/ui/Avatar';
 
 const StudentDashboard: React.FC = () => {
   const { currentUser, students, classes, academySettings, events, registerForEvent } = useStore();
@@ -23,6 +24,7 @@ const StudentDashboard: React.FC = () => {
   const nextRankConfig = academySettings.ranks.find(r => r.order === currentRankConfig.order + 1);
   const required = currentRankConfig.requiredAttendance;
   const current = student?.attendance || 0;
+  // Calculate percentage but cap at 100
   const progressPercent = required > 0 ? Math.min((current / required) * 100, 100) : 100;
   
   // -- 2. FINANCIAL LOGIC --
@@ -69,7 +71,7 @@ const StudentDashboard: React.FC = () => {
               return isPublic || isRegistered;
           })
           .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .slice(0, 2); 
+          .slice(0, 2); // Show only top 2 to save space
   }, [events, todayStr, student, nextAssignedExam]);
 
 
@@ -82,36 +84,35 @@ const StudentDashboard: React.FC = () => {
       }
   };
 
+  const getEventIcon = (type: string) => {
+      switch(type) {
+          case 'exam': return 'stars';
+          case 'tournament': return 'emoji_events';
+          case 'seminar': return 'menu_book';
+          default: return 'event';
+      }
+  };
+
   return (
-    <div className="max-w-[1600px] mx-auto p-6 md:p-10 flex flex-col gap-10 pb-24 text-gray-200">
+    <div className="max-w-[1600px] mx-auto p-6 md:p-10 flex flex-col gap-8 pb-24">
       
       {/* --- HEADER: WELCOME & SUMMARY --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-zinc-800 pb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white mb-2">
-              Hola, <span className="text-zinc-400">{student?.name.split(' ')[0]}</span>
+          <h2 className="text-4xl font-black tracking-tight text-text-main mb-1">
+              Hola, {student?.name.split(' ')[0]}
           </h2>
-          <p className="text-zinc-500 font-medium text-sm">
+          <p className="text-text-secondary font-medium">
               {nextRankConfig 
-                ? `Progreso hacia ${nextRankConfig.name}: ${Math.round(progressPercent)}%` 
-                : 'Máximo nivel alcanzado.'}
+                ? `Estás al ${Math.round(progressPercent)}% de tu camino hacia ${nextRankConfig.name}.` 
+                : '¡Has alcanzado el máximo nivel registrado!'}
           </p>
         </div>
-        <div className="flex items-center gap-4">
-            <div className="text-right">
-                <p className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Rango Actual</p>
-                <p className="text-xl font-bold text-white">{student?.rank}</p>
-            </div>
-            {/* Minimalist Belt Representation */}
-            <div className={`h-10 w-1 rounded bg-zinc-900 border border-zinc-800 overflow-hidden relative`}>
-                 <div className={`absolute bottom-0 w-full ${
-                     student?.rankColor === 'white' ? 'bg-zinc-200' :
-                     student?.rankColor === 'blue' ? 'bg-blue-600' :
-                     student?.rankColor === 'purple' ? 'bg-purple-600' :
-                     student?.rankColor === 'brown' ? 'bg-amber-800' :
-                     student?.rankColor === 'black' ? 'bg-black border border-zinc-700' : 'bg-zinc-500'
-                 }`} style={{height: '100%'}}></div>
-            </div>
+        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl shadow-sm border border-gray-100">
+            <span className="text-xs font-bold uppercase text-text-secondary tracking-wider">Tu Rango Actual:</span>
+            <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase bg-gray-100 text-gray-800 border border-gray-200`}>
+                {student?.rank}
+            </span>
         </div>
       </div>
 
@@ -119,98 +120,112 @@ const StudentDashboard: React.FC = () => {
       {nextAssignedExam && (
           <div 
             onClick={() => setSelectedEvent(nextAssignedExam)}
-            className="cursor-pointer apple-glass rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 hover:border-orange-500/50 transition-all group shadow-lg"
+            className="cursor-pointer relative overflow-hidden rounded-[2rem] bg-gray-900 text-white shadow-xl shadow-gray-900/20 group hover:scale-[1.01] transition-transform duration-300"
           >
-              <div className="flex items-center gap-6">
-                  <div className="size-12 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-500/20 group-hover:text-orange-400">
-                      <span className="material-symbols-outlined text-2xl">stars</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-900 to-indigo-900 opacity-90"></div>
+              <div className="relative z-10 p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center gap-6">
+                      <div className="size-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
+                          <span className="material-symbols-outlined text-4xl text-yellow-400 animate-pulse">stars</span>
+                      </div>
+                      <div>
+                          <div className="text-yellow-300 text-xs font-bold uppercase tracking-wider mb-1">Convocatoria Oficial</div>
+                          <h3 className="text-2xl font-black leading-tight">{nextAssignedExam.title}</h3>
+                          <p className="text-white/70 text-sm">Prepárate para tu evaluación.</p>
+                      </div>
                   </div>
-                  <div>
-                      <div className="text-orange-500 text-[10px] font-bold uppercase tracking-widest mb-1">Convocatoria Oficial</div>
-                      <h3 className="text-xl font-bold text-white">{nextAssignedExam.title}</h3>
-                      <p className="text-zinc-400 text-sm">Prepárate para tu evaluación.</p>
-                  </div>
+                  <button className="bg-white text-gray-900 px-6 py-3 rounded-xl font-bold text-sm shadow-lg group-hover:bg-gray-100 transition-colors">
+                      Ver Detalles
+                  </button>
               </div>
-              <span className="material-symbols-outlined text-zinc-600 group-hover:text-white transition-colors">arrow_forward</span>
           </div>
       )}
 
       {/* --- MAIN GRID: STATS & ACTIONS --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           
-          {/* 1. FINANCIAL STATUS WIDGET (Minimal) */}
-          <div className="p-6 rounded-3xl bg-[#1c1c1e] border border-zinc-800 flex flex-col justify-between h-[180px] shadow-lg">
-              <div>
-                  <div className="flex justify-between items-start mb-4">
-                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Finanzas</p>
-                      <span className={`size-2 rounded-full ${hasDebt ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'}`}></span>
+          {/* 1. FINANCIAL STATUS WIDGET */}
+          <div className={`p-6 rounded-[2rem] border relative overflow-hidden flex flex-col justify-between h-[200px] group ${hasDebt ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
+              <div className="relative z-10">
+                  <div className={`size-12 rounded-2xl flex items-center justify-center mb-4 ${hasDebt ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                      <span className="material-symbols-outlined text-2xl">{hasDebt ? 'gpp_bad' : 'gpp_good'}</span>
                   </div>
-                  <h3 className={`text-2xl font-bold ${hasDebt ? 'text-white' : 'text-zinc-300'}`}>
-                      {hasDebt ? `$${student?.balance.toFixed(2)}` : 'Al Día'}
+                  <p className={`text-xs font-bold uppercase tracking-wider ${hasDebt ? 'text-red-600' : 'text-green-600'}`}>Estado de Cuenta</p>
+                  <h3 className={`text-2xl font-black ${hasDebt ? 'text-red-900' : 'text-green-900'}`}>
+                      {hasDebt ? `$${student?.balance.toFixed(2)}` : 'Al Corriente'}
                   </h3>
-                  {hasDebt && <p className="text-xs text-red-400 mt-1 font-medium">Saldo pendiente</p>}
               </div>
               
-              {hasDebt ? (
+              {hasDebt && (
                   <button 
                     onClick={() => navigate('/student/payments')}
-                    className="w-full py-2 bg-red-500/10 border border-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                    className="relative z-10 mt-auto w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                   >
-                      Pagar
+                      Pagar Ahora <span className="material-symbols-outlined text-sm">arrow_forward</span>
                   </button>
-              ) : (
-                  <p className="text-xs text-zinc-600 font-mono">Sin acciones requeridas</p>
               )}
+              {!hasDebt && (
+                  <p className="text-sm text-green-700 mt-auto relative z-10">¡Gracias por tu pago!</p>
+              )}
+              
+              {/* Decor */}
+              <span className={`material-symbols-outlined absolute -bottom-4 -right-4 text-[120px] opacity-10 pointer-events-none ${hasDebt ? 'text-red-500' : 'text-green-500'}`}>
+                  account_balance_wallet
+              </span>
           </div>
 
-          {/* 2. ATTENDANCE PROGRESS WIDGET (Minimal) */}
-          <div className="p-6 rounded-3xl bg-[#1c1c1e] border border-zinc-800 flex flex-col justify-between h-[180px] shadow-lg">
-              <div>
-                  <div className="flex justify-between items-start mb-4">
-                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Asistencias</p>
-                      <span className="material-symbols-outlined text-zinc-600 text-lg">directions_run</span>
+          {/* 2. ATTENDANCE PROGRESS WIDGET */}
+          <div className="bg-white p-6 rounded-[2rem] shadow-card border border-gray-100 relative overflow-hidden h-[200px] flex flex-col">
+              <div className="flex justify-between items-start mb-2">
+                  <div>
+                      <p className="text-xs font-bold text-text-secondary uppercase tracking-wider">Asistencias</p>
+                      <h3 className="text-2xl font-black text-text-main">{current} <span className="text-sm text-text-secondary font-medium">/ {required}</span></h3>
                   </div>
-                  <h3 className="text-2xl font-bold text-white">{current} <span className="text-sm text-zinc-600 font-normal">/ {required}</span></h3>
+                  <div className="size-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <span className="material-symbols-outlined">directions_run</span>
+                  </div>
               </div>
               
-              <div className="flex flex-col gap-2">
-                  <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden border border-zinc-800">
-                      <div className="h-full bg-primary rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(10,132,255,0.5)]" style={{ width: `${progressPercent}%` }}></div>
+              <div className="flex-1 flex flex-col justify-end">
+                  <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden mb-2">
+                      <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
                   </div>
-                  <p className="text-[10px] text-zinc-500 text-right font-mono">
-                      {progressPercent >= 100 ? 'Requisito cumplido' : `${Math.round(progressPercent)}% completado`}
+                  <p className="text-xs text-text-secondary">
+                      {progressPercent >= 100 
+                        ? '¡Requisitos cumplidos!' 
+                        : `Te faltan ${required - current} clases para examen.`}
                   </p>
               </div>
           </div>
 
-          {/* 3. NEXT CLASS WIDGET (Hero Minimal) */}
-          <div className="lg:col-span-2 p-8 rounded-3xl bg-gradient-to-br from-[#1c1c1e] to-[#121212] border border-zinc-800 relative overflow-hidden group h-[180px] flex flex-col justify-center shadow-lg">
-              <div className="absolute right-8 top-1/2 -translate-y-1/2 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
-                  <span className="material-symbols-outlined text-9xl">schedule</span>
+          {/* 3. NEXT CLASS WIDGET (Hero) */}
+          <div className="lg:col-span-2 bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-[2rem] text-white relative overflow-hidden shadow-2xl shadow-gray-900/20 group h-[200px] flex flex-col justify-center">
+              <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <span className="material-symbols-outlined text-[140px]">schedule</span>
               </div>
               
               <div className="relative z-10">
-                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
-                      <span className="size-1.5 rounded-full bg-primary animate-pulse"></span>
-                      Próxima Sesión
-                  </p>
+                  <div className="flex items-center gap-2 mb-3">
+                      <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-white/10">Próxima Clase</span>
+                  </div>
                   
                   {nextClass ? (
                       <div>
-                          <h2 className="text-3xl font-bold text-white mb-2">{nextClass.title}</h2>
-                          <div className="flex items-center gap-4 text-zinc-400 text-sm">
-                              <span className="font-mono text-zinc-300 bg-zinc-800/50 px-2 py-1 rounded border border-zinc-700/50">
+                          <h2 className="text-3xl md:text-4xl font-black leading-none mb-2">{nextClass.title}</h2>
+                          <div className="flex items-center gap-4 text-white/80">
+                              <span className="font-medium text-lg">
                                   {nextClass.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
                               </span>
-                              <span className="w-px h-3 bg-zinc-700"></span>
-                              <span className="uppercase tracking-wide text-xs font-bold text-zinc-500">{nextClass.instructor}</span>
+                              <span className="w-1 h-1 bg-white/50 rounded-full"></span>
+                              <span className="text-sm uppercase tracking-wide font-bold">{nextClass.instructor}</span>
                           </div>
                       </div>
                   ) : (
                       <div>
-                          <h2 className="text-2xl font-bold text-zinc-300">Sin clases hoy</h2>
-                          <button onClick={() => navigate('/student/schedule')} className="mt-4 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-white transition-colors flex items-center gap-1 group/btn">
-                              Ver Calendario <span className="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+                          <h2 className="text-2xl font-bold text-white/90">Sin clases hoy</h2>
+                          <p className="text-white/60 text-sm mt-1">Consulta el calendario completo.</p>
+                          <button onClick={() => navigate('/student/schedule')} className="mt-4 text-xs font-bold uppercase tracking-wider text-white border-b border-white/30 hover:border-white pb-0.5 transition-colors">
+                              Ver Calendario
                           </button>
                       </div>
                   )}
@@ -218,14 +233,17 @@ const StudentDashboard: React.FC = () => {
           </div>
       </div>
 
-      {/* --- SECONDARY SECTION --- */}
+      {/* --- SECONDARY SECTION: CLASSES & EXTRA --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* LEFT: MY ENROLLED CLASSES (List) */}
-          <div className="lg:col-span-2">
-              <div className="flex justify-between items-center mb-4 px-1">
-                  <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Mis Grupos</h3>
-                  <button onClick={() => navigate('/student/classes')} className="text-xs font-bold text-primary hover:text-blue-400 transition-colors">
+          <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-gray-100 shadow-card p-8">
+              <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-text-main flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary">class</span>
+                      Mis Clases
+                  </h3>
+                  <button onClick={() => navigate('/student/classes')} className="text-sm font-bold text-primary hover:text-blue-700 transition-colors">
                       Ver Todo
                   </button>
               </div>
@@ -233,122 +251,186 @@ const StudentDashboard: React.FC = () => {
               {myEnrolledClasses.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {myEnrolledClasses.map(cls => (
-                          <div key={cls.id} onClick={() => navigate(`/student/classes/${cls.id}`)} className="p-5 rounded-2xl bg-[#1c1c1e] border border-zinc-800 hover:border-zinc-600 transition-all cursor-pointer group shadow-sm hover:shadow-md">
-                              <div className="flex justify-between items-start mb-3">
-                                  <h4 className="font-bold text-white text-base truncate pr-4 group-hover:text-primary transition-colors">{cls.name}</h4>
-                                  <span className="text-[10px] font-mono text-zinc-500 border border-zinc-800 px-1.5 py-0.5 rounded bg-zinc-900">
-                                      {cls.studentCount}
+                          <div key={cls.id} onClick={() => navigate(`/student/classes/${cls.id}`)} className="p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:bg-white hover:shadow-lg hover:border-gray-200 transition-all cursor-pointer group">
+                              <div className="flex items-start justify-between mb-3">
+                                  <div className="size-10 rounded-full bg-white flex items-center justify-center shadow-sm text-text-secondary group-hover:text-primary transition-colors">
+                                      <span className="material-symbols-outlined">sports_martial_arts</span>
+                                  </div>
+                                  <span className="text-[10px] font-bold uppercase bg-white border border-gray-200 px-2 py-1 rounded text-text-secondary">
+                                      {cls.studentCount} Alumnos
                                   </span>
                               </div>
-                              <p className="text-xs text-zinc-400 mb-4 flex items-center gap-2">
-                                  <span className="material-symbols-outlined text-[14px]">schedule</span> {cls.schedule}
+                              <h4 className="font-bold text-text-main text-lg mb-1">{cls.name}</h4>
+                              <p className="text-xs text-text-secondary mb-3 flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[12px]">schedule</span> {cls.schedule}
                               </p>
-                              <div className="flex items-center gap-2 pt-3 border-t border-zinc-800">
-                                  <div className="size-5 rounded-full bg-zinc-900 flex items-center justify-center text-[10px] text-zinc-500 font-bold border border-zinc-800">
-                                      {cls.instructor.charAt(0)}
-                                  </div>
-                                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">{cls.instructor}</span>
+                              <div className="flex items-center gap-2 pt-3 border-t border-gray-200/50">
+                                  <Avatar name={cls.instructor} className="size-6 rounded-full text-[10px]" />
+                                  <span className="text-xs font-medium text-text-secondary">{cls.instructor}</span>
                               </div>
                           </div>
                       ))}
                   </div>
               ) : (
-                  <div className="text-center py-10 border border-dashed border-zinc-800 rounded-2xl">
-                      <p className="text-zinc-600 text-sm">No estás inscrito en grupos regulares.</p>
+                  <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                      <p className="text-text-secondary text-sm">No estás inscrito en grupos regulares.</p>
                   </div>
               )}
           </div>
 
-          {/* RIGHT: EVENTS LIST */}
+          {/* RIGHT: EVENTS & BELT STATUS */}
           <div className="flex flex-col gap-6">
               
-              <div>
-                  <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4 px-1">Próximos Eventos</h3>
+              {/* Event List */}
+              <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm">
+                  <h3 className="text-sm font-bold text-text-secondary uppercase tracking-wider mb-4">Eventos Próximos</h3>
                   <div className="flex flex-col gap-3">
                       {marketplaceEvents.length > 0 ? (
                           marketplaceEvents.map(evt => (
-                              <div key={evt.id} onClick={() => setSelectedEvent(evt)} className="flex items-center gap-4 p-4 rounded-2xl bg-[#1c1c1e] border border-zinc-800 hover:bg-zinc-800 cursor-pointer transition-colors group shadow-sm">
-                                  <div className="flex flex-col items-center justify-center w-12 shrink-0 bg-zinc-900/50 rounded-xl py-2 border border-zinc-800">
-                                      <span className="text-[9px] font-bold uppercase text-zinc-500">{new Date(evt.date).toLocaleDateString('es-ES', {month: 'short'})}</span>
-                                      <span className="text-lg font-bold text-white leading-none">{new Date(evt.date).getDate()}</span>
+                              <div key={evt.id} onClick={() => setSelectedEvent(evt)} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors border border-transparent hover:border-gray-100">
+                                  <div className={`size-10 rounded-lg flex flex-col items-center justify-center shrink-0 text-white shadow-sm ${evt.type === 'tournament' ? 'bg-orange-500' : 'bg-blue-500'}`}>
+                                      <span className="text-[10px] font-bold uppercase">{new Date(evt.date).toLocaleDateString('es-ES', {month: 'short'})}</span>
+                                      <span className="text-sm font-black leading-none">{new Date(evt.date).getDate()}</span>
                                   </div>
                                   <div className="min-w-0">
-                                      <p className="text-sm font-bold text-zinc-200 truncate group-hover:text-white transition-colors">{evt.title}</p>
-                                      <p className="text-xs text-zinc-500 truncate flex items-center gap-1 mt-0.5">
-                                          {evt.type === 'exam' ? <span className="size-1.5 bg-purple-500 rounded-full"></span> : <span className="size-1.5 bg-orange-500 rounded-full"></span>}
-                                          {evt.time}
-                                      </p>
+                                      <p className="text-sm font-bold text-text-main truncate">{evt.title}</p>
+                                      <p className="text-xs text-text-secondary truncate">{evt.time} • {evt.type === 'exam' ? 'Examen' : 'Evento'}</p>
                                   </div>
                               </div>
                           ))
                       ) : (
-                          <div className="p-6 rounded-2xl border border-dashed border-zinc-800 text-center">
-                              <p className="text-xs text-zinc-600">No hay eventos próximos.</p>
-                          </div>
+                          <p className="text-xs text-gray-400 italic">No hay eventos próximos.</p>
                       )}
                   </div>
               </div>
+
+              {/* Current Belt Card */}
+              {student && (
+                  <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm relative overflow-hidden flex flex-col justify-between min-h-[180px]">
+                      <div>
+                          <div className="flex justify-between items-start mb-2">
+                              <div>
+                                  <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
+                                      Tu Cinturón
+                                  </span>
+                                  <h3 className="text-xl font-black text-text-main mt-3 leading-none">
+                                      {student.rank}
+                                  </h3>
+                              </div>
+                              <div className="size-10 flex items-center justify-center rounded-full bg-gray-50 border border-gray-100">
+                                  <span className="material-symbols-outlined text-gray-400">workspace_premium</span>
+                              </div>
+                          </div>
+                          
+                          {/* Belt Visual */}
+                          <div className={`mt-4 h-12 w-full rounded-lg shadow-sm border flex items-center justify-end pr-3 relative overflow-hidden ${
+                              student.rankColor === 'white' ? 'bg-slate-50 border-slate-200' :
+                              student.rankColor === 'yellow' ? 'bg-yellow-300 border-yellow-400' :
+                              student.rankColor === 'orange' ? 'bg-orange-400 border-orange-500' :
+                              student.rankColor === 'green' ? 'bg-green-600 border-green-700' :
+                              student.rankColor === 'blue' ? 'bg-blue-600 border-blue-700' :
+                              student.rankColor === 'purple' ? 'bg-purple-600 border-purple-700' :
+                              student.rankColor === 'brown' ? 'bg-[#5D4037] border-[#3E2723]' :
+                              'bg-gray-900 border-black'
+                          }`}>
+                              {/* Texture overlay */}
+                              <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/fabric-of-squares.png')]"></div>
+                              
+                              <div className={`relative h-full w-16 ${student.rankColor === 'black' ? 'bg-red-600' : 'bg-black'} flex items-center justify-center gap-1 shadow-lg`}>
+                                  {Array.from({ length: student.stripes || 0 }).map((_, i) => (
+                                      <div key={i} className="w-1.5 h-7 bg-white/90 rounded-sm shadow-sm"></div>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between items-center text-xs">
+                          <span className="text-text-secondary font-medium">
+                              {student.stripes > 0 ? `${student.stripes} ${student.stripes === 1 ? 'Grado' : 'Grados'}` : 'Sin grados'}
+                          </span>
+                          {nextRankConfig && (
+                              <span className="text-primary font-bold">
+                                  Próximo: {nextRankConfig.name}
+                              </span>
+                          )}
+                      </div>
+                  </div>
+              )}
           </div>
       </div>
 
-      {/* --- EVENT MODAL (Dark Theme) --- */}
+      {/* --- EVENT MODAL (Reused) --- */}
       {selectedEvent && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setSelectedEvent(null)}>
-              <div className="bg-[#1c1c1e] rounded-3xl w-full max-w-lg shadow-2xl border border-zinc-800 overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setSelectedEvent(null)}>
+              <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl relative overflow-hidden" onClick={e => e.stopPropagation()}>
                   
-                  <div className="p-8 border-b border-zinc-800">
-                      <div className="flex justify-between items-start mb-4">
-                          <span className={`text-[10px] font-bold uppercase tracking-widest border px-2 py-1 rounded ${
-                              selectedEvent.type === 'exam' ? 'text-purple-400 border-purple-500/20 bg-purple-500/10' : 'text-orange-400 border-orange-500/20 bg-orange-500/10'
-                          }`}>
-                              {selectedEvent.type === 'exam' ? 'Examen Oficial' : 'Evento Especial'}
+                  <div className={`p-8 pb-12 relative ${
+                      selectedEvent.type === 'exam' ? 'bg-gray-900 text-white' : 
+                      selectedEvent.type === 'tournament' ? 'bg-orange-500 text-white' : 
+                      'bg-blue-600 text-white'
+                  }`}>
+                      <button onClick={() => setSelectedEvent(null)} className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full backdrop-blur-md transition-colors">
+                          <span className="material-symbols-outlined">close</span>
+                      </button>
+                      
+                      <div className="flex items-center gap-3 mb-4 opacity-90">
+                          <span className="material-symbols-outlined text-2xl">{getEventIcon(selectedEvent.type)}</span>
+                          <span className="text-sm font-bold uppercase tracking-wider">
+                              {selectedEvent.type === 'exam' ? 'Examen de Grado' : 'Evento Oficial'}
                           </span>
-                          <button onClick={() => setSelectedEvent(null)} className="text-zinc-500 hover:text-white transition-colors p-1 hover:bg-zinc-800 rounded-full">
-                              <span className="material-symbols-outlined">close</span>
-                          </button>
                       </div>
-                      <h2 className="text-2xl font-bold text-white mb-2">{selectedEvent.title}</h2>
-                      <p className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap">{selectedEvent.description}</p>
+                      <h2 className="text-3xl font-black leading-tight">{selectedEvent.title}</h2>
                   </div>
 
-                  <div className="p-8 bg-[#121212]">
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                          <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
-                              <p className="text-[10px] font-bold text-zinc-500 uppercase mb-1 flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-xs">calendar_today</span> Fecha
-                              </p>
-                              <p className="font-mono text-sm text-white">{new Date(selectedEvent.date + 'T12:00:00').toLocaleDateString()}</p>
+                  <div className="p-8 -mt-6 bg-white rounded-t-[2rem] relative z-10 flex flex-col gap-6">
+                      <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-gray-50 p-4 rounded-2xl">
+                              <p className="text-xs font-bold text-gray-400 uppercase mb-1">Fecha</p>
+                              <p className="font-bold text-text-main">{new Date(selectedEvent.date + 'T12:00:00').toLocaleDateString()}</p>
                           </div>
-                          <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
-                              <p className="text-[10px] font-bold text-zinc-500 uppercase mb-1 flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-xs">schedule</span> Hora
-                              </p>
-                              <p className="font-mono text-sm text-white">{selectedEvent.time}</p>
+                          <div className="bg-gray-50 p-4 rounded-2xl">
+                              <p className="text-xs font-bold text-gray-400 uppercase mb-1">Horario</p>
+                              <p className="font-bold text-text-main">{selectedEvent.time}</p>
                           </div>
                       </div>
 
-                      {selectedEvent.type === 'exam' && !selectedEvent.registrants?.includes(student?.id || '') ? (
-                          <div className="flex items-center gap-3 text-amber-500 bg-amber-900/10 p-4 rounded-xl border border-amber-900/30">
-                              <span className="material-symbols-outlined text-lg">lock</span>
-                              <p className="text-xs font-medium">Inscripción restringida. Contacta a tu maestro.</p>
-                          </div>
-                      ) : (
-                          <>
-                              {selectedEvent.registrants?.includes(student?.id || '') ? (
-                                  <div className="w-full py-4 bg-green-500/10 border border-green-500/20 text-green-500 text-sm font-bold text-center rounded-xl flex items-center justify-center gap-2">
-                                      <span className="material-symbols-outlined text-lg">check_circle</span>
-                                      Ya estás inscrito
+                      <div>
+                          <h4 className="text-sm font-bold text-text-main mb-2">Detalles</h4>
+                          <p className="text-text-secondary text-sm leading-relaxed whitespace-pre-wrap">
+                              {selectedEvent.description}
+                          </p>
+                      </div>
+
+                      <div className="pt-4 border-t border-gray-100">
+                          {selectedEvent.type === 'exam' && !selectedEvent.registrants?.includes(student?.id || '') ? (
+                              <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 flex items-start gap-3">
+                                  <span className="material-symbols-outlined text-yellow-600">info</span>
+                                  <div>
+                                      <p className="text-sm font-bold text-yellow-800">Inscripción Controlada</p>
+                                      <p className="text-xs text-yellow-700 mt-1">
+                                          Contacta a tu maestro para confirmar tu elegibilidad.
+                                      </p>
                                   </div>
-                              ) : (
-                                  <button 
-                                      onClick={handleRegister}
-                                      className="w-full py-4 bg-white hover:bg-zinc-200 text-black font-bold text-sm rounded-xl transition-colors shadow-lg active:scale-95"
-                                  >
-                                      Confirmar Asistencia
-                                  </button>
-                              )}
-                          </>
-                      )}
+                              </div>
+                          ) : (
+                              <>
+                                  {selectedEvent.registrants?.includes(student?.id || '') ? (
+                                      <div className="flex items-center justify-center gap-2 text-green-600 font-bold bg-green-50 px-4 py-3 rounded-xl border border-green-100">
+                                          <span className="material-symbols-outlined">check_circle</span>
+                                          Ya estás inscrito
+                                      </div>
+                                  ) : (
+                                      <button 
+                                          onClick={handleRegister}
+                                          className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95"
+                                      >
+                                          <span>Confirmar Inscripción</span>
+                                          <span className="material-symbols-outlined">how_to_reg</span>
+                                      </button>
+                                  )}
+                              </>
+                          )}
+                      </div>
                   </div>
               </div>
           </div>
