@@ -49,50 +49,52 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
     <>
       {/* Mobile Overlay */}
       <div 
-        className={`fixed inset-0 bg-black/90 backdrop-blur-none z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
-      {/* Sidebar Content - INDUSTRIAL DESIGN */}
+      {/* Sidebar Content - ZINC / LINEAR STYLE */}
       <aside 
         className={`
           fixed md:static inset-y-0 left-0 z-50
-          flex flex-col w-72 h-full bg-[#000000] border-r border-primary
-          transform transition-transform duration-200 ease-linear shadow-none
+          flex flex-col w-72 h-full
+          bg-[#09090b]/95 backdrop-blur-2xl md:bg-transparent md:backdrop-blur-none
+          border-r border-white/5
+          transform transition-transform duration-300 ease-out shadow-2xl md:shadow-none
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
         {/* LOGO */}
-        <div className="h-20 flex items-center px-6 border-b border-border bg-[#000000]">
+        <div className="h-24 flex items-center px-8">
             <div className="flex items-center gap-3">
-                <div className="size-8 bg-primary flex items-center justify-center">
-                    <span className="font-black text-black text-lg leading-none">A</span>
+                <div className="size-8 rounded-lg bg-gradient-to-br from-primary to-orange-600 flex items-center justify-center text-white shadow-lg shadow-primary/20">
+                    <span className="font-bold text-lg leading-none">A</span>
                 </div>
-                <h1 className="text-lg font-bold tracking-tighter text-white uppercase">
-                    Academy<span className="text-primary">Pro</span>
+                <h1 className="text-lg font-semibold tracking-tight text-white">
+                    Academy<span className="text-zinc-500">Pro</span>
                 </h1>
             </div>
         </div>
 
-        <div className="flex flex-col h-full justify-between overflow-y-auto bg-[#000000]">
-          <div className="flex flex-col pt-6">
+        <div className="flex flex-col h-full justify-between overflow-y-auto px-4 pb-6">
+          <div className="flex flex-col gap-8">
             
-            {/* User Info - Squared */}
-            <div className="flex items-center gap-4 px-6 mb-8">
+            {/* User Info - Glass Card */}
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
                 <Avatar 
                     src={currentUser?.avatarUrl} 
                     name={displayName} 
-                    className="size-10 ring-1 ring-border" 
+                    className="size-10 rounded-xl ring-1 ring-white/10" 
                 />
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold text-white truncate uppercase tracking-wide">{displayName}</span>
-                  <span className="text-[10px] text-text-secondary truncate uppercase tracking-widest">{displaySubtext}</span>
+                  <span className="text-sm font-semibold text-zinc-100 truncate group-hover:text-white transition-colors">{displayName}</span>
+                  <span className="text-xs text-zinc-500 truncate">{displaySubtext}</span>
                 </div>
             </div>
 
-            {/* Menu - Rectangular & Sharp */}
+            {/* Navigation - Floating Items */}
             <nav className="flex flex-col gap-1 w-full">
-              <p className="px-6 text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">Navegación</p>
+              <p className="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Menu</p>
               {links.map((link) => {
                 const isActive = location.pathname.startsWith(link.path);
                 return (
@@ -100,18 +102,23 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
                     key={link.path}
                     to={link.path}
                     onClick={onClose}
-                    className={`flex items-center gap-4 px-6 py-4 transition-all group relative border-l-2 ${
-                        isActive
-                            ? 'border-primary bg-background-paper text-white'
-                            : 'border-transparent text-text-secondary hover:bg-background-subtle hover:text-white'
-                        }`}
+                    className={`
+                        flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group
+                        ${isActive
+                            ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/5'
+                            : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5'
+                        }
+                    `}
                     >
-                        <span className={`material-symbols-outlined text-[20px] ${isActive ? 'text-primary' : ''}`}>
+                        <span className={`material-symbols-outlined text-[20px] transition-colors ${isActive ? 'text-primary' : 'text-zinc-500 group-hover:text-zinc-300'}`}>
                             {link.icon}
                         </span>
-                        <span className="font-medium text-sm tracking-wide uppercase">
+                        <span>
                             {link.name}
                         </span>
+                        {isActive && (
+                            <div className="ml-auto size-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(249,115,22,0.6)]"></div>
+                        )}
                     </Link>
                 );
               })}
@@ -119,13 +126,13 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
           </div>
 
           {/* Footer */}
-          <div className="border-t border-border">
+          <div className="pt-6 border-t border-white/5 mt-auto">
               <button 
                   onClick={handleLogout}
-                  className="flex items-center gap-4 px-6 py-5 hover:bg-red-900/10 text-text-secondary hover:text-red-500 cursor-pointer transition-colors group w-full text-left"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all group"
               >
-                <span className="material-symbols-outlined text-[20px]">logout</span>
-                <span className="font-medium text-sm uppercase tracking-wide">Cerrar Sesión</span>
+                <span className="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">logout</span>
+                <span className="font-medium text-sm">Cerrar Sesión</span>
               </button>
           </div>
         </div>

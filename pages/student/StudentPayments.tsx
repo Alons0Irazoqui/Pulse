@@ -16,35 +16,35 @@ const StatusBadge: React.FC<{ status: TuitionRecord['status'] }> = ({ status }) 
     switch (status) {
         case 'paid':
             return (
-                <span className="inline-flex items-center gap-2 px-2 py-1 bg-black border border-green-500 text-green-500 text-[10px] font-bold tracking-widest uppercase rounded-none">
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
                     <span className="material-symbols-outlined text-[12px]">check_circle</span>
                     PAGADO
                 </span>
             );
         case 'in_review':
             return (
-                <span className="inline-flex items-center gap-2 px-2 py-1 bg-black border border-amber-500 text-amber-500 text-[10px] font-bold tracking-widest uppercase rounded-none">
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
                     <span className="material-symbols-outlined text-[12px]">hourglass_top</span>
                     REVISIÓN
                 </span>
             );
         case 'overdue':
             return (
-                <span className="inline-flex items-center gap-2 px-2 py-1 bg-black border border-red-500 text-red-500 text-[10px] font-bold tracking-widest uppercase rounded-none animate-pulse">
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold tracking-wider uppercase rounded-lg animate-pulse">
                     <span className="material-symbols-outlined text-[12px]">warning</span>
                     VENCIDO
                 </span>
             );
         case 'partial':
             return (
-                <span className="inline-flex items-center gap-2 px-2 py-1 bg-black border border-orange-500 text-orange-500 text-[10px] font-bold tracking-widest uppercase rounded-none">
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
                     <span className="material-symbols-outlined text-[12px]">pie_chart</span>
                     RESTANTE
                 </span>
             );
         default:
             return (
-                <span className="inline-flex items-center gap-2 px-2 py-1 bg-black border border-zinc-600 text-zinc-400 text-[10px] font-bold tracking-widest uppercase rounded-none">
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-zinc-800 border border-zinc-700 text-zinc-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
                     <span className="material-symbols-outlined text-[12px]">pending</span>
                     POR PAGAR
                 </span>
@@ -178,48 +178,48 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-none animate-in fade-in duration-200">
-            <div className="bg-[#0D0D0D] w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,1)] flex flex-col max-h-[90vh] overflow-hidden border border-[#333] rounded-none" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-[#121212] w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-zinc-800 rounded-2xl" onClick={(e) => e.stopPropagation()}>
                 
                 {/* Header */}
-                <div className="p-6 border-b border-[#1A1A1A] flex justify-between items-start shrink-0 bg-black">
+                <div className="p-6 border-b border-zinc-800 flex justify-between items-start shrink-0 bg-[#18181b]">
                     <div>
-                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">Reportar Pago</h3>
-                        <div className="h-1 w-8 bg-primary mt-1"></div>
+                        <h3 className="text-xl font-bold text-white tracking-tight">Reportar Pago</h3>
+                        <p className="text-sm text-zinc-400">Adjunta comprobante o notifica efectivo.</p>
                     </div>
-                    <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
-                        <span className="material-symbols-outlined">close</span>
+                    <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors bg-zinc-800/50 rounded-full p-2 hover:bg-zinc-800">
+                        <span className="material-symbols-outlined text-[20px]">close</span>
                     </button>
                 </div>
 
-                <div className="p-6 overflow-y-auto flex flex-col gap-8 bg-[#0D0D0D]">
+                <div className="p-6 overflow-y-auto flex flex-col gap-8 bg-[#121212]">
                     
                     {/* 1. DEBT SELECTOR */}
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Conceptos a Pagar</label>
+                    <div className="space-y-3">
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block">Conceptos a Pagar</label>
                         
                         {!isSinglePaymentMode && (
-                            <div className="relative mb-4">
+                            <div className="relative">
                                 <select 
                                     defaultValue=""
                                     onChange={handleSelectChange}
-                                    className="w-full border border-[#333] bg-black py-4 px-4 text-sm font-bold text-white focus:border-primary transition-all appearance-none outline-none rounded-none"
+                                    className="w-full border border-zinc-800 bg-zinc-950 py-3 pl-4 pr-10 text-sm font-medium text-white focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all appearance-none outline-none rounded-xl"
                                 >
-                                    <option value="" disabled>+ SELECCIONAR CONCEPTO...</option>
+                                    <option value="" disabled>+ Agregar otro concepto...</option>
                                     {availableOptions.map(debt => (
                                         <option key={debt.id} value={debt.id}>
                                             {debt.concept} - ${debt.amount + debt.penaltyAmount}
                                         </option>
                                     ))}
                                 </select>
-                                <div className="absolute right-4 top-4 pointer-events-none text-zinc-500">
-                                    <span className="material-symbols-outlined text-lg">arrow_drop_down</span>
+                                <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500">
+                                    <span className="material-symbols-outlined text-xl">arrow_drop_down</span>
                                 </div>
                             </div>
                         )}
 
                         {/* Selected Items List */}
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-2">
                             <AnimatePresence>
                                 {selectedDebts.map(debt => (
                                     <MotionDiv 
@@ -227,27 +227,27 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: 10 }}
-                                        className="flex items-center justify-between p-3 bg-black border border-[#1A1A1A] group"
+                                        className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-xl"
                                     >
                                         <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className={`size-6 flex items-center justify-center shrink-0 ${debt.canBePaidInParts ? 'text-blue-500' : 'text-orange-500'}`}>
-                                                <span className="material-symbols-outlined text-base">
+                                            <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${debt.canBePaidInParts ? 'bg-blue-500/10 text-blue-400' : 'bg-orange-500/10 text-orange-400'}`}>
+                                                <span className="material-symbols-outlined text-[18px]">
                                                     {debt.canBePaidInParts ? 'payments' : 'lock'}
                                                 </span>
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-sm font-bold text-white truncate uppercase tracking-wide">{debt.concept}</p>
-                                                <p className="text-[10px] text-zinc-500 font-mono uppercase">
-                                                    {debt.canBePaidInParts ? 'ABONABLE' : 'PAGO EXACTO'}
+                                                <p className="text-sm font-bold text-white truncate">{debt.concept}</p>
+                                                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide">
+                                                    {debt.canBePaidInParts ? 'Abonable' : 'Pago Exacto'}
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                            <span className="font-mono font-bold text-sm text-white">${(debt.amount + debt.penaltyAmount).toFixed(2)}</span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-mono font-bold text-sm text-zinc-300">${(debt.amount + debt.penaltyAmount).toFixed(2)}</span>
                                             {!isSinglePaymentMode && (
                                                 <button 
                                                     onClick={() => handleRemoveDebt(debt.id)}
-                                                    className="text-zinc-600 hover:text-red-500 transition-colors"
+                                                    className="text-zinc-600 hover:text-red-400 transition-colors p-1"
                                                 >
                                                     <span className="material-symbols-outlined text-lg">close</span>
                                                 </button>
@@ -258,15 +258,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                             </AnimatePresence>
                             
                             {selectedDebts.length === 0 && (
-                                <div className="text-center py-8 border border-dashed border-[#333] text-zinc-600 text-xs uppercase tracking-widest">
-                                    Lista vacía
+                                <div className="text-center py-6 border-2 border-dashed border-zinc-800 rounded-xl text-zinc-600 text-sm">
+                                    No hay conceptos seleccionados
                                 </div>
                             )}
                         </div>
                     </div>
 
                     {/* 2. TOTALS & CUSTOM AMOUNT */}
-                    <div className="space-y-4 pt-6 border-t border-[#1A1A1A]">
+                    <div className="space-y-4 pt-6 border-t border-zinc-800">
                         <div className="flex items-center justify-between">
                             <label className="flex items-center gap-3 cursor-pointer group">
                                 <input 
@@ -274,63 +274,63 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                                     checked={isPartialEnabled}
                                     onChange={handlePartialToggle}
                                     disabled={!canCustomizeAmount || selectedDebts.length === 0}
-                                    className="size-4 rounded-none border-zinc-600 bg-black text-primary focus:ring-0 disabled:opacity-50 cursor-pointer"
+                                    className="size-4 rounded border-zinc-600 bg-zinc-900 text-primary focus:ring-primary focus:ring-offset-0 disabled:opacity-50 cursor-pointer"
                                 />
-                                <span className={`text-xs font-bold uppercase tracking-wide ${!canCustomizeAmount ? 'text-zinc-600' : 'text-zinc-300 group-hover:text-white'}`}>
+                                <span className={`text-xs font-bold uppercase tracking-wide ${!canCustomizeAmount ? 'text-zinc-600' : 'text-zinc-400 group-hover:text-zinc-200'}`}>
                                     Editar Monto a Pagar
                                 </span>
                             </label>
                         </div>
 
                         <div className="relative">
-                            <span className="absolute left-4 top-4 text-zinc-500 font-bold text-xl">$</span>
+                            <span className="absolute left-4 top-3.5 text-zinc-500 font-bold text-lg">$</span>
                             <input 
                                 type="number" 
                                 value={isPartialEnabled ? customAmount : totalDebtSum.toFixed(2)}
                                 onChange={(e) => setCustomAmount(e.target.value)}
                                 disabled={!isPartialEnabled}
-                                className={`w-full border py-4 pl-10 pr-4 text-2xl font-black text-white focus:ring-0 transition-all rounded-none font-mono ${
+                                className={`w-full border py-3 pl-10 pr-4 text-xl font-bold text-white focus:ring-1 transition-all rounded-xl font-mono ${
                                     !isPartialEnabled 
-                                    ? 'bg-black border-[#333] text-zinc-500 cursor-not-allowed' 
+                                    ? 'bg-zinc-900 border-zinc-800 text-zinc-500 cursor-not-allowed' 
                                     : isAmountValid 
-                                        ? 'bg-black border-primary' 
-                                        : 'bg-red-950/20 border-red-500 text-red-500'
+                                        ? 'bg-zinc-950 border-primary focus:border-primary focus:ring-primary/50' 
+                                        : 'bg-red-950/20 border-red-500 text-red-400 focus:border-red-500 focus:ring-red-500/50'
                                 }`}
                                 placeholder="0.00"
                             />
                         </div>
 
                         {!isAmountValid && isPartialEnabled && (
-                            <div className="flex items-center gap-2 text-[10px] text-red-500 font-bold bg-red-950/30 p-3 border border-red-900 uppercase tracking-wide">
+                            <div className="flex items-center gap-2 text-xs text-red-400 font-medium bg-red-500/10 p-3 rounded-lg border border-red-500/20">
                                 <span className="material-symbols-outlined text-sm">error</span>
                                 {finalAmount > totalDebtSum 
-                                    ? `EXCEDE EL TOTAL ($${totalDebtSum.toFixed(2)})`
-                                    : `MÍNIMO REQUERIDO: $${mandatorySum.toFixed(2)}`
+                                    ? `Excede el total ($${totalDebtSum.toFixed(2)})`
+                                    : `Mínimo requerido: $${mandatorySum.toFixed(2)}`
                                 }
                             </div>
                         )}
                     </div>
 
                     {/* 3. METHOD */}
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Método de Pago</label>
+                    <div className="space-y-3">
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block">Método de Pago</label>
                         <div className="flex gap-4">
                             <button 
                                 onClick={() => setMethod('Transferencia')}
-                                className={`flex-1 py-3 text-xs font-black uppercase tracking-wider transition-all border ${
+                                className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-all rounded-xl border ${
                                     method === 'Transferencia' 
-                                    ? 'bg-white text-black border-white' 
-                                    : 'bg-black text-zinc-500 border-[#333] hover:border-zinc-500 hover:text-white'
+                                    ? 'bg-white text-black border-white shadow-lg shadow-white/10' 
+                                    : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:border-zinc-600 hover:text-zinc-300'
                                 }`}
                             >
                                 Transferencia
                             </button>
                             <button 
                                 onClick={() => setMethod('Efectivo')}
-                                className={`flex-1 py-3 text-xs font-black uppercase tracking-wider transition-all border ${
+                                className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-all rounded-xl border ${
                                     method === 'Efectivo' 
-                                    ? 'bg-white text-black border-white' 
-                                    : 'bg-black text-zinc-500 border-[#333] hover:border-zinc-500 hover:text-white'
+                                    ? 'bg-white text-black border-white shadow-lg shadow-white/10' 
+                                    : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:border-zinc-600 hover:text-zinc-300'
                                 }`}
                             >
                                 Efectivo
@@ -340,10 +340,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                         {method === 'Transferencia' ? (
                             <div 
                                 onClick={() => fileInputRef.current?.click()}
-                                className={`border border-dashed p-8 text-center cursor-pointer transition-all mt-4 group ${
+                                className={`border-2 border-dashed p-8 text-center cursor-pointer transition-all mt-2 group rounded-xl ${
                                     file 
-                                    ? 'border-green-500 bg-green-950/10' 
-                                    : 'border-[#333] hover:border-primary hover:bg-primary/5'
+                                    ? 'border-emerald-500 bg-emerald-500/10' 
+                                    : 'border-zinc-800 bg-zinc-900/50 hover:border-primary hover:bg-primary/5'
                                 }`}
                             >
                                 <input 
@@ -355,9 +355,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                                 />
                                 {file ? (
                                     <div className="flex flex-col items-center">
-                                        <span className="material-symbols-outlined text-3xl text-green-500 mb-2">check_circle</span>
-                                        <p className="text-xs font-bold text-green-400 break-all uppercase tracking-wide">{file.name}</p>
-                                        <p className="text-[10px] text-green-600 mt-1 uppercase">Clic para cambiar</p>
+                                        <div className="size-10 rounded-full bg-emerald-500 flex items-center justify-center text-white mb-2 shadow-lg shadow-emerald-500/30">
+                                            <span className="material-symbols-outlined text-xl">check</span>
+                                        </div>
+                                        <p className="text-sm font-bold text-emerald-400 break-all">{file.name}</p>
+                                        <p className="text-xs text-emerald-600 mt-1 font-medium">Clic para cambiar archivo</p>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center text-zinc-500 group-hover:text-primary transition-colors">
@@ -367,10 +369,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                                 )}
                             </div>
                         ) : (
-                            <div className="bg-[#111] border border-[#222] p-4 flex gap-4 items-center mt-4">
-                                <span className="material-symbols-outlined text-zinc-400 text-2xl">storefront</span>
+                            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex gap-4 items-center mt-2">
+                                <div className="size-10 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
+                                    <span className="material-symbols-outlined text-zinc-400 text-[20px]">storefront</span>
+                                </div>
                                 <p className="text-xs text-zinc-400 font-medium leading-relaxed">
-                                    Notifica tu pago ahora y acude a recepción para liquidar.
+                                    Notifica tu pago ahora y acude a recepción para liquidar. El cargo quedará como "Pendiente" hasta confirmar el efectivo.
                                 </p>
                             </div>
                         )}
@@ -378,12 +382,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-6 border-t border-[#1A1A1A] bg-black flex gap-4 shrink-0">
-                    <button onClick={onClose} className="flex-1 py-4 border border-[#333] font-bold text-zinc-500 hover:text-white hover:border-white transition-all uppercase tracking-wider text-xs rounded-none">Cancelar</button>
+                <div className="p-6 border-t border-zinc-800 bg-[#18181b] flex gap-4 shrink-0">
+                    <button onClick={onClose} className="flex-1 py-3.5 border border-zinc-700 font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all uppercase tracking-wider text-xs rounded-xl">Cancelar</button>
                     <button 
                         onClick={handleSubmit} 
                         disabled={selectedDebts.length === 0 || (method === 'Transferencia' && !file) || !isAmountValid}
-                        className="flex-[2] py-4 bg-primary text-black font-black hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(249,115,22,0.3)] transition-all uppercase tracking-wider text-xs flex items-center justify-center gap-2 rounded-none"
+                        className="flex-[2] py-3.5 bg-primary text-white font-bold hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20 transition-all uppercase tracking-wider text-xs flex items-center justify-center gap-2 rounded-xl active:scale-95"
                     >
                         {method === 'Efectivo' ? 'Notificar Pago' : 'Enviar Comprobante'}
                     </button>
@@ -448,26 +452,26 @@ const StudentPayments: React.FC = () => {
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto p-4 md:p-10 w-full min-h-full flex flex-col gap-10 pb-24 text-white">
+    <div className="max-w-[1200px] mx-auto p-4 md:p-10 w-full min-h-full flex flex-col gap-10 pb-24 text-zinc-200">
       
       {/* Header & Balance */}
-      <header className="flex flex-wrap md:flex-nowrap justify-between items-start md:items-end gap-6 bg-[#0D0D0D] p-8 border border-[#1A1A1A] relative overflow-hidden">
+      <header className="flex flex-wrap md:flex-nowrap justify-between items-start md:items-end gap-6 bg-[#18181b] p-8 border border-zinc-800 rounded-3xl relative overflow-hidden shadow-card">
           <div className="relative z-10 w-full md:w-auto md:max-w-xl">
-            <h1 className="text-3xl font-black tracking-tight text-white uppercase">Mis Pagos</h1>
-            <p className="text-zinc-500 mt-2 text-sm leading-relaxed font-medium">
+            <h1 className="text-3xl font-black tracking-tight text-white">Mis Pagos</h1>
+            <p className="text-zinc-400 mt-2 text-sm leading-relaxed font-medium">
                 Mantén tus cuotas al día para asegurar tu acceso al dojo.
             </p>
           </div>
           
           <div className="flex flex-col items-end relative z-10 min-w-[140px] ml-auto">
-            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Deuda Total</span>
-            <div className={`text-4xl font-black font-mono tracking-tighter ${totalDebt > 0 ? 'text-red-500' : 'text-green-500'}`}>
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Deuda Total</span>
+            <div className={`text-4xl font-black font-mono tracking-tight ${totalDebt > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                 ${totalDebt.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </div>
             {totalDebt > 0 ? (
-                <span className="text-[10px] font-bold text-red-500 mt-2 bg-red-950/20 px-2 py-1 border border-red-900 uppercase tracking-wider">Pendiente de pago</span>
+                <span className="text-[10px] font-bold text-red-400 mt-2 bg-red-500/10 px-2 py-1 border border-red-500/20 rounded-lg uppercase tracking-wider">Pendiente de pago</span>
             ) : (
-                <span className="text-[10px] font-bold text-green-500 mt-2 bg-green-950/20 px-2 py-1 border border-green-900 uppercase tracking-wider flex items-center gap-1">
+                <span className="text-[10px] font-bold text-emerald-400 mt-2 bg-emerald-500/10 px-2 py-1 border border-emerald-500/20 rounded-lg uppercase tracking-wider flex items-center gap-1">
                     <span className="material-symbols-outlined text-[12px]">check</span> Al corriente
                 </span>
             )}
@@ -481,19 +485,19 @@ const StudentPayments: React.FC = () => {
               
               {/* --- ACTIVE DEBTS SECTION --- */}
               <div className="flex flex-col gap-4">
-                  <div className="flex justify-between items-center px-1 border-b border-[#1A1A1A] pb-4">
-                      <h3 className="text-lg font-black text-white flex items-center gap-3 uppercase tracking-wide">
+                  <div className="flex justify-between items-center px-1 border-b border-zinc-800 pb-4">
+                      <h3 className="text-lg font-bold text-white flex items-center gap-3">
                           <span className="material-symbols-outlined text-primary">payments</span>
                           Por Pagar
                       </h3>
                   </div>
                   
                   {activeRecords.length === 0 && inReviewRecords.length === 0 ? (
-                      <div className="bg-[#0D0D0D] border border-[#1A1A1A] p-12 text-center">
-                          <div className="size-20 bg-[#111] text-green-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#222]">
+                      <div className="bg-[#18181b] border border-zinc-800 p-12 text-center rounded-3xl">
+                          <div className="size-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
                               <span className="material-symbols-outlined text-4xl">celebration</span>
                           </div>
-                          <h4 className="font-bold text-white text-lg uppercase tracking-wide">¡Estás al día!</h4>
+                          <h4 className="font-bold text-white text-lg">¡Estás al día!</h4>
                           <p className="text-zinc-500 text-sm mt-1">No tienes pagos pendientes.</p>
                       </div>
                   ) : (
@@ -511,10 +515,10 @@ const StudentPayments: React.FC = () => {
                                           initial={{ opacity: 0, y: 10 }}
                                           animate={{ opacity: 1, y: 0 }}
                                           exit={{ opacity: 0, scale: 0.95 }}
-                                          className={`bg-[#0D0D0D] p-6 border-l-4 flex flex-col sm:flex-row gap-6 justify-between items-start sm:items-center transition-all border-y border-r border-y-[#1A1A1A] border-r-[#1A1A1A] hover:bg-[#111] group ${
-                                              isOverdue ? 'border-l-red-500' : 
-                                              record.status === 'partial' ? 'border-l-orange-500' :
-                                              'border-l-zinc-600'
+                                          className={`bg-[#18181b] p-6 rounded-2xl border flex flex-col sm:flex-row gap-6 justify-between items-start sm:items-center transition-all hover:border-zinc-600 group shadow-sm ${
+                                              isOverdue ? 'border-red-500/50 bg-red-500/5' : 
+                                              record.status === 'partial' ? 'border-orange-500/50' :
+                                              'border-zinc-800'
                                           }`}
                                       >
                                           <div className="flex-1 w-full">
@@ -522,31 +526,31 @@ const StudentPayments: React.FC = () => {
                                                   <StatusBadge status={record.status} />
                                                   <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">Vence: {formatDateDisplay(record.dueDate)}</span>
                                               </div>
-                                              <h4 className="text-lg font-bold text-white uppercase tracking-wide">{record.concept}</h4>
+                                              <h4 className="text-lg font-bold text-white tracking-tight">{record.concept}</h4>
                                               {isOverdue && (
-                                                  <p className="text-xs text-red-500 font-bold mt-2 flex items-center gap-1 uppercase tracking-wider">
+                                                  <p className="text-xs text-red-400 font-bold mt-2 flex items-center gap-1">
                                                       <span className="material-symbols-outlined text-[14px]">error</span>
                                                       + ${record.penaltyAmount} Recargo
                                                   </p>
                                               )}
                                               {record.status === 'partial' && (
-                                                  <p className="text-xs text-orange-500 font-bold mt-2 flex items-center gap-1 uppercase tracking-wider">
+                                                  <p className="text-xs text-orange-400 font-bold mt-2 flex items-center gap-1">
                                                       <span className="material-symbols-outlined text-[14px]">pie_chart</span>
                                                       Saldo Restante
                                                   </p>
                                               )}
                                           </div>
 
-                                          <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-[#222] pt-4 sm:pt-0">
+                                          <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-zinc-800 pt-4 sm:pt-0">
                                               <div className="text-right">
                                                   <span className="block text-[9px] text-zinc-500 uppercase tracking-widest font-black mb-1">Total</span>
-                                                  <span className={`text-2xl font-black font-mono ${isOverdue ? 'text-red-500' : 'text-white'}`}>
+                                                  <span className={`text-2xl font-black font-mono ${isOverdue ? 'text-red-400' : 'text-white'}`}>
                                                       ${amountDisplay.toFixed(2)}
                                                   </span>
                                               </div>
                                               <button 
                                                   onClick={() => handleOpenPaymentModal(record)}
-                                                  className="bg-white text-black hover:bg-zinc-200 px-6 py-3 font-black text-xs uppercase tracking-wider flex items-center gap-2 transition-all active:scale-95 whitespace-nowrap rounded-none"
+                                                  className="bg-white text-black hover:bg-zinc-200 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all active:scale-95 whitespace-nowrap shadow-lg"
                                               >
                                                   <span className="material-symbols-outlined text-[18px]">upload_file</span>
                                                   <span className="hidden sm:inline">Pagar</span>
@@ -562,21 +566,21 @@ const StudentPayments: React.FC = () => {
                               <MotionDiv 
                                   key={record.id}
                                   layout
-                                  className="bg-[#0D0D0D] p-6 border border-amber-900/30 flex flex-col sm:flex-row gap-4 justify-between items-center opacity-80"
+                                  className="bg-[#18181b]/50 p-6 rounded-2xl border border-dashed border-amber-500/30 flex flex-col sm:flex-row gap-4 justify-between items-center opacity-80"
                               >
                                   <div className="flex-1 w-full">
                                       <div className="flex justify-between items-start mb-2">
                                           <StatusBadge status="in_review" />
                                           <span className="text-[10px] text-zinc-500 font-mono uppercase">Enviado: {formatDateDisplay(record.paymentDate || '')}</span>
                                       </div>
-                                      <h4 className="text-lg font-bold text-zinc-400 uppercase tracking-wide">{record.concept}</h4>
-                                      <span className="text-[10px] font-bold text-amber-600 bg-amber-950/20 px-2 py-1 inline-block mt-2 border border-amber-900/50 uppercase tracking-wider">
+                                      <h4 className="text-lg font-bold text-zinc-400">{record.concept}</h4>
+                                      <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-1 inline-block mt-2 rounded border border-amber-500/20 uppercase tracking-wider">
                                           Método: {record.method || 'Transferencia'}
                                       </span>
                                   </div>
                                   <div className="text-right w-full sm:w-auto flex justify-between sm:block items-center">
                                       <span className="text-xl font-bold font-mono text-zinc-500">${record.amount.toFixed(2)}</span>
-                                      <p className="text-[10px] text-amber-600 font-bold mt-1 uppercase tracking-widest animate-pulse">Verificando...</p>
+                                      <p className="text-[10px] text-amber-500 font-bold mt-1 uppercase tracking-widest animate-pulse">Verificando...</p>
                                   </div>
                               </MotionDiv>
                           ))}
@@ -586,17 +590,17 @@ const StudentPayments: React.FC = () => {
 
               {/* --- HISTORY SECTION --- */}
               {historyRecords.length > 0 && (
-                  <div className="flex flex-col gap-4 mt-8">
-                      <h3 className="text-lg font-black text-zinc-600 flex items-center gap-2 px-1 uppercase tracking-wide">
+                  <div className="flex flex-col gap-4 mt-4">
+                      <h3 className="text-lg font-bold text-zinc-500 flex items-center gap-2 px-1">
                           <span className="material-symbols-outlined">history</span>
                           Historial
                       </h3>
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-3">
                           {historyRecords.map((record) => (
-                              <div key={record.id} className="bg-[#0D0D0D] p-5 border-b border-[#1A1A1A] flex justify-between items-center group hover:bg-[#111] transition-all">
+                              <div key={record.id} className="bg-[#18181b] p-5 rounded-xl border border-zinc-800 flex justify-between items-center group hover:bg-[#202023] transition-all hover:border-zinc-700">
                                   <div>
                                       <div className="flex items-center gap-3 mb-1">
-                                          <span className="text-sm font-bold text-white uppercase tracking-wide">{record.concept}</span>
+                                          <span className="text-sm font-bold text-white">{record.concept}</span>
                                           <StatusBadge status="paid" />
                                       </div>
                                       <p className="text-[10px] text-zinc-500 font-mono uppercase">
@@ -604,10 +608,10 @@ const StudentPayments: React.FC = () => {
                                       </p>
                                   </div>
                                   <div className="flex items-center gap-6">
-                                      <span className="font-bold font-mono text-green-500">${(record.originalAmount || record.amount).toFixed(2)}</span>
+                                      <span className="font-bold font-mono text-emerald-400">${(record.originalAmount || record.amount).toFixed(2)}</span>
                                       <button 
                                           onClick={() => handleDownloadReceipt(record)}
-                                          className="size-8 bg-[#1A1A1A] text-zinc-400 hover:text-white hover:bg-[#222] flex items-center justify-center transition-colors"
+                                          className="size-9 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 flex items-center justify-center transition-colors"
                                           title="Descargar Recibo"
                                       >
                                           <span className="material-symbols-outlined text-lg">receipt_long</span>
@@ -626,19 +630,19 @@ const StudentPayments: React.FC = () => {
               {/* QUICK ACTION: PAY BATCH */}
               <button 
                   onClick={() => handleOpenPaymentModal()}
-                  className="w-full py-5 bg-primary text-black font-black uppercase tracking-wider shadow-[0_0_20px_rgba(249,115,22,0.3)] hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-3 group rounded-none text-sm"
+                  className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-bold uppercase tracking-wider text-xs rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95 flex items-center justify-center gap-3"
               >
                   <span className="material-symbols-outlined text-xl">add_shopping_cart</span>
                   Pagar Varios Conceptos
               </button>
 
               {/* BANK INFO CARD */}
-              <div className="bg-[#0D0D0D] p-8 text-white shadow-xl relative overflow-hidden border border-[#1A1A1A]">
+              <div className="bg-[#18181b] p-8 text-white shadow-card rounded-3xl relative overflow-hidden border border-zinc-800">
                   <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
                       <span className="material-symbols-outlined text-[150px]">account_balance</span>
                   </div>
                   <div className="relative z-10">
-                      <h3 className="text-lg font-black mb-6 flex items-center gap-2 uppercase tracking-wide">
+                      <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                           <span className="material-symbols-outlined text-zinc-500">account_balance_wallet</span>
                           Datos Bancarios
                       </h3>
@@ -646,15 +650,15 @@ const StudentPayments: React.FC = () => {
                       {bankInfo ? (
                           <div className="space-y-6">
                               <div>
-                                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-black mb-1">Banco</p>
+                                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Banco</p>
                                   <p className="text-xl font-bold tracking-tight text-white">{bankInfo.bankName}</p>
                               </div>
                               <div>
-                                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-black mb-1">Beneficiario</p>
+                                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Beneficiario</p>
                                   <p className="text-lg font-medium tracking-tight text-white">{bankInfo.accountHolder}</p>
                               </div>
-                              <div className="bg-black p-4 border border-[#333]">
-                                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-black mb-2">CLABE Interbancaria</p>
+                              <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800">
+                                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-2">CLABE Interbancaria</p>
                                   <div className="flex items-center justify-between">
                                       <p className="font-mono text-lg tracking-wider select-all text-white">{bankInfo.clabe}</p>
                                       <button 
@@ -666,14 +670,14 @@ const StudentPayments: React.FC = () => {
                                   </div>
                               </div>
                               {bankInfo.instructions && (
-                                  <div className="text-xs text-zinc-400 leading-relaxed bg-[#111] p-3 border border-[#222]">
-                                      <span className="font-bold text-zinc-300 block mb-1 uppercase tracking-wide">Instrucciones:</span>
+                                  <div className="text-xs text-zinc-400 leading-relaxed bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
+                                      <span className="font-bold text-zinc-300 block mb-1">Instrucciones:</span>
                                       {bankInfo.instructions}
                                   </div>
                               )}
                           </div>
                       ) : (
-                          <p className="text-zinc-500">Sin información bancaria configurada.</p>
+                          <p className="text-zinc-500 text-sm">Sin información bancaria configurada.</p>
                       )}
                   </div>
               </div>

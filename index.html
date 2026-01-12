@@ -15,53 +15,45 @@
           extend: {
             colors: {
               primary: {
-                DEFAULT: "#F97316", // Vibrant Orange
+                DEFAULT: "#F97316", // Orange remains as accent
                 hover: "#EA580C",
-                light: "#FDBA74",
-                dark: "#C2410C",
-                glass: "rgba(249, 115, 22, 0.10)"
+                glass: "rgba(249, 115, 22, 0.15)"
               },
               background: {
-                DEFAULT: "#000000", // Absolute Black
-                paper: "#0D0D0D",   // Dark Surface
-                subtle: "#1A1A1A",  // Hover/Input
-                elevated: "#171717" // Modals
+                DEFAULT: "#09090b", // Zinc 950 (Canvas)
+                paper: "#18181b",   // Zinc 900 (Cards/Surfaces)
+                subtle: "#27272a",  // Zinc 800 (Hover/Inputs)
+                elevated: "#3f3f46" // Zinc 700 (Modals/Popovers)
               },
               text: {
-                main: "#FFFFFF",
-                secondary: "#737373", // Metal Gray
-                muted: "#404040",     // Dark Gray
+                main: "#E4E4E7",      // Zinc 200
+                secondary: "#A1A1AA", // Zinc 400
+                muted: "#52525B",     // Zinc 600
                 inverted: "#000000"
               },
               border: {
-                DEFAULT: "#1A1A1A", // Subtle divider
-                hover: "#404040"
+                DEFAULT: "rgba(255, 255, 255, 0.08)", // Very subtle divider
+                hover: "rgba(255, 255, 255, 0.15)"
               },
-              status: {
-                success: "#10b981", // Emerald
-                error: "#ef4444",   // Red
-                warning: "#f59e0b", // Amber
-                info: "#3b82f6"     // Blue
+              zinc: {
+                800: "#27272a",
+                900: "#18181b",
+                950: "#09090b"
               }
             },
             fontFamily: {
               sans: ["Inter", "sans-serif"],
             },
             boxShadow: {
-              glow: "0 0 0 1px rgba(249, 115, 22, 0.2)",
-              card: "0 0 0 1px #1A1A1A",
-              premium: "0 20px 40px -20px rgba(0, 0, 0, 1)",
+              glow: "0 0 20px -5px rgba(249, 115, 22, 0.3)",
+              card: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+              glass: "0 8px 32px 0 rgba(0, 0, 0, 0.3)",
             },
+            // Restoring default border radius capabilities
             borderRadius: {
-              DEFAULT: "0px",
-              none: "0px",
-              sm: "0px",
-              md: "0px",
-              lg: "0px",
-              xl: "0px",
-              "2xl": "0px",
-              "3xl": "0px",
-              full: "0px", // Industrial Geometry
+              'xl': '0.75rem',
+              '2xl': '1rem',
+              '3xl': '1.5rem',
             }
           },
         },
@@ -70,26 +62,26 @@
     <style>
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #000000;
-        color: #ffffff;
+        background-color: #09090b; /* Zinc 950 */
+        color: #E4E4E7; /* Zinc 200 */
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
       
-      /* Industrial Scrollbar */
+      /* Smooth Dark Scrollbar */
       ::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
-        background: #000000; 
+        background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #333333; 
-        border-radius: 0px;
+        background: #27272a; 
+        border-radius: 99px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #F97316; 
+        background: #3f3f46; 
       }
 
       .material-symbols-outlined {
@@ -99,23 +91,28 @@
         font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
       }
       
-      /* Force sharp corners everywhere */
-      * {
-        border-radius: 0 !important;
-      }
+      /* Remove the forced sharp corners override */
       
-      /* Form Autofill Fix for Dark Mode */
+      /* Form Autofill Fix for Dark Mode - Updated to Zinc */
       input:-webkit-autofill,
       input:-webkit-autofill:hover, 
       input:-webkit-autofill:focus, 
       input:-webkit-autofill:active{
-          -webkit-box-shadow: 0 0 0 30px #0D0D0D inset !important;
-          -webkit-text-fill-color: white !important;
+          -webkit-box-shadow: 0 0 0 30px #18181b inset !important;
+          -webkit-text-fill-color: #E4E4E7 !important;
           transition: background-color 5000s ease-in-out 0s;
       }
 
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      
+      /* Glass effect utility class */
+      .glass-panel {
+        background: rgba(24, 24, 27, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
     </style>
   <script type="importmap">
 {
@@ -136,7 +133,7 @@
 }
 </script>
 </head>
-  <body class="bg-background text-text-main selection:bg-primary selection:text-black">
+  <body class="bg-background text-text-main selection:bg-primary/30 selection:text-white">
     <div id="root"></div>
   </body>
 </html>
