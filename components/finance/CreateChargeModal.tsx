@@ -57,8 +57,6 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
     useEffect(() => {
         if (categoryGroup === 'event' && selectedEvent) {
             setCustomTitle(selectedEvent.title); // Auto-fill title
-            // Determine internal category based on event type
-            // Note: Amount is NOT auto-filled as costs might vary per student/late-fee
         } else if (categoryGroup === 'event' && !selectedEvent) {
             setCustomTitle('');
         }
@@ -121,21 +119,21 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-background-paper rounded-[2rem] w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-border" onClick={e => e.stopPropagation()}>
                 
                 {/* Header */}
-                <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div className="px-8 py-6 border-b border-border flex justify-between items-center bg-background-subtle">
                     <div className="flex items-center gap-4">
-                        <div className="size-12 bg-blue-100 text-primary rounded-2xl flex items-center justify-center">
+                        <div className="size-12 bg-blue-500/10 text-blue-400 rounded-2xl flex items-center justify-center border border-blue-500/20">
                             <span className="material-symbols-outlined text-2xl">point_of_sale</span>
                         </div>
                         <div>
-                            <h2 className="text-xl font-black text-text-main leading-tight">Generar Cargo Manual</h2>
+                            <h2 className="text-xl font-black text-white leading-tight">Generar Cargo Manual</h2>
                             <p className="text-sm text-text-secondary">Crea una deuda específica para un alumno.</p>
                         </div>
                     </div>
-                    <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
+                    <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-full text-text-secondary hover:text-white transition-colors">
                         <span className="material-symbols-outlined">close</span>
                     </button>
                 </div>
@@ -150,7 +148,7 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                             {/* Step 1: Student */}
                             <div className="space-y-3">
                                 <label className="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-wider">
-                                    <span className="bg-gray-200 text-gray-600 size-5 rounded-full flex items-center justify-center text-[10px]">1</span>
+                                    <span className="bg-background-elevated text-white size-5 rounded-full flex items-center justify-center text-[10px]">1</span>
                                     Seleccionar Alumno
                                 </label>
                                 <StudentSearch 
@@ -164,7 +162,7 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                             {/* Step 2: Category */}
                             <div className="space-y-3">
                                 <label className="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-wider">
-                                    <span className="bg-gray-200 text-gray-600 size-5 rounded-full flex items-center justify-center text-[10px]">2</span>
+                                    <span className="bg-background-elevated text-white size-5 rounded-full flex items-center justify-center text-[10px]">2</span>
                                     Categoría del Cobro
                                 </label>
                                 <div className="grid grid-cols-3 gap-3">
@@ -172,8 +170,8 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                                         onClick={() => setCategoryGroup('event')}
                                         className={`p-3 rounded-xl border text-sm font-bold flex flex-col items-center gap-2 transition-all ${
                                             categoryGroup === 'event' 
-                                            ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm' 
-                                            : 'bg-white border-gray-200 text-text-secondary hover:bg-gray-50'
+                                            ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 shadow-sm' 
+                                            : 'bg-background-subtle border-border text-text-secondary hover:bg-background-elevated'
                                         }`}
                                     >
                                         <span className="material-symbols-outlined">emoji_events</span>
@@ -183,8 +181,8 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                                         onClick={() => setCategoryGroup('equipment')}
                                         className={`p-3 rounded-xl border text-sm font-bold flex flex-col items-center gap-2 transition-all ${
                                             categoryGroup === 'equipment' 
-                                            ? 'bg-purple-50 border-purple-200 text-purple-700 shadow-sm' 
-                                            : 'bg-white border-gray-200 text-text-secondary hover:bg-gray-50'
+                                            ? 'bg-purple-500/10 border-purple-500/30 text-purple-400 shadow-sm' 
+                                            : 'bg-background-subtle border-border text-text-secondary hover:bg-background-elevated'
                                         }`}
                                     >
                                         <span className="material-symbols-outlined">checkroom</span>
@@ -194,8 +192,8 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                                         onClick={() => setCategoryGroup('other')}
                                         className={`p-3 rounded-xl border text-sm font-bold flex flex-col items-center gap-2 transition-all ${
                                             categoryGroup === 'other' 
-                                            ? 'bg-gray-100 border-gray-300 text-gray-800 shadow-sm' 
-                                            : 'bg-white border-gray-200 text-text-secondary hover:bg-gray-50'
+                                            ? 'bg-white/10 border-white/20 text-white shadow-sm' 
+                                            : 'bg-background-subtle border-border text-text-secondary hover:bg-background-elevated'
                                         }`}
                                     >
                                         <span className="material-symbols-outlined">receipt</span>
@@ -207,19 +205,19 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                             {/* Step 3: Conditional Inputs */}
                             <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-300">
                                 <label className="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-wider">
-                                    <span className="bg-gray-200 text-gray-600 size-5 rounded-full flex items-center justify-center text-[10px]">3</span>
+                                    <span className="bg-background-elevated text-white size-5 rounded-full flex items-center justify-center text-[10px]">3</span>
                                     Detalle del Concepto
                                 </label>
 
                                 {categoryGroup === 'event' ? (
-                                    <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                                    <div className="bg-blue-900/10 p-4 rounded-2xl border border-blue-500/20">
                                         {availableEvents.length > 0 ? (
                                             <>
-                                                <label className="block text-xs font-bold text-blue-800 mb-2">Selecciona el Evento Inscrito</label>
+                                                <label className="block text-xs font-bold text-blue-300 mb-2">Selecciona el Evento Inscrito</label>
                                                 <select 
                                                     value={selectedEventId}
                                                     onChange={(e) => setSelectedEventId(e.target.value)}
-                                                    className="w-full rounded-xl border-blue-200 bg-white p-3 text-sm font-medium focus:ring-blue-500 focus:border-blue-500"
+                                                    className="w-full rounded-xl border-border bg-background p-3 text-sm font-medium focus:ring-blue-500 focus:border-blue-500 text-white"
                                                 >
                                                     <option value="">-- Seleccionar --</option>
                                                     {availableEvents.map(evt => (
@@ -228,12 +226,12 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                                                         </option>
                                                     ))}
                                                 </select>
-                                                <p className="text-[10px] text-blue-600 mt-2">
+                                                <p className="text-[10px] text-blue-400 mt-2">
                                                     * Solo se muestran eventos donde el alumno ya está registrado.
                                                 </p>
                                             </>
                                         ) : (
-                                            <div className="flex items-center gap-3 text-amber-600">
+                                            <div className="flex items-center gap-3 text-amber-500">
                                                 <span className="material-symbols-outlined">warning</span>
                                                 <p className="text-sm font-medium">Este alumno no está inscrito en eventos recientes.</p>
                                             </div>
@@ -248,7 +246,7 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                                                 value={customTitle}
                                                 onChange={(e) => setCustomTitle(e.target.value)}
                                                 placeholder={categoryGroup === 'equipment' ? "Ej. Gi Blanco Talla A2" : "Ej. Reposición de Credencial"}
-                                                className="w-full rounded-xl border-gray-200 p-3 text-sm font-medium focus:border-primary focus:ring-primary"
+                                                className="w-full rounded-xl border-border bg-background-subtle p-3 text-sm font-medium focus:border-primary focus:ring-primary text-white"
                                             />
                                         </div>
                                         <div>
@@ -257,7 +255,7 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                                                 rows={2}
                                                 value={description}
                                                 onChange={(e) => setDescription(e.target.value)}
-                                                className="w-full rounded-xl border-gray-200 p-3 text-sm font-medium focus:border-primary focus:ring-primary resize-none"
+                                                className="w-full rounded-xl border-border bg-background-subtle p-3 text-sm font-medium focus:border-primary focus:ring-primary resize-none text-white"
                                                 placeholder="Detalles adicionales para el recibo..."
                                             />
                                         </div>
@@ -268,23 +266,23 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                         </div>
 
                         {/* RIGHT COLUMN: FINANCE */}
-                        <div className="flex flex-col h-full bg-gray-50 rounded-3xl p-8 border border-gray-100">
+                        <div className="flex flex-col h-full bg-background rounded-3xl p-8 border border-border">
                             <div className="space-y-6 flex-1">
                                 <label className="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-wider">
-                                    <span className="bg-gray-200 text-gray-600 size-5 rounded-full flex items-center justify-center text-[10px]">4</span>
+                                    <span className="bg-background-elevated text-white size-5 rounded-full flex items-center justify-center text-[10px]">4</span>
                                     Configuración Financiera
                                 </label>
 
                                 <div>
                                     <label className="block text-xs font-bold text-text-secondary mb-2">Monto a Cobrar</label>
                                     <div className="relative">
-                                        <span className="absolute left-4 top-3 text-gray-400 font-bold text-lg">$</span>
+                                        <span className="absolute left-4 top-3 text-text-muted font-bold text-lg">$</span>
                                         <input 
                                             type="number"
                                             min="0"
                                             value={amount}
                                             onChange={(e) => setAmount(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-4 rounded-xl border-gray-200 text-2xl font-black text-text-main focus:border-green-500 focus:ring-green-500"
+                                            className="w-full pl-10 pr-4 py-4 rounded-xl border-border bg-background-paper text-2xl font-black text-white focus:border-green-500 focus:ring-green-500 placeholder-text-muted"
                                             placeholder="0.00"
                                         />
                                     </div>
@@ -296,14 +294,14 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                                         type="date"
                                         value={dueDate}
                                         onChange={(e) => setDueDate(e.target.value)}
-                                        className="w-full p-3 rounded-xl border-gray-200 text-sm font-medium focus:border-primary focus:ring-primary"
+                                        className="w-full p-3 rounded-xl border-border bg-background-paper text-sm font-medium focus:border-primary focus:ring-primary text-white"
                                     />
                                 </div>
 
-                                <div className="bg-white p-4 rounded-xl border border-gray-200">
+                                <div className="bg-background-paper p-4 rounded-xl border border-border">
                                     <label className="flex items-center justify-between cursor-pointer">
                                         <div>
-                                            <span className="block text-sm font-bold text-text-main">Permitir Abonos</span>
+                                            <span className="block text-sm font-bold text-white">Permitir Abonos</span>
                                             <span className="text-xs text-text-secondary">El alumno podrá pagar en partes.</span>
                                         </div>
                                         <div className="relative inline-flex items-center cursor-pointer">
@@ -313,22 +311,22 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                                                 onChange={(e) => setCanBePaidInParts(e.target.checked)} 
                                                 className="sr-only peer" 
                                             />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                            <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                                         </div>
                                     </label>
                                 </div>
                             </div>
 
-                            <div className="mt-8 pt-6 border-t border-gray-200 flex gap-4">
+                            <div className="mt-8 pt-6 border-t border-border flex gap-4">
                                 <button 
                                     onClick={handleClose}
-                                    className="flex-1 py-3.5 rounded-xl border border-gray-200 font-bold text-text-secondary hover:bg-white hover:text-text-main transition-colors"
+                                    className="flex-1 py-3.5 rounded-xl border border-border font-bold text-text-secondary hover:bg-white/5 hover:text-white transition-colors"
                                 >
                                     Cancelar
                                 </button>
                                 <button 
                                     onClick={handleSubmit}
-                                    className="flex-[2] py-3.5 rounded-xl bg-black text-white font-bold hover:bg-gray-800 shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                                    className="flex-[2] py-3.5 rounded-xl bg-white text-black font-bold hover:bg-gray-200 shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
                                 >
                                     <span>Generar Cargo</span>
                                     <span className="material-symbols-outlined text-sm">arrow_forward</span>

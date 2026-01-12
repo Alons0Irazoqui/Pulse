@@ -241,32 +241,32 @@ const MasterDashboard: React.FC = () => {
           value: `$${dashboardData.revenue.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
           trend: dashboardData.revenueTrend,
           icon: 'payments',
-          color: 'text-green-600',
-          bg: 'bg-green-50'
+          color: 'text-green-400',
+          bg: 'bg-green-500/10'
       },
       {
           label: 'Alumnos Activos',
           value: dashboardData.activeStudents,
           trend: 0, 
           icon: 'groups',
-          color: 'text-blue-600',
-          bg: 'bg-blue-50'
+          color: 'text-blue-400',
+          bg: 'bg-blue-500/10'
       },
       {
           label: timeRange === 'month' ? 'Nuevos (Mes)' : 'Nuevos (Año)',
           value: dashboardData.newStudents,
           trend: dashboardData.enrollmentTrend,
           icon: 'person_add',
-          color: 'text-purple-600',
-          bg: 'bg-purple-50'
+          color: 'text-purple-400',
+          bg: 'bg-purple-500/10'
       },
       {
           label: 'Deuda Pendiente',
           value: `$${dashboardData.pendingDebt.toLocaleString('es-MX', { minimumFractionDigits: 0 })}`,
           trend: 0,
           icon: 'warning',
-          color: 'text-orange-600',
-          bg: 'bg-orange-50',
+          color: 'text-orange-400',
+          bg: 'bg-orange-500/10',
           isInverse: true
       }
   ];
@@ -275,24 +275,24 @@ const MasterDashboard: React.FC = () => {
   if (isLoading) {
       return (
         <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full animate-pulse">
-            <div className="h-8 w-48 bg-gray-200 rounded-lg mb-8"></div>
+            <div className="h-8 w-48 bg-zinc-800 rounded-lg mb-8"></div>
             <div className="grid grid-cols-4 gap-6 mb-8">
-                {[1,2,3,4].map(i => <div key={i} className="h-32 bg-gray-100 rounded-3xl"></div>)}
+                {[1,2,3,4].map(i => <div key={i} className="h-32 bg-background-paper rounded-3xl"></div>)}
             </div>
-            <div className="h-96 bg-gray-100 rounded-3xl"></div>
+            <div className="h-96 bg-background-paper rounded-3xl"></div>
         </div>
       );
   }
 
   return (
-    <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 text-white">
         
         {/* Header & Controls */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
             <div>
-                <h1 className="text-3xl font-black tracking-tight text-text-main flex items-center gap-3">
+                <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
                     Dashboard
-                    <span className="text-lg font-medium text-text-secondary bg-gray-100 px-3 py-1 rounded-xl">
+                    <span className="text-lg font-medium text-text-secondary bg-background-subtle border border-border px-3 py-1 rounded-lg">
                         {timeRange === 'month' 
                             ? format(currentDate, 'MMMM yyyy', { locale: es }) 
                             : format(currentDate, 'yyyy')}
@@ -305,26 +305,26 @@ const MasterDashboard: React.FC = () => {
             
             <div className="flex items-center gap-3">
                 {/* Date Navigator Controls */}
-                <div className="flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
-                    <button onClick={handlePrevPeriod} className="p-2 hover:bg-gray-100 rounded-lg text-text-secondary transition-colors">
+                <div className="flex bg-background-paper border border-border rounded-xl p-1 shadow-sm">
+                    <button onClick={handlePrevPeriod} className="p-2 hover:bg-background-subtle rounded-lg text-text-secondary hover:text-white transition-colors">
                         <span className="material-symbols-outlined text-xl">chevron_left</span>
                     </button>
-                    <button onClick={() => setCurrentDate(new Date())} className="px-3 text-xs font-bold text-text-main hover:bg-gray-50 rounded-lg transition-colors border-x border-transparent hover:border-gray-100">
+                    <button onClick={() => setCurrentDate(new Date())} className="px-3 text-xs font-bold text-white hover:bg-background-subtle rounded-lg transition-colors border-x border-transparent hover:border-border">
                         Hoy
                     </button>
-                    <button onClick={handleNextPeriod} className="p-2 hover:bg-gray-100 rounded-lg text-text-secondary transition-colors">
+                    <button onClick={handleNextPeriod} className="p-2 hover:bg-background-subtle rounded-lg text-text-secondary hover:text-white transition-colors">
                         <span className="material-symbols-outlined text-xl">chevron_right</span>
                     </button>
                 </div>
 
                 {/* View Toggle */}
-                <div className="bg-white border border-gray-200 rounded-xl p-1 flex shadow-sm">
+                <div className="bg-background-paper border border-border rounded-xl p-1 flex shadow-sm">
                     <button 
                         onClick={() => setTimeRange('month')}
                         className={`px-6 py-2 text-xs font-bold rounded-lg transition-all ${
                             timeRange === 'month' 
-                            ? 'bg-black text-white shadow-md' 
-                            : 'text-text-secondary hover:text-text-main hover:bg-gray-50'
+                            ? 'bg-white text-black shadow-md' 
+                            : 'text-text-secondary hover:text-white hover:bg-background-subtle'
                         }`}
                     >
                         Mensual
@@ -333,8 +333,8 @@ const MasterDashboard: React.FC = () => {
                         onClick={() => setTimeRange('year')}
                         className={`px-6 py-2 text-xs font-bold rounded-lg transition-all ${
                             timeRange === 'year' 
-                            ? 'bg-black text-white shadow-md' 
-                            : 'text-text-secondary hover:text-text-main hover:bg-gray-50'
+                            ? 'bg-white text-black shadow-md' 
+                            : 'text-text-secondary hover:text-white hover:bg-background-subtle'
                         }`}
                     >
                         Anual
@@ -351,13 +351,13 @@ const MasterDashboard: React.FC = () => {
                 const isBadTrend = kpi.isInverse ? isPositive : !isPositive; 
                 
                 return (
-                    <div key={idx} className="bg-white p-6 rounded-[1.5rem] shadow-card border border-gray-100 flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
+                    <div key={idx} className="bg-background-paper p-6 rounded-2xl shadow-card border border-border flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
                         <div className="flex justify-between items-start mb-4">
-                            <div className={`size-12 rounded-2xl flex items-center justify-center ${kpi.bg} ${kpi.color}`}>
+                            <div className={`size-12 rounded-xl flex items-center justify-center ${kpi.bg} ${kpi.color}`}>
                                 <span className="material-symbols-outlined text-2xl">{kpi.icon}</span>
                             </div>
                             {hasTrend && (
-                                <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${isBadTrend ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${isBadTrend ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
                                     <span className="material-symbols-outlined text-sm">{isPositive ? 'trending_up' : 'trending_down'}</span>
                                     {Math.abs(kpi.trend).toFixed(1)}%
                                 </div>
@@ -365,7 +365,7 @@ const MasterDashboard: React.FC = () => {
                         </div>
                         <div>
                             <p className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{kpi.label}</p>
-                            <h3 className="text-3xl font-black text-text-main mt-1 tracking-tight">{kpi.value}</h3>
+                            <h3 className="text-3xl font-black text-white mt-1 tracking-tight">{kpi.value}</h3>
                         </div>
                     </div>
                 );
@@ -376,10 +376,10 @@ const MasterDashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {/* Chart */}
-            <div className="lg:col-span-2 bg-white p-8 rounded-[2rem] shadow-card border border-gray-100 flex flex-col h-[450px]">
+            <div className="lg:col-span-2 bg-background-paper p-8 rounded-2xl shadow-card border border-border flex flex-col h-[450px]">
                 <div className="flex justify-between items-center mb-8">
                     <div>
-                        <h3 className="text-xl font-bold text-text-main">
+                        <h3 className="text-xl font-bold text-white">
                             {timeRange === 'month' ? 'Crecimiento de Ingresos' : 'Historial de Ingresos'}
                         </h3>
                         <p className="text-sm text-text-secondary capitalize">
@@ -389,7 +389,7 @@ const MasterDashboard: React.FC = () => {
                         </p>
                     </div>
                     {/* Dynamic total badge in chart header */}
-                    <div className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold">
+                    <div className="px-3 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg text-sm font-bold">
                         Total: ${dashboardData.revenue.toLocaleString()}
                     </div>
                 </div>
@@ -399,36 +399,37 @@ const MasterDashboard: React.FC = () => {
                         <AreaChart data={dashboardData.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#007AFF" stopOpacity={0.4}/>
-                                    <stop offset="95%" stopColor="#007AFF" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                             <XAxis 
                                 dataKey="name" 
                                 axisLine={false} 
                                 tickLine={false} 
-                                tick={{fill: '#9CA3AF', fontSize: 11, fontWeight: 600}} 
+                                tick={{fill: '#a3a3a3', fontSize: 11, fontWeight: 600}} 
                                 dy={10}
                                 interval={timeRange === 'month' ? 4 : 0} 
                             />
                             <YAxis 
                                 axisLine={false} 
                                 tickLine={false} 
-                                tick={{fill: '#9CA3AF', fontSize: 11}} 
+                                tick={{fill: '#a3a3a3', fontSize: 11}} 
                                 tickFormatter={(value) => value >= 1000 ? `$${value/1000}k` : `$${value}`}
                             />
                             <Tooltip 
-                                contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)', padding: '12px 16px' }}
-                                cursor={{ stroke: '#007AFF', strokeWidth: 2, strokeDasharray: '4 4' }}
+                                contentStyle={{ backgroundColor: '#141414', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)', padding: '12px 16px' }}
+                                cursor={{ stroke: '#f97316', strokeWidth: 2, strokeDasharray: '4 4' }}
                                 formatter={(value: number) => [`$${value.toLocaleString()}`, timeRange === 'month' ? 'Acumulado' : 'Ingresos']}
-                                labelStyle={{ color: '#6B7280', marginBottom: '4px', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}
+                                labelStyle={{ color: '#a3a3a3', marginBottom: '4px', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}
+                                itemStyle={{ color: '#FFFFFF' }}
                             />
                             <Area 
                                 type="monotone" 
                                 dataKey="value" 
-                                stroke="#007AFF" 
-                                strokeWidth={4} 
+                                stroke="#f97316" 
+                                strokeWidth={3} 
                                 fillOpacity={1} 
                                 fill="url(#colorRevenue)" 
                                 animationDuration={1000}
@@ -440,10 +441,10 @@ const MasterDashboard: React.FC = () => {
             </div>
 
             {/* Critical Alerts */}
-            <div className="bg-white p-8 rounded-[2rem] shadow-card border border-gray-100 flex flex-col h-[450px]">
+            <div className="bg-background-paper p-8 rounded-2xl shadow-card border border-border flex flex-col h-[450px]">
                 <div className="flex justify-between items-center mb-6">
                     <div>
-                        <h3 className="text-xl font-bold text-text-main flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
                             Alertas de Deuda
                             {criticalDebtors.length > 0 && <span className="flex size-2 rounded-full bg-red-500 animate-pulse"></span>}
                         </h3>
@@ -453,36 +454,36 @@ const MasterDashboard: React.FC = () => {
 
                 <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
                     {criticalDebtors.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-text-secondary opacity-60 text-center">
-                            <div className="size-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
-                                <span className="material-symbols-outlined text-3xl text-gray-400">check_circle</span>
+                        <div className="h-full flex flex-col items-center justify-center text-text-muted opacity-60 text-center">
+                            <div className="size-16 bg-background-subtle rounded-full flex items-center justify-center mb-3">
+                                <span className="material-symbols-outlined text-3xl text-text-muted">check_circle</span>
                             </div>
                             <p className="text-sm font-medium">Sin deudas críticas.</p>
                             <p className="text-xs">¡Excelente gestión!</p>
                         </div>
                     ) : (
                         criticalDebtors.map(debtor => (
-                            <div key={debtor.id} className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-red-100 hover:bg-red-50/30 transition-all group cursor-pointer" onClick={() => navigate('/master/finance')}>
+                            <div key={debtor.id} className="flex items-center justify-between p-4 rounded-xl bg-background-subtle border border-border hover:border-red-500/30 hover:bg-red-500/5 transition-all group cursor-pointer" onClick={() => navigate('/master/finance')}>
                                 <div className="flex items-center gap-3 overflow-hidden">
                                     <Avatar src={debtor.avatarUrl} name={debtor.name} className="size-10 rounded-full shrink-0" />
                                     <div className="min-w-0">
-                                        <p className="text-sm font-bold text-text-main truncate">{debtor.name}</p>
-                                        <p className="text-xs text-red-500 font-bold flex items-center gap-1">
+                                        <p className="text-sm font-bold text-white truncate">{debtor.name}</p>
+                                        <p className="text-xs text-red-400 font-bold flex items-center gap-1">
                                             <span className="material-symbols-outlined text-[10px]">warning</span>
                                             ${debtor.balance.toLocaleString()}
                                         </p>
                                     </div>
                                 </div>
-                                <span className="material-symbols-outlined text-gray-300 group-hover:text-red-400 transition-colors">chevron_right</span>
+                                <span className="material-symbols-outlined text-text-muted group-hover:text-red-400 transition-colors">chevron_right</span>
                             </div>
                         ))
                     )}
                 </div>
 
-                <div className="pt-6 border-t border-gray-100 mt-auto">
+                <div className="pt-6 border-t border-border mt-auto">
                     <button 
                         onClick={() => navigate('/master/finance')}
-                        className="w-full py-3 rounded-xl bg-gray-900 text-white font-bold text-sm hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-lg"
+                        className="w-full py-3 rounded-lg bg-white text-black font-bold text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 shadow-lg"
                     >
                         Gestionar Cobranza
                         <span className="material-symbols-outlined text-sm">arrow_forward</span>

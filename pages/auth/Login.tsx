@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
@@ -14,7 +15,6 @@ const Login: React.FC = () => {
       
       const success = await login(formData.email, formData.password);
       if (success) {
-          // Retrieve user directly for instant redirect logic
           const user = JSON.parse(localStorage.getItem('pulse_current_session') || '{}');
           if (user.role === 'master') navigate('/master/dashboard');
           else navigate('/student/dashboard');
@@ -23,38 +23,39 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
-      {/* Background Ambience */}
-      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-200/40 rounded-full blur-[100px] pointer-events-none"></div>
-      <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-indigo-200/40 rounded-full blur-[100px] pointer-events-none"></div>
-
-      <div className="w-full max-w-md glass-card rounded-3xl p-10 relative z-10 animate-in fade-in zoom-in-95 duration-500">
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden text-white">
+      
+      {/* Background Ambience: Subtle Radial Orange */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
+      
+      {/* Glassmorphism Card */}
+      <div className="w-full max-w-md bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-2xl p-10 relative z-10 shadow-2xl">
         <div className="flex flex-col items-center mb-8">
-            <div className="size-14 bg-gradient-to-br from-primary to-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 mb-5">
-                <span className="material-symbols-outlined text-3xl">ecg_heart</span>
+            <div className="size-12 rounded-xl bg-primary flex items-center justify-center shadow-[0_0_20px_rgba(249,115,22,0.3)] mb-6">
+                <span className="font-black text-black text-2xl leading-none">A</span>
             </div>
-            <h1 className="text-3xl font-bold text-text-main tracking-tight">Bienvenido</h1>
-            <p className="text-text-secondary mt-1">Inicia sesión en tu cuenta Pulse</p>
+            <h1 className="text-3xl font-bold tracking-tight text-white">Bienvenido</h1>
+            <p className="text-zinc-400 mt-2 text-sm font-medium">Inicia sesión en AcademyPro</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-            <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider ml-1">Correo Electrónico</label>
+            <div className="space-y-2">
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider ml-1">Correo Electrónico</label>
                 <input 
                     type="email" 
                     required 
-                    className="w-full rounded-2xl border-gray-200 bg-white/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 px-5 py-3.5 text-sm transition-all" 
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3.5 text-sm transition-all text-white placeholder-zinc-600 focus:border-primary focus:ring-1 focus:ring-primary outline-none" 
                     placeholder="usuario@ejemplo.com"
                     value={formData.email}
                     onChange={e => setFormData({...formData, email: e.target.value})}
                 />
             </div>
-            <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider ml-1">Contraseña</label>
+            <div className="space-y-2">
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider ml-1">Contraseña</label>
                 <input 
                     type="password" 
                     required 
-                    className="w-full rounded-2xl border-gray-200 bg-white/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 px-5 py-3.5 text-sm transition-all" 
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3.5 text-sm transition-all text-white placeholder-zinc-600 focus:border-primary focus:ring-1 focus:ring-primary outline-none" 
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={e => setFormData({...formData, password: e.target.value})}
@@ -64,25 +65,25 @@ const Login: React.FC = () => {
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-500/25 transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 mt-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full bg-primary hover:bg-orange-500 text-black font-black py-4 rounded-xl shadow-lg transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 mt-2 disabled:opacity-70 disabled:cursor-not-allowed text-sm uppercase tracking-wide"
             >
                 {loading ? (
-                    <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    <span className="size-5 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
                 ) : (
                     <>
-                        <span>Iniciar Sesión</span>
+                        <span>Ingresar al Portal</span>
                         <span className="material-symbols-outlined text-lg">arrow_forward</span>
                     </>
                 )}
             </button>
         </form>
 
-        <div className="mt-8 text-center text-sm text-text-secondary">
-            ¿No tienes cuenta? <Link to="/role-selection" className="text-primary font-bold hover:text-blue-700 transition-colors">Regístrate gratis</Link>
+        <div className="mt-8 text-center text-sm text-zinc-500">
+            ¿No tienes cuenta? <Link to="/role-selection" className="text-white font-bold hover:text-primary transition-colors ml-1">Crear Cuenta</Link>
         </div>
       </div>
       
-      <p className="mt-8 text-xs text-text-secondary/50 relative z-10">© 2024 Pulse Academy Systems. Secure Login.</p>
+      <p className="mt-8 text-xs text-zinc-600 relative z-10 font-medium">© 2024 AcademyPro Systems. Enterprise Security.</p>
     </div>
   );
 };

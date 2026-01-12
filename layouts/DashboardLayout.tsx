@@ -13,25 +13,25 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full bg-background-light overflow-hidden">
+    <div className="flex h-screen w-full bg-background overflow-hidden text-text-main">
       <Sidebar 
         role={role} 
         isOpen={isMobileMenuOpen} 
         onClose={() => setIsMobileMenuOpen(false)} 
       />
       
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Mobile Header with Overlay Control */}
-        <header className="md:hidden flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-md border-b border-gray-200 z-30 sticky top-0">
-            <div className="flex items-center gap-2">
-                 <div className="flex items-center justify-center size-8 rounded-lg bg-primary text-white shadow-lg shadow-primary/30">
-                    <span className="material-symbols-outlined text-lg">ecg_heart</span>
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-background">
+        {/* Mobile Header */}
+        <header className="md:hidden flex items-center justify-between px-6 py-4 bg-background-paper border-b border-border z-30 sticky top-0">
+            <div className="flex items-center gap-3">
+                 <div className="flex items-center justify-center size-8 rounded-lg bg-primary text-white shadow-glow">
+                    <span className="font-black text-sm">A</span>
                  </div>
-                 <span className="font-bold text-lg text-text-main">Pulse</span>
+                 <span className="font-bold text-lg text-white tracking-tight">Academy<span className="text-primary">Pro</span></span>
             </div>
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
-              className="text-text-main p-2 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none active:scale-95"
+              className="text-text-secondary p-2 hover:bg-background-subtle rounded-lg transition-colors focus:outline-none"
             >
                 <span className="material-symbols-outlined text-2xl">menu</span>
             </button>

@@ -4,89 +4,112 @@ import { Link } from 'react-router-dom';
 
 const LandingPage: React.FC = () => {
   return (
-    <div className="min-h-screen flex flex-col relative bg-background-light font-display">
+    <div className="min-h-screen flex flex-col relative bg-background text-text-main font-sans selection:bg-primary/30">
+      
       {/* Navbar */}
-      <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-5 lg:px-12">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center size-10 rounded-xl bg-primary text-white shadow-lg shadow-primary/30">
-            <span className="material-symbols-outlined text-2xl">ecg_heart</span>
-          </div>
-          <span className="text-xl font-bold tracking-tight text-text-main">Pulse</span>
-        </div>
-        <div className="flex gap-4">
-            <Link to="/login" className="hidden md:block px-5 py-2.5 text-sm font-semibold text-text-main hover:bg-white/50 rounded-xl transition-all">
-                Iniciar Sesión
-            </Link>
-            <Link to="/role-selection" className="px-5 py-2.5 bg-text-main text-white text-sm font-semibold rounded-xl hover:bg-black transition-all shadow-lg">
-                Registrarse
-            </Link>
+      <header className="fixed top-0 left-0 right-0 z-50 px-6 py-5 lg:px-12 bg-background/80 backdrop-blur-xl border-b border-border">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <div className="size-9 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+                    <span className="font-black text-white text-lg leading-none">A</span>
+                </div>
+                <span className="text-lg font-bold tracking-tight">Academy<span className="text-primary">Pro</span></span>
+            </div>
+            <div className="flex gap-4">
+                <Link to="/login" className="hidden md:block px-6 py-2 text-sm font-medium text-text-secondary hover:text-white transition-colors">
+                    Iniciar Sesión
+                </Link>
+                <Link to="/role-selection" className="px-5 py-2 bg-white text-black text-sm font-bold rounded-lg hover:bg-gray-200 transition-all shadow-glow">
+                    Comenzar Ahora
+                </Link>
+            </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center p-4 lg:p-8">
-        <div className="w-full max-w-[1200px] bg-surface-white rounded-3xl shadow-soft-lg overflow-hidden min-h-[600px] flex flex-col lg:flex-row border border-gray-100">
+      {/* Hero Section */}
+      <main className="flex-1 flex items-center justify-center p-6 lg:p-12 mt-20 relative">
+        {/* Background Gradients */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+        <div className="w-full max-w-7xl grid lg:grid-cols-2 gap-16 items-center relative z-10">
           
-          {/* Left Column: Visual */}
-          <div className="relative w-full lg:w-5/12 bg-gray-900 flex flex-col justify-end p-8 lg:p-12 overflow-hidden group">
-            <div 
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105 opacity-60"
-                style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=2072&auto=format&fit=crop")' }}
-            ></div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+          {/* Text Content */}
+          <div className="space-y-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-background-subtle border border-border text-xs font-medium text-primary">
+                <span className="size-2 rounded-full bg-primary animate-pulse"></span>
+                <span>Software de gestión para Dojos Modernos</span>
+            </div>
             
-            <div className="relative z-10 text-white space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm border border-white/10 text-xs font-medium">
-                <span className="material-symbols-outlined text-sm">verified</span>
-                <span>Gestión Integral de Dojo</span>
-              </div>
-              <h1 className="text-3xl lg:text-4xl font-black leading-tight tracking-tight">
-                Potencia tu disciplina. <br/>Escala tu academia.
-              </h1>
-              <p className="text-gray-300 text-sm lg:text-base leading-relaxed max-w-sm">
-                Únete a miles de maestros y alumnos que gestionan su progreso, pagos y comunidad en un solo lugar.
-              </p>
+            <h1 className="text-5xl lg:text-7xl font-black leading-tight tracking-tight text-white">
+              Domina tu <br/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-orange-400">Academia.</span>
+            </h1>
+            
+            <p className="text-text-secondary text-lg leading-relaxed max-w-lg">
+              Control total de alumnos, finanzas automatizadas y seguimiento de cinturones en una interfaz oscura diseñada para la excelencia.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                <Link to="/role-selection" className="px-8 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2">
+                  <span>Crear Cuenta Gratis</span>
+                  <span className="material-symbols-outlined">arrow_forward</span>
+                </Link>
+                <Link to="/login" className="px-8 py-4 bg-background-paper border border-border hover:bg-background-subtle text-white font-bold rounded-xl transition-all flex items-center justify-center">
+                  Acceder al Portal
+                </Link>
             </div>
-          </div>
 
-          {/* Right Column: CTA */}
-          <div className="w-full lg:w-7/12 p-6 lg:p-12 lg:pl-16 flex flex-col justify-center items-center text-center lg:items-start lg:text-left">
-            <div className="max-w-[480px] w-full flex flex-col gap-8">
-              <div className="space-y-2">
-                <h2 className="text-3xl lg:text-4xl font-bold text-text-main tracking-tight">Bienvenido a Pulse</h2>
-                <p className="text-text-secondary text-lg">La plataforma definitiva para artes marciales.</p>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <Link to="/login" className="w-full py-4 text-base font-bold text-white bg-primary rounded-xl shadow-lg shadow-primary/30 hover:bg-primary-hover transition-all flex items-center justify-center gap-2">
-                  <span>Iniciar Sesión</span>
-                  <span className="material-symbols-outlined text-lg">login</span>
-                </Link>
-                
-                <Link to="/role-selection" className="w-full py-4 text-base font-bold text-text-main bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
-                  Crear Cuenta Nueva
-                </Link>
-              </div>
-
-              <div className="relative flex py-2 items-center">
-                  <div className="flex-grow border-t border-gray-200"></div>
-                  <span className="flex-shrink-0 mx-4 text-xs font-medium text-text-secondary">Enterprise Solutions</span>
-                  <div className="flex-grow border-t border-gray-200"></div>
-              </div>
-
-               <div className="grid grid-cols-2 gap-3 opacity-60">
-                    <div className="flex items-center justify-center gap-2 h-10">
-                        <span className="font-bold text-xl text-gray-400">Google</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-2 h-10">
-                        <span className="font-bold text-xl text-gray-400">Apple</span>
-                    </div>
+            <div className="pt-8 border-t border-border flex gap-8">
+                <div>
+                    <p className="text-3xl font-black text-white">2k+</p>
+                    <p className="text-xs text-text-secondary uppercase tracking-wider font-bold">Academias</p>
                 </div>
-
+                <div>
+                    <p className="text-3xl font-black text-white">50k+</p>
+                    <p className="text-xs text-text-secondary uppercase tracking-wider font-bold">Alumnos</p>
+                </div>
             </div>
           </div>
+
+          {/* Visual Content */}
+          <div className="relative">
+             <div className="relative bg-background-paper border border-border rounded-[2rem] overflow-hidden shadow-2xl">
+                 <div className="aspect-[4/3] relative bg-background-subtle flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[100px] text-border">dashboard</span>
+                    
+                    {/* Floating Cards UI Simulation */}
+                    <div className="absolute bottom-8 left-8 right-8 space-y-3">
+                        <div className="bg-background/90 backdrop-blur-md p-4 rounded-xl border border-border flex items-center justify-between shadow-lg transform translate-y-2">
+                            <div className="flex items-center gap-3">
+                                <div className="size-10 rounded-full bg-background-subtle"></div>
+                                <div>
+                                    <div className="h-2 w-24 bg-background-elevated rounded full mb-1"></div>
+                                    <div className="h-2 w-16 bg-background-subtle rounded full"></div>
+                                </div>
+                            </div>
+                            <div className="h-8 w-20 bg-primary/20 rounded-lg"></div>
+                        </div>
+                        <div className="bg-background-paper p-4 rounded-xl border border-border flex items-center justify-between shadow-2xl">
+                            <div className="flex items-center gap-3">
+                                <div className="size-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">A</div>
+                                <div>
+                                    <p className="text-sm font-bold text-white">Nuevo Ingreso</p>
+                                    <p className="text-xs text-text-secondary">Hace 2 minutos</p>
+                                </div>
+                            </div>
+                            <span className="text-status-success text-sm font-bold">+$850.00</span>
+                        </div>
+                    </div>
+                 </div>
+             </div>
+          </div>
+
         </div>
       </main>
+      
+      <footer className="py-8 text-center text-text-muted text-sm border-t border-border bg-background">
+        &copy; 2024 AcademyPro Systems. Enterprise Grade Dojo Management.
+      </footer>
     </div>
   );
 };

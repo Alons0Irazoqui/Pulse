@@ -17,39 +17,39 @@ const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: nu
     switch (status) {
         case 'paid':
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
-                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-green-500/10 text-green-400 border border-green-500/20 tracking-wider uppercase">
+                    <span className="material-symbols-outlined text-[12px]">check_circle</span>
                     PAGADO
                 </span>
             );
         case 'in_review':
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
-                    <span className="material-symbols-outlined text-[14px]">hourglass_top</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 tracking-wider uppercase animate-pulse">
+                    <span className="material-symbols-outlined text-[12px]">hourglass_top</span>
                     REVISAR
                 </span>
             );
         case 'overdue':
             return (
                 <div className="flex flex-col items-start">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
-                        <span className="material-symbols-outlined text-[14px]">warning</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-red-500/10 text-red-400 border border-red-500/20 tracking-wider uppercase">
+                        <span className="material-symbols-outlined text-[12px]">warning</span>
                         VENCIDO
                     </span>
-                    {penalty > 0 && <span className="text-[10px] text-red-500 font-medium mt-0.5">+${penalty} Recargo</span>}
+                    {penalty > 0 && <span className="text-[10px] text-red-500/80 font-medium mt-0.5 ml-1">+${penalty} Recargo</span>}
                 </div>
             );
         case 'partial':
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200">
-                    <span className="material-symbols-outlined text-[14px]">pie_chart</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 tracking-wider uppercase">
+                    <span className="material-symbols-outlined text-[12px]">pie_chart</span>
                     RESTANTE
                 </span>
             );
         default: // pending
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
-                    <span className="material-symbols-outlined text-[14px]">pending</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-white/5 text-gray-400 border border-white/10 tracking-wider uppercase">
+                    <span className="material-symbols-outlined text-[12px]">pending</span>
                     PENDIENTE
                 </span>
             );
@@ -133,8 +133,6 @@ const Finance: React.FC = () => {
               const batchItems = groups[r.batchPaymentId];
               batchItems.forEach(i => processedIds.add(i.id));
               
-              // Only sum amounts for display in list, logical distribution happens later
-              // Look for declaredAmount in the first record of the batch (it should be consistent)
               const declared = batchItems.find(i => i.declaredAmount !== undefined)?.declaredAmount;
               
               result.push({
@@ -225,16 +223,12 @@ const Finance: React.FC = () => {
 
   const handleApprove = () => {
       if (!selectedGroup) return;
-      
-      // Use Declared Amount for approval logic
       const amountToApprove = selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount;
 
       if (selectedGroup.isBatch) {
           approveBatchPayment(selectedGroup.id, amountToApprove);
       } else {
-          // If single record, check if it's partial or full based on declared amount
           if (amountToApprove < selectedGroup.totalAmount) {
-               // Treat as 1-item batch to trigger waterfall partial logic
                approveBatchPayment(selectedGroup.records[0].batchPaymentId || `temp-${selectedGroup.records[0].id}`, amountToApprove);
           } else {
                approvePayment(selectedGroup.id);
@@ -296,23 +290,23 @@ const Finance: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#F5F5F7]">
+    <div className="flex flex-col h-full bg-background text-text-main">
         
         {/* --- HEADER --- */}
-        <div className="bg-white border-b border-gray-200 px-6 py-6 md:px-10 sticky top-0 z-20 shadow-sm">
+        <div className="bg-background-paper border-b border-border px-6 py-6 md:px-10 sticky top-0 z-20 shadow-premium">
             <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight text-text-main">Control Financiero</h1>
+                    <h1 className="text-3xl font-black tracking-tight text-white">Control Financiero</h1>
                     <p className="text-text-secondary mt-1">Valida pagos, gestiona cobros y revisa el historial.</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                    <button onClick={handleExport} className="px-4 py-2.5 bg-white border border-gray-200 text-text-secondary font-bold rounded-xl hover:bg-gray-50 transition-all text-sm flex items-center gap-2">
+                    <button onClick={handleExport} className="px-4 py-2.5 bg-background-subtle border border-border text-text-secondary hover:text-white hover:bg-white/5 font-bold rounded-xl transition-all text-sm flex items-center gap-2">
                         <span className="material-symbols-outlined text-lg">download</span> Exportar
                     </button>
-                    <button onClick={() => setIsChargeModalOpen(true)} className="px-5 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover transition-all text-sm flex items-center gap-2 shadow-lg shadow-primary/30 active:scale-95">
+                    <button onClick={() => setIsChargeModalOpen(true)} className="px-5 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover transition-all text-sm flex items-center gap-2 shadow-glow active:scale-95">
                         <span className="material-symbols-outlined text-lg">add_circle</span> Nuevo Cargo
                     </button>
-                    <button onClick={handleGenerateBilling} className="px-5 py-2.5 bg-black text-white font-bold rounded-xl hover:bg-gray-800 transition-all text-sm flex items-center gap-2 shadow-lg">
+                    <button onClick={handleGenerateBilling} className="px-5 py-2.5 bg-background-elevated border border-border text-white font-bold rounded-xl hover:bg-background-subtle transition-all text-sm flex items-center gap-2 shadow-lg">
                         <span className="material-symbols-outlined text-lg">payments</span> Generar Mensualidad
                     </button>
                 </div>
@@ -320,7 +314,7 @@ const Finance: React.FC = () => {
 
             {/* --- TABS --- */}
             <div className="max-w-[1600px] mx-auto mt-8 flex flex-col md:flex-row gap-4 justify-between items-center">
-                <div className="flex bg-gray-100 p-1 rounded-xl w-full md:w-auto overflow-x-auto no-scrollbar">
+                <div className="flex bg-background-subtle p-1 rounded-xl w-full md:w-auto overflow-x-auto no-scrollbar border border-border">
                     {[
                         { id: 'review', label: 'Por Revisar', count: stats.review, icon: 'rate_review' },
                         { id: 'pending', label: 'Pendientes', count: stats.pending, icon: 'pending' },
@@ -333,16 +327,16 @@ const Finance: React.FC = () => {
                             onClick={() => setActiveTab(tab.id as any)}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
                                 activeTab === tab.id 
-                                ? 'bg-white text-primary shadow-sm' 
-                                : 'text-text-secondary hover:text-text-main hover:bg-gray-200/50'
+                                ? 'bg-background-paper text-primary shadow-sm border border-border' 
+                                : 'text-text-secondary hover:text-white hover:bg-white/5'
                             }`}
                         >
                             <span className={`material-symbols-outlined text-[18px] ${activeTab === tab.id ? 'filled' : ''}`}>{tab.icon}</span>
                             {tab.label}
                             {tab.count !== null && tab.count > 0 && (
-                                <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] ${
-                                    tab.id === 'review' ? 'bg-amber-100 text-amber-700' : 
-                                    tab.id === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-600'
+                                <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                    tab.id === 'review' ? 'bg-amber-500/20 text-amber-400' : 
+                                    tab.id === 'overdue' ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-white'
                                 }`}>
                                     {tab.count}
                                 </span>
@@ -352,15 +346,21 @@ const Finance: React.FC = () => {
                 </div>
 
                 <div className="relative w-full md:w-72">
-                    <span className="absolute left-3 top-2.5 text-gray-400 material-symbols-outlined text-[20px]">search</span>
-                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar alumno, monto..." className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/20" />
+                    <span className="absolute left-3 top-2.5 text-gray-500 material-symbols-outlined text-[20px]">search</span>
+                    <input 
+                        type="text" 
+                        value={searchQuery} 
+                        onChange={e => setSearchQuery(e.target.value)} 
+                        placeholder="Buscar alumno, monto..." 
+                        className="w-full pl-10 pr-4 py-2.5 bg-black/40 border border-white/5 rounded-xl text-sm text-white focus:ring-1 focus:ring-primary focus:border-primary placeholder-gray-600 transition-all" 
+                    />
                 </div>
             </div>
         </div>
 
         {/* --- LIST CONTENT --- */}
         <div className="flex-1 overflow-y-auto p-6 md:px-10">
-            <div className="max-w-[1600px] mx-auto bg-white rounded-3xl shadow-card border border-gray-100 overflow-hidden min-h-[400px]">
+            <div className="max-w-[1600px] mx-auto bg-background-paper rounded-3xl shadow-card border border-border overflow-hidden min-h-[400px]">
                 {groupedTransactions.length === 0 ? (
                     <EmptyState 
                         title="Sin movimientos" 
@@ -369,27 +369,26 @@ const Finance: React.FC = () => {
                     />
                 ) : (
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-gray-50/50 border-b border-gray-100 sticky top-0 backdrop-blur-sm z-10">
+                        <thead className="bg-[#1a1a1a] border-b border-border sticky top-0 backdrop-blur-sm z-10">
                             <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Alumno</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Concepto</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Monto Declarado</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Acción</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Alumno</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Concepto</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Monto Declarado</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Acción</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {groupedTransactions.map(group => {
+                        <tbody className="divide-y divide-white/5">
+                            {groupedTransactions.map((group, idx) => {
                                 const { mainRecord, isBatch, totalAmount, declaredAmount } = group;
-                                // Display declared amount if available (Review mode), else debt amount
                                 const displayAmount = declaredAmount !== undefined ? declaredAmount : totalAmount;
                                 
                                 return (
-                                    <tr key={group.id} className="hover:bg-blue-50/20 transition-colors group">
+                                    <tr key={group.id} className={`hover:bg-white/5 transition-colors group ${idx % 2 === 0 ? 'bg-transparent' : 'bg-background-subtle/30'}`}>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
-                                                <span className="font-bold text-text-main text-sm">{formatDateDisplay(mainRecord.dueDate)}</span>
+                                                <span className="font-bold text-white text-sm">{formatDateDisplay(mainRecord.dueDate)}</span>
                                                 {mainRecord.paymentDate && (
                                                     <span className="text-[10px] text-text-secondary mt-0.5">
                                                         Pagado: {formatDateDisplay(mainRecord.paymentDate)}
@@ -398,53 +397,53 @@ const Finance: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="font-bold text-text-main text-sm">{mainRecord.studentName}</div>
+                                            <div className="font-bold text-white text-sm">{mainRecord.studentName}</div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text-secondary">
                                             {isBatch ? (
                                                 <div className="flex flex-col">
-                                                    <span className="font-bold text-text-main text-xs uppercase tracking-wide flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-[14px] text-purple-500">layers</span>
-                                                        Pago Lote ({group.itemCount})
+                                                    <span className="font-bold text-white text-xs uppercase tracking-wide flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px] text-purple-400">layers</span>
+                                                        Pago Lote ({group.itemCount} items)
                                                     </span>
-                                                    <span className="text-xs mt-0.5 truncate max-w-[200px]">
+                                                    <span className="text-xs mt-0.5 truncate max-w-[200px] opacity-70">
                                                         {group.records.map(r => r.concept).join(', ')}
                                                     </span>
                                                 </div>
                                             ) : (
                                                 <span>{mainRecord.concept}</span>
                                             )}
-                                            {mainRecord.method && <span className="ml-2 text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">{mainRecord.method}</span>}
+                                            {mainRecord.method && <span className="ml-2 text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-gray-400">{mainRecord.method}</span>}
                                         </td>
                                         <td className="px-6 py-4">
                                             <StatusBadge status={mainRecord.status} amount={mainRecord.amount} penalty={mainRecord.penaltyAmount} />
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <span className={`font-black text-sm ${mainRecord.status === 'paid' ? 'text-green-600' : 'text-text-main'}`}>
+                                            <span className={`font-black text-sm ${mainRecord.status === 'paid' ? 'text-green-400' : 'text-white'}`}>
                                                 ${displayAmount.toFixed(2)}
                                             </span>
                                             {declaredAmount !== undefined && declaredAmount < totalAmount && (
-                                                <div className="text-[10px] text-orange-500 font-bold">Parcial (Deuda total: ${totalAmount})</div>
+                                                <div className="text-[10px] text-orange-400 font-bold">Parcial (Deuda: ${totalAmount})</div>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             {mainRecord.status === 'in_review' ? (
                                                 <button 
                                                     onClick={() => setSelectedGroup(group)}
-                                                    className="bg-primary hover:bg-primary-hover text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg shadow-primary/20 transition-all active:scale-95 animate-pulse"
+                                                    className="bg-primary hover:bg-primary-hover text-white text-xs font-bold px-4 py-2 rounded-lg shadow-glow transition-all active:scale-95"
                                                 >
                                                     Revisar
                                                 </button>
                                             ) : mainRecord.status === 'paid' ? (
                                                 <button 
                                                     onClick={() => generateReceipt(mainRecord, academySettings, currentUser)}
-                                                    className="text-gray-400 hover:text-primary p-2 rounded-lg transition-colors"
+                                                    className="text-gray-500 hover:text-primary p-2 rounded-lg transition-colors"
                                                     title="Descargar Recibo"
                                                 >
                                                     <span className="material-symbols-outlined">receipt_long</span>
                                                 </button>
                                             ) : (
-                                                <span className="text-gray-300 text-xs">-</span>
+                                                <span className="text-gray-600 text-xs">-</span>
                                             )}
                                         </td>
                                     </tr>
@@ -458,36 +457,36 @@ const Finance: React.FC = () => {
 
         {/* --- REVIEW MODAL (IMPROVED WATERFALL PREVIEW) --- */}
         {selectedGroup && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white rounded-[2rem] w-full max-w-4xl h-[85vh] shadow-2xl flex overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-background-paper rounded-[2rem] w-full max-w-4xl h-[85vh] shadow-2xl flex overflow-hidden animate-in zoom-in-95 duration-200 border border-white/10">
                     
                     {/* Left: Proof Image */}
-                    <div className="w-1/2 bg-gray-900 flex items-center justify-center relative p-4">
+                    <div className="w-1/2 bg-[#09090b] flex items-center justify-center relative p-4 border-r border-white/5">
                         {selectedGroup.mainRecord.proofUrl ? (
                             selectedGroup.mainRecord.proofType?.includes('pdf') ? (
-                                <iframe src={selectedGroup.mainRecord.proofUrl} className="w-full h-full rounded-xl" />
+                                <iframe src={selectedGroup.mainRecord.proofUrl} className="w-full h-full rounded-xl border border-white/10" />
                             ) : (
-                                <img src={selectedGroup.mainRecord.proofUrl} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                                <img src={selectedGroup.mainRecord.proofUrl} className="max-w-full max-h-full object-contain rounded-lg shadow-lg border border-white/10" />
                             )
                         ) : (
-                            <div className="text-white/50 flex flex-col items-center">
+                            <div className="text-white/20 flex flex-col items-center">
                                 <span className="material-symbols-outlined text-6xl mb-2">broken_image</span>
                                 <p>Sin comprobante visible</p>
                             </div>
                         )}
-                        <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-bold border border-white/10">
+                        <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-bold border border-white/10">
                             Comprobante {selectedGroup.isBatch ? '(Lote)' : ''}
                         </div>
                     </div>
 
                     {/* Right: Validation & Waterfall Preview */}
-                    <div className="w-1/2 flex flex-col">
-                        <div className="p-8 border-b border-gray-100 flex justify-between items-start">
+                    <div className="w-1/2 flex flex-col bg-background-paper">
+                        <div className="p-8 border-b border-white/5 flex justify-between items-start">
                             <div>
-                                <h2 className="text-2xl font-black text-text-main mb-1">Revisión de Pago</h2>
+                                <h2 className="text-2xl font-black text-white mb-1">Revisión de Pago</h2>
                                 <p className="text-text-secondary text-sm">Distribución automática de fondos.</p>
                             </div>
-                            <button onClick={() => setSelectedGroup(null)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
+                            <button onClick={() => setSelectedGroup(null)} className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
                         </div>
@@ -495,18 +494,18 @@ const Finance: React.FC = () => {
                         <div className="flex-1 overflow-y-auto p-8 space-y-8">
                             
                             {/* Total Amount Display */}
-                            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                            <div className="bg-background-subtle rounded-2xl p-6 border border-white/5">
                                 <div className="flex items-center justify-between mb-2">
-                                    <p className="text-xs font-bold text-text-secondary uppercase">Monto Declarado (Recibido)</p>
-                                    <span className="bg-white border border-gray-200 px-3 py-1 rounded-lg text-xs font-bold text-text-main shadow-sm">
+                                    <p className="text-xs font-bold text-text-secondary uppercase">Monto Declarado</p>
+                                    <span className="bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-xs font-bold text-white shadow-sm">
                                         {selectedGroup.mainRecord.method}
                                     </span>
                                 </div>
-                                <p className="text-4xl font-black text-text-main tracking-tight">
+                                <p className="text-4xl font-black text-white tracking-tight">
                                     ${(selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount).toFixed(2)}
                                 </p>
                                 {selectedGroup.declaredAmount !== undefined && selectedGroup.declaredAmount < selectedGroup.totalAmount && (
-                                    <p className="text-xs text-orange-600 font-bold mt-2 flex items-center gap-1">
+                                    <p className="text-xs text-orange-400 font-bold mt-2 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-[14px]">warning</span>
                                         Pago parcial. Deuda total era ${selectedGroup.totalAmount}
                                     </p>
@@ -518,29 +517,29 @@ const Finance: React.FC = () => {
                                 <h4 className="text-xs font-bold text-text-secondary uppercase mb-3 ml-1">Aplicación de Fondos</h4>
                                 <div className="space-y-3">
                                     {previewDistribution.map((item: any) => (
-                                        <div key={item.id} className="flex flex-col p-3 bg-white border border-gray-100 rounded-xl relative overflow-hidden">
+                                        <div key={item.id} className="flex flex-col p-3 bg-[#1a1a1a] border border-white/5 rounded-xl relative overflow-hidden">
                                             {/* Status Indicator Bar */}
                                             <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                                                item._status === 'paid' ? 'bg-green-500' : item._status === 'partial' ? 'bg-orange-500' : 'bg-red-300'
+                                                item._status === 'paid' ? 'bg-green-500' : item._status === 'partial' ? 'bg-orange-500' : 'bg-red-500'
                                             }`}></div>
                                             
                                             <div className="flex justify-between items-start pl-3">
                                                 <div>
-                                                    <span className="text-sm font-bold text-text-main block">{item.concept}</span>
+                                                    <span className="text-sm font-bold text-white block">{item.concept}</span>
                                                     <span className="text-xs text-text-secondary">Deuda Total: ${(item.amount + item.penaltyAmount).toFixed(2)}</span>
                                                 </div>
                                                 <div className="text-right">
-                                                    <span className={`font-mono font-bold text-sm ${item._status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>
+                                                    <span className={`font-mono font-bold text-sm ${item._status === 'paid' ? 'text-green-400' : 'text-orange-400'}`}>
                                                         ${item._paid.toFixed(2)}
                                                     </span>
-                                                    <div className="text-[10px] font-bold uppercase mt-0.5">
+                                                    <div className="text-[10px] font-bold uppercase mt-0.5 text-gray-500">
                                                         {item._status === 'paid' ? 'Cubierto' : item._status === 'partial' ? 'Abono' : 'Pendiente'}
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {item._remaining > 0 && (
-                                                <div className="mt-2 pl-3 pt-2 border-t border-gray-50 flex items-center gap-2 text-xs text-orange-600 font-medium">
+                                                <div className="mt-2 pl-3 pt-2 border-t border-white/5 flex items-center gap-2 text-xs text-orange-400 font-medium">
                                                     <span className="material-symbols-outlined text-[14px]">pie_chart</span>
                                                     Restarán ${item._remaining.toFixed(2)} por cobrar
                                                 </div>
@@ -554,7 +553,7 @@ const Finance: React.FC = () => {
                             {(() => {
                                 const { isLate, diffDays } = getTimeValidation(selectedGroup.mainRecord);
                                 return (
-                                    <div className={`rounded-2xl p-4 border-l-4 text-xs ${isLate ? 'bg-red-50 border-red-500 text-red-700' : 'bg-green-50 border-green-500 text-green-700'}`}>
+                                    <div className={`rounded-2xl p-4 border-l-4 text-xs ${isLate ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-green-500/10 border-green-500 text-green-400'}`}>
                                         <div className="flex items-center gap-2 font-bold mb-1">
                                             <span className="material-symbols-outlined text-base">{isLate ? 'history_toggle_off' : 'verified_user'}</span>
                                             {isLate ? 'Pago Tardío' : 'A Tiempo'}
@@ -565,9 +564,9 @@ const Finance: React.FC = () => {
                             })()}
                         </div>
 
-                        <div className="p-8 border-t border-gray-100 bg-gray-50 flex gap-4">
-                            <button onClick={handleReject} className="flex-1 py-4 rounded-xl border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-all">Rechazar</button>
-                            <button onClick={handleApprove} className="flex-[2] py-4 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-lg shadow-green-600/30 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <div className="p-8 border-t border-white/5 bg-[#18181b] flex gap-4">
+                            <button onClick={handleReject} className="flex-1 py-4 rounded-xl border border-white/10 text-red-400 font-bold hover:bg-red-500/10 transition-all">Rechazar</button>
+                            <button onClick={handleApprove} className="flex-[2] py-4 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center justify-center gap-2">
                                 <span className="material-symbols-outlined">check_circle</span>
                                 Confirmar Distribución
                             </button>
