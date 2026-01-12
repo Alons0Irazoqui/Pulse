@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -18,30 +19,39 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  // Function to remove a specific toast
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
   const addToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = Date.now().toString();
-    setToasts((prev) => [...prev, { id, message, type }]);
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     
-    // Auto dismiss
+    setToasts((prev) => {
+        // Prevent duplicates if multiple clicks happen fast
+        if (prev.length > 0 && prev[prev.length - 1].message === message) return prev;
+        // Limit to 3 toasts max
+        const newList = [...prev, { id, message, type }];
+        if (newList.length > 3) newList.shift();
+        return newList;
+    });
+
+    // Auto dismiss after 4 seconds
     setTimeout(() => {
-      removeToast(id);
+        setToasts((currentToasts) => currentToasts.filter(t => t.id !== id));
     }, 4000);
-  }, [removeToast]);
+  }, []);
 
   return (
     <ToastContext.Provider value={{ addToast, removeToast }}>
       {children}
       
-      {/* Toast Container */}
-      <div className="fixed top-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
+      {/* Toast Container - High Z-Index to stay on top */}
+      <div className="fixed top-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto min-w-[320px] max-w-sm p-4 rounded-2xl shadow-soft-lg border flex items-center gap-3 transform transition-all duration-500 animate-in slide-in-from-top-5 fade-in ${
+            className={`pointer-events-auto min-w-[320px] max-w-sm p-4 rounded-2xl shadow-xl border flex items-center gap-3 transform transition-all duration-300 animate-in slide-in-from-top-5 fade-in ${
               toast.type === 'success' ? 'bg-white border-green-100 text-green-800' :
               toast.type === 'error' ? 'bg-white border-red-100 text-red-800' :
               'bg-white border-gray-100 text-gray-800'
@@ -60,7 +70,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               <p className="text-sm font-semibold">{toast.type === 'success' ? 'Éxito' : toast.type === 'error' ? 'Error' : 'Información'}</p>
               <p className="text-sm opacity-90">{toast.message}</p>
             </div>
-            <button onClick={() => removeToast(toast.id)} className="text-gray-400 hover:text-gray-600">
+            <button 
+                onClick={() => removeToast(toast.id)} 
+                className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+            >
               <span className="material-symbols-outlined text-sm">close</span>
             </button>
           </div>

@@ -42,6 +42,9 @@ interface FinanceContextType {
   generateMonthlyBilling: () => void; 
   checkOverdueStatus: () => void;
   getStudentPendingDebts: (studentId: string) => TuitionRecord[];
+  
+  // --- DELETE HELPER ---
+  purgeStudentDebts: (studentId: string) => void;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -431,6 +434,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           (r.status === 'pending' || r.status === 'overdue' || r.status === 'charged' || r.status === 'in_review' || r.status === 'partial')
       );
   };
+  
+  // --- DELETE HELPER (For Cleanup) ---
+  const purgeStudentDebts = (studentId: string) => {
+      setRecords(prev => prev.filter(r => {
+          if (r.studentId === studentId) {
+              // Only keep PAID records for history. Remove everything else.
+              return r.status === 'paid';
+          }
+          return true;
+      }));
+  };
 
   const calculateMonthlyRevenue = () => {
       const revenueByMonth: Record<string, number> = {};
@@ -471,7 +485,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         rejectPayment, 
         generateMonthlyBilling, 
         checkOverdueStatus,
-        getStudentPendingDebts 
+        getStudentPendingDebts,
+        purgeStudentDebts 
     }}>
       {children}
     </FinanceContext.Provider>

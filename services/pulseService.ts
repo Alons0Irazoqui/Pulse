@@ -209,6 +209,66 @@ export const PulseService = {
         return newUser;
     },
 
+    // --- HARD DELETE LOGIC (CRUD FIX) ---
+    deleteFullStudentData: (studentId: string) => {
+        // 1. Load all data
+        const users = PulseService.getUsersDB();
+        const students = PulseService.getStudents();
+        const classes = PulseService.getClasses();
+        const events = PulseService.getEvents();
+        const payments = PulseService.getPayments();
+        
+        // 2. Filter Users (Remove Login/Email/Phone record)
+        // We match by ID or linked StudentID to be safe
+        const newUsers = users.filter(u => u.id !== studentId && u.studentId !== studentId);
+        
+        // 3. Filter Students (Remove Profile)
+        const newStudents = students.filter(s => s.id !== studentId);
+        
+        // 4. Clean Classes (Remove enrollment)
+        const newClasses = classes.map(c => {
+            if (c.studentIds.includes(studentId)) {
+                return {
+                    ...c,
+                    studentIds: c.studentIds.filter(id => id !== studentId),
+                    studentCount: Math.max(0, c.studentCount - 1)
+                };
+            }
+            return c;
+        });
+
+        // 5. Clean Events (Remove registration)
+        const newEvents = events.map(e => {
+            if (e.registrants?.includes(studentId)) {
+                return {
+                    ...e,
+                    registrants: e.registrants.filter(id => id !== studentId),
+                    registeredCount: Math.max(0, (e.registeredCount || 0) - 1)
+                };
+            }
+            return e;
+        });
+
+        // 6. Clean Payments (Remove pending debts, KEEP paid history)
+        // Keep records that are PAID. Remove everything else (pending, overdue, in_review).
+        const newPayments = payments.filter(p => {
+            if (p.studentId === studentId) {
+                // Return true to KEEP, false to DELETE
+                return p.status === 'paid';
+            }
+            return true; // Keep other students' records
+        });
+
+        // 7. Save All back to LocalStorage
+        localStorage.setItem(STORAGE_KEYS.USERS_DB, JSON.stringify(newUsers));
+        localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(newStudents));
+        localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(newClasses));
+        localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(newEvents));
+        localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(newPayments));
+
+        return true;
+    },
+
     login: (email: string, password: string): UserProfile => {
         const users = PulseService.getUsersDB();
         const user = users.find(u => u.email === email && u.password === password);

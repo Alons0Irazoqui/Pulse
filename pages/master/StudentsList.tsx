@@ -19,7 +19,7 @@ const MotionTbody = motion.tbody as any;
 const MotionTr = motion.tr as any;
 
 const StudentsList: React.FC = () => {
-  const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, records, isLoading } = useStore();
+  const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, records, isLoading, purgeStudentDebts } = useStore();
   const { addToast } = useToast();
   const { confirm } = useConfirmation();
   const navigate = useNavigate();
@@ -136,10 +136,11 @@ const StudentsList: React.FC = () => {
       e?.stopPropagation();
       confirm({
           title: 'Eliminar Alumno',
-          message: '¿Estás seguro? Esta acción es irreversible y eliminará el historial del alumno.',
+          message: '¿Estás seguro? Se eliminará TOTALMENTE el registro del alumno, incluyendo credenciales, clases, eventos y deudas pendientes. Solo se mantendrá el historial de ingresos pagados.',
           type: 'danger',
           onConfirm: () => {
-              deleteStudent(id);
+              deleteStudent(id); // Handles Academy Context (Students, Classes, Events)
+              purgeStudentDebts(id); // Handles Finance Context (Unpaid Debts)
           }
       });
   };

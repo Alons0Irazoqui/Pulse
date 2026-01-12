@@ -267,10 +267,41 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setStudents(updatedStudents);
   };
 
+  // --- DELETE STUDENT (CRUD FIXED) ---
   const deleteStudent = (id: string) => {
       if (currentUser?.role !== 'master') return;
+      
+      // 1. Perform Hard Delete in DB layer
+      PulseService.deleteFullStudentData(id);
+
+      // 2. Update Local State (Students List)
       setStudents(prev => prev.filter(s => s.id !== id));
-      addToast('Alumno eliminado correctamente', 'success');
+
+      // 3. Update Local State (Classes Enrollment)
+      setClasses(prev => prev.map(c => {
+          if (c.studentIds.includes(id)) {
+              return {
+                  ...c,
+                  studentIds: c.studentIds.filter(sid => sid !== id),
+                  studentCount: Math.max(0, c.studentCount - 1)
+              };
+          }
+          return c;
+      }));
+
+      // 4. Update Local State (Events Registration)
+      setEvents(prev => prev.map(e => {
+          if (e.registrants?.includes(id)) {
+              return {
+                  ...e,
+                  registrants: e.registrants.filter(rid => rid !== id),
+                  registeredCount: Math.max(0, (e.registeredCount || 0) - 1)
+              };
+          }
+          return e;
+      }));
+
+      addToast('Alumno eliminado totalmente del sistema', 'success');
   };
   
   const updateStudentStatus = (id: string, status: Student['status']) => {
@@ -537,9 +568,12 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const registerForEvent = (studentId: string, eventId: string) => {
       const event = events.find(e => e.id === eventId);
       
+      // FIXED: Allow Masters to register students for exams. Block only Students.
       if (event && event.type === 'exam') {
-          addToast('La inscripción a exámenes es gestionada exclusivamente por el maestro.', 'error');
-          return;
+          if (currentUser?.role !== 'master') {
+              addToast('La inscripción a exámenes es gestionada exclusivamente por el maestro.', 'error');
+              return;
+          }
       }
 
       setEvents(prev => prev.map(e => {

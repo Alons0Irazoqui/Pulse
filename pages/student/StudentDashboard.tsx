@@ -1,67 +1,43 @@
 
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import { Event, CalendarEvent } from '../../types';
 import { useAcademy } from '../../context/AcademyContext';
-import { getLocalDate } from '../../utils/dateUtils'; // Importar dateUtils
+import { getLocalDate } from '../../utils/dateUtils';
+import Avatar from '../../components/ui/Avatar';
 
 const StudentDashboard: React.FC = () => {
-  const { currentUser, students, academySettings, events, registerForEvent } = useStore();
+  const { currentUser, students, classes, academySettings, events, registerForEvent } = useStore();
   const { scheduleEvents } = useAcademy(); 
   const { addToast } = useToast();
+  const navigate = useNavigate();
   
   const student = students.find(s => s.id === currentUser?.studentId);
   
   // -- STATE --
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
-  // -- RANK PROGRESS LOGIC --
+  // -- 1. RANK PROGRESS LOGIC --
   const currentRankConfig = academySettings.ranks.find(r => r.id === student?.rankId) || academySettings.ranks[0];
   const nextRankConfig = academySettings.ranks.find(r => r.order === currentRankConfig.order + 1);
   const required = currentRankConfig.requiredAttendance;
   const current = student?.attendance || 0;
-  const progressPercent = Math.min((current / required) * 100, 100);
+  // Calculate percentage but cap at 100
+  const progressPercent = required > 0 ? Math.min((current / required) * 100, 100) : 100;
+  
+  // -- 2. FINANCIAL LOGIC --
+  const hasDebt = (student?.balance || 0) > 0;
 
-  // -- EVENT CATEGORIZATION --
-  // FIXED: Usar getLocalDate() en lugar de toISOString() para evitar desfase de zona horaria
-  const todayStr = getLocalDate();
+  // -- 3. ENROLLED CLASSES LOGIC --
+  const myEnrolledClasses = useMemo(() => {
+      return classes.filter(c => student?.classesId?.includes(c.id));
+  }, [classes, student]);
 
-  // 1. Critical Exams (Assigned by Master) - Show ONLY if registered
-  const nextAssignedExam = useMemo(() => {
-      if (!student) return null;
-      return events
-          .filter(e => e.type === 'exam' && e.registrants?.includes(student.id) && e.date >= todayStr)
-          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
-  }, [events, student, todayStr]);
-
-  // 2. Marketplace Events (Everything else + Exams I'm NOT registered for yet but are public)
-  const marketplaceEvents = useMemo(() => {
-      return events
-          .filter(e => {
-              // Rule 1: Must be in future
-              if (e.date < todayStr) return false;
-              
-              // Rule 2: If it's the specific assigned exam above, don't duplicate
-              if (nextAssignedExam && e.id === nextAssignedExam.id) return false;
-
-              // Rule 3: VISIBILITY LOGIC
-              // Show if:
-              // - Explicitly Public (isVisibleToStudents !== false)
-              // - OR I am already registered (even if private)
-              const isPublic = e.isVisibleToStudents !== false;
-              const isRegistered = student && e.registrants?.includes(student.id);
-
-              return isPublic || isRegistered;
-          })
-          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [events, todayStr, student, nextAssignedExam]);
-
-  // -- NEXT CLASS LOGIC (UPDATED to use Generated Calendar) --
+  // -- 4. NEXT CLASS LOGIC --
   const nextClass = useMemo(() => {
       if (!student) return null;
-      
       const now = new Date();
       
       const upcomingClasses = scheduleEvents.filter(evt => {
@@ -71,12 +47,33 @@ const StudentDashboard: React.FC = () => {
           return evt.end > now;
       });
 
-      // Sort by start time ascending
       upcomingClasses.sort((a, b) => a.start.getTime() - b.start.getTime());
-
-      // Return the first one
       return upcomingClasses[0] || null;
   }, [scheduleEvents, student]);
+
+  // -- 5. EVENTS LOGIC --
+  const todayStr = getLocalDate();
+  
+  const nextAssignedExam = useMemo(() => {
+      if (!student) return null;
+      return events
+          .filter(e => e.type === 'exam' && e.registrants?.includes(student.id) && e.date >= todayStr)
+          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+  }, [events, student, todayStr]);
+
+  const marketplaceEvents = useMemo(() => {
+      return events
+          .filter(e => {
+              if (e.date < todayStr) return false;
+              if (nextAssignedExam && e.id === nextAssignedExam.id) return false;
+              const isPublic = e.isVisibleToStudents !== false;
+              const isRegistered = student && e.registrants?.includes(student.id);
+              return isPublic || isRegistered;
+          })
+          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .slice(0, 2); // Show only top 2 to save space
+  }, [events, todayStr, student, nextAssignedExam]);
+
 
   // -- ACTIONS --
   const handleRegister = () => {
@@ -89,200 +86,284 @@ const StudentDashboard: React.FC = () => {
 
   const getEventIcon = (type: string) => {
       switch(type) {
-          case 'exam': return 'stars'; // Cinturón/Rango visual
-          case 'tournament': return 'emoji_events'; // Medalla
-          case 'seminar': return 'menu_book'; // Libro/Aprendizaje
+          case 'exam': return 'stars';
+          case 'tournament': return 'emoji_events';
+          case 'seminar': return 'menu_book';
           default: return 'event';
       }
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto p-6 md:p-10 flex flex-col gap-8 relative overflow-hidden">
+    <div className="max-w-[1600px] mx-auto p-6 md:p-10 flex flex-col gap-8 pb-24">
       
-      {/* Header */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-3xl md:text-4xl font-black tracking-tight text-text-main">
+      {/* --- HEADER: WELCOME & SUMMARY --- */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <h2 className="text-4xl font-black tracking-tight text-text-main mb-1">
               Hola, {student?.name.split(' ')[0]}
           </h2>
-          <p className="text-text-secondary text-base font-normal">
-              {nextRankConfig ? `Rumbo al ${nextRankConfig.name}` : 'Maestría alcanzada'}
+          <p className="text-text-secondary font-medium">
+              {nextRankConfig 
+                ? `Estás al ${Math.round(progressPercent)}% de tu camino hacia ${nextRankConfig.name}.` 
+                : '¡Has alcanzado el máximo nivel registrado!'}
           </p>
         </div>
-      </header>
+        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl shadow-sm border border-gray-100">
+            <span className="text-xs font-bold uppercase text-text-secondary tracking-wider">Tu Rango Actual:</span>
+            <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase bg-gray-100 text-gray-800 border border-gray-200`}>
+                {student?.rank}
+            </span>
+        </div>
+      </div>
 
-      {/* --- SECTION 1: CRITICAL ALERTS (EXAMS) --- */}
+      {/* --- CRITICAL ALERT: EXAM --- */}
       {nextAssignedExam && (
           <div 
             onClick={() => setSelectedEvent(nextAssignedExam)}
             className="cursor-pointer relative overflow-hidden rounded-[2rem] bg-gray-900 text-white shadow-xl shadow-gray-900/20 group hover:scale-[1.01] transition-transform duration-300"
           >
               <div className="absolute inset-0 bg-gradient-to-r from-purple-900 to-indigo-900 opacity-90"></div>
-              {/* Animated Background */}
-              <div className="absolute -right-20 -top-20 size-96 bg-white/5 rounded-full blur-3xl group-hover:bg-white/10 transition-colors"></div>
-              
-              <div className="relative z-10 p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                  <div className="flex items-start gap-6">
-                      <div className="size-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
-                          <span className="material-symbols-outlined text-4xl text-yellow-400">stars</span>
+              <div className="relative z-10 p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center gap-6">
+                      <div className="size-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
+                          <span className="material-symbols-outlined text-4xl text-yellow-400 animate-pulse">stars</span>
                       </div>
                       <div>
-                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 text-xs font-bold uppercase tracking-wider mb-2 animate-pulse">
-                              <span className="size-2 rounded-full bg-yellow-400"></span>
-                              Convocatoria Oficial
-                          </div>
-                          <h3 className="text-2xl md:text-3xl font-black leading-tight mb-1">{nextAssignedExam.title}</h3>
-                          <p className="text-white/70 font-medium flex items-center gap-2">
-                              <span className="material-symbols-outlined text-lg">event</span>
-                              {new Date(nextAssignedExam.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
-                              <span className="w-1 h-1 bg-white/50 rounded-full mx-1"></span>
-                              {nextAssignedExam.time}
-                          </p>
+                          <div className="text-yellow-300 text-xs font-bold uppercase tracking-wider mb-1">Convocatoria Oficial</div>
+                          <h3 className="text-2xl font-black leading-tight">{nextAssignedExam.title}</h3>
+                          <p className="text-white/70 text-sm">Prepárate para tu evaluación.</p>
                       </div>
                   </div>
-                  <div className="bg-white text-gray-900 px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg group-hover:bg-gray-100 transition-colors">
-                      Ver Instrucciones
-                      <span className="material-symbols-outlined text-lg">visibility</span>
-                  </div>
+                  <button className="bg-white text-gray-900 px-6 py-3 rounded-xl font-bold text-sm shadow-lg group-hover:bg-gray-100 transition-colors">
+                      Ver Detalles
+                  </button>
               </div>
           </div>
       )}
 
-      {/* --- SECTION 2: DASHBOARD GRID --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10">
-        
-        {/* Next Class Widget */}
-        <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-card flex flex-col justify-between h-[300px] relative overflow-hidden group">
-             <div className="relative z-10">
-                 <h3 className="text-lg font-bold text-text-main flex items-center gap-2 mb-6">
-                    <span className="material-symbols-outlined text-blue-500">schedule</span>
-                    Próximo Entrenamiento
-                 </h3>
-                 
-                 {nextClass ? (
-                     <div className="space-y-4">
-                         <div>
-                             <p className="text-4xl font-black text-text-main tracking-tight">
-                                 {nextClass.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
-                             </p>
-                             <div className="flex flex-col mt-1">
-                                <p className="text-text-secondary font-medium">{nextClass.title}</p>
-                                <p className="text-xs text-primary font-bold uppercase mt-1">
-                                    {nextClass.start.toLocaleDateString('es-ES', { weekday: 'long' })}
-                                </p>
-                             </div>
-                         </div>
-                         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-sm text-text-main font-semibold border border-gray-100">
-                             <div className="size-6 rounded-full bg-gray-200 flex items-center justify-center">
-                                 <span className="material-symbols-outlined text-xs">person</span>
-                             </div>
-                             {nextClass.instructor}
-                         </div>
-                     </div>
-                 ) : (
-                     <div className="flex flex-col items-center justify-center h-40 text-text-secondary">
-                         <span className="material-symbols-outlined text-4xl opacity-20 mb-2">bedtime</span>
-                         <p className="text-sm font-medium">No hay clases próximas</p>
-                     </div>
-                 )}
-             </div>
-             
-             {/* Progress Mini-Bar */}
-             <div className="relative z-10 mt-auto pt-6 border-t border-gray-50">
-                 <div className="flex justify-between text-xs font-bold text-text-secondary mb-2">
-                     <span>Progreso de Rango</span>
-                     <span className={student?.status === 'exam_ready' ? 'text-green-600' : 'text-primary'}>{current} / {required}</span>
-                 </div>
-                 <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                     <div 
-                        className={`h-full rounded-full transition-all duration-1000 ${student?.status === 'exam_ready' ? 'bg-green-500' : 'bg-primary'}`} 
-                        style={{ width: `${progressPercent}%` }}
-                     ></div>
-                 </div>
-                 {student?.status === 'exam_ready' && (
-                     <p className="text-[10px] text-green-600 font-bold mt-2 text-center bg-green-50 py-1 rounded">
-                         ¡LISTO PARA EXAMEN!
-                     </p>
-                 )}
-             </div>
-        </div>
+      {/* --- MAIN GRID: STATS & ACTIONS --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          {/* 1. FINANCIAL STATUS WIDGET */}
+          <div className={`p-6 rounded-[2rem] border relative overflow-hidden flex flex-col justify-between h-[200px] group ${hasDebt ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
+              <div className="relative z-10">
+                  <div className={`size-12 rounded-2xl flex items-center justify-center mb-4 ${hasDebt ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                      <span className="material-symbols-outlined text-2xl">{hasDebt ? 'gpp_bad' : 'gpp_good'}</span>
+                  </div>
+                  <p className={`text-xs font-bold uppercase tracking-wider ${hasDebt ? 'text-red-600' : 'text-green-600'}`}>Estado de Cuenta</p>
+                  <h3 className={`text-2xl font-black ${hasDebt ? 'text-red-900' : 'text-green-900'}`}>
+                      {hasDebt ? `$${student?.balance.toFixed(2)}` : 'Al Corriente'}
+                  </h3>
+              </div>
+              
+              {hasDebt && (
+                  <button 
+                    onClick={() => navigate('/student/payments')}
+                    className="relative z-10 mt-auto w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                      Pagar Ahora <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  </button>
+              )}
+              {!hasDebt && (
+                  <p className="text-sm text-green-700 mt-auto relative z-10">¡Gracias por tu pago!</p>
+              )}
+              
+              {/* Decor */}
+              <span className={`material-symbols-outlined absolute -bottom-4 -right-4 text-[120px] opacity-10 pointer-events-none ${hasDebt ? 'text-red-500' : 'text-green-500'}`}>
+                  account_balance_wallet
+              </span>
+          </div>
 
-        {/* --- MARKETPLACE: AVAILABLE EVENTS --- */}
-        <div className="md:col-span-1 xl:col-span-2 flex flex-col gap-4">
-            <h3 className="text-lg font-bold text-text-main flex items-center gap-2 px-2">
-                <span className="material-symbols-outlined text-orange-500">local_activity</span>
-                Eventos Disponibles
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {marketplaceEvents.length > 0 ? (
-                    marketplaceEvents.map(evt => {
-                        const isRegistered = evt.registrants?.includes(student?.id || '');
-                        const icon = getEventIcon(evt.type);
-                        
-                        return (
-                            <div key={evt.id} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition-all group flex flex-col">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className={`size-12 rounded-2xl flex items-center justify-center ${
-                                        evt.type === 'tournament' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'
-                                    }`}>
-                                        <span className="material-symbols-outlined text-2xl">{icon}</span>
-                                    </div>
-                                    {isRegistered ? (
-                                        <span className="bg-green-100 text-green-700 text-[10px] font-bold uppercase px-2 py-1 rounded-lg flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-xs">check_circle</span>
-                                            Inscrito
-                                        </span>
-                                    ) : evt.isVisibleToStudents === false ? (
-                                        // This implies student was manually registered to private event, 
-                                        // OR logic change allows seeing private events.
-                                        // Current logic: only see private if registered.
-                                        <span className="bg-gray-100 text-gray-600 text-[10px] font-bold uppercase px-2 py-1 rounded-lg flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-xs">lock</span>
-                                            Privado
-                                        </span>
-                                    ) : null}
-                                </div>
-                                
-                                <h4 className="text-lg font-bold text-text-main leading-tight mb-1">{evt.title}</h4>
-                                <p className="text-sm text-text-secondary font-medium mb-4">
-                                    {/* FIXED DATE PARSING */}
-                                    {new Date(evt.date + 'T12:00:00').toLocaleDateString()} • {evt.time}
-                                </p>
-                                
-                                <div className="mt-auto">
-                                    <button 
-                                        onClick={() => setSelectedEvent(evt)}
-                                        className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                                            isRegistered 
-                                            ? 'bg-gray-50 text-text-main border border-gray-200 hover:bg-gray-100'
-                                            : 'bg-white text-primary border-2 border-primary hover:bg-primary hover:text-white'
-                                        }`}
-                                    >
-                                        {isRegistered ? 'Ver Detalles' : 'Más Información'}
-                                        {!isRegistered && <span className="material-symbols-outlined text-sm">arrow_forward</span>}
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })
-                ) : (
-                    <div className="col-span-full bg-gray-50 rounded-3xl border-dashed border-2 border-gray-200 p-8 flex flex-col items-center justify-center text-center">
-                        <span className="material-symbols-outlined text-gray-300 text-4xl mb-2">event_busy</span>
-                        <p className="text-text-secondary font-medium">No hay eventos próximos.</p>
-                        <p className="text-xs text-gray-400">Revisa más tarde para torneos o seminarios.</p>
-                    </div>
-                )}
-            </div>
-        </div>
+          {/* 2. ATTENDANCE PROGRESS WIDGET */}
+          <div className="bg-white p-6 rounded-[2rem] shadow-card border border-gray-100 relative overflow-hidden h-[200px] flex flex-col">
+              <div className="flex justify-between items-start mb-2">
+                  <div>
+                      <p className="text-xs font-bold text-text-secondary uppercase tracking-wider">Asistencias</p>
+                      <h3 className="text-2xl font-black text-text-main">{current} <span className="text-sm text-text-secondary font-medium">/ {required}</span></h3>
+                  </div>
+                  <div className="size-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <span className="material-symbols-outlined">directions_run</span>
+                  </div>
+              </div>
+              
+              <div className="flex-1 flex flex-col justify-end">
+                  <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden mb-2">
+                      <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
+                  </div>
+                  <p className="text-xs text-text-secondary">
+                      {progressPercent >= 100 
+                        ? '¡Requisitos cumplidos!' 
+                        : `Te faltan ${required - current} clases para examen.`}
+                  </p>
+              </div>
+          </div>
+
+          {/* 3. NEXT CLASS WIDGET (Hero) */}
+          <div className="lg:col-span-2 bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-[2rem] text-white relative overflow-hidden shadow-2xl shadow-gray-900/20 group h-[200px] flex flex-col justify-center">
+              <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <span className="material-symbols-outlined text-[140px]">schedule</span>
+              </div>
+              
+              <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-3">
+                      <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-white/10">Próxima Clase</span>
+                  </div>
+                  
+                  {nextClass ? (
+                      <div>
+                          <h2 className="text-3xl md:text-4xl font-black leading-none mb-2">{nextClass.title}</h2>
+                          <div className="flex items-center gap-4 text-white/80">
+                              <span className="font-medium text-lg">
+                                  {nextClass.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
+                              </span>
+                              <span className="w-1 h-1 bg-white/50 rounded-full"></span>
+                              <span className="text-sm uppercase tracking-wide font-bold">{nextClass.instructor}</span>
+                          </div>
+                      </div>
+                  ) : (
+                      <div>
+                          <h2 className="text-2xl font-bold text-white/90">Sin clases hoy</h2>
+                          <p className="text-white/60 text-sm mt-1">Consulta el calendario completo.</p>
+                          <button onClick={() => navigate('/student/schedule')} className="mt-4 text-xs font-bold uppercase tracking-wider text-white border-b border-white/30 hover:border-white pb-0.5 transition-colors">
+                              Ver Calendario
+                          </button>
+                      </div>
+                  )}
+              </div>
+          </div>
       </div>
 
-      {/* --- UNIVERSAL EVENT MODAL --- */}
+      {/* --- SECONDARY SECTION: CLASSES & EXTRA --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* LEFT: MY ENROLLED CLASSES (List) */}
+          <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-gray-100 shadow-card p-8">
+              <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-text-main flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary">class</span>
+                      Mis Clases
+                  </h3>
+                  <button onClick={() => navigate('/student/classes')} className="text-sm font-bold text-primary hover:text-blue-700 transition-colors">
+                      Ver Todo
+                  </button>
+              </div>
+
+              {myEnrolledClasses.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {myEnrolledClasses.map(cls => (
+                          <div key={cls.id} onClick={() => navigate(`/student/classes/${cls.id}`)} className="p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:bg-white hover:shadow-lg hover:border-gray-200 transition-all cursor-pointer group">
+                              <div className="flex items-start justify-between mb-3">
+                                  <div className="size-10 rounded-full bg-white flex items-center justify-center shadow-sm text-text-secondary group-hover:text-primary transition-colors">
+                                      <span className="material-symbols-outlined">sports_martial_arts</span>
+                                  </div>
+                                  <span className="text-[10px] font-bold uppercase bg-white border border-gray-200 px-2 py-1 rounded text-text-secondary">
+                                      {cls.studentCount} Alumnos
+                                  </span>
+                              </div>
+                              <h4 className="font-bold text-text-main text-lg mb-1">{cls.name}</h4>
+                              <p className="text-xs text-text-secondary mb-3 flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[12px]">schedule</span> {cls.schedule}
+                              </p>
+                              <div className="flex items-center gap-2 pt-3 border-t border-gray-200/50">
+                                  <Avatar name={cls.instructor} className="size-6 rounded-full text-[10px]" />
+                                  <span className="text-xs font-medium text-text-secondary">{cls.instructor}</span>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              ) : (
+                  <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                      <p className="text-text-secondary text-sm">No estás inscrito en grupos regulares.</p>
+                  </div>
+              )}
+          </div>
+
+          {/* RIGHT: EVENTS & BELT STATUS */}
+          <div className="flex flex-col gap-6">
+              
+              {/* Event List */}
+              <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm">
+                  <h3 className="text-sm font-bold text-text-secondary uppercase tracking-wider mb-4">Eventos Próximos</h3>
+                  <div className="flex flex-col gap-3">
+                      {marketplaceEvents.length > 0 ? (
+                          marketplaceEvents.map(evt => (
+                              <div key={evt.id} onClick={() => setSelectedEvent(evt)} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors border border-transparent hover:border-gray-100">
+                                  <div className={`size-10 rounded-lg flex flex-col items-center justify-center shrink-0 text-white shadow-sm ${evt.type === 'tournament' ? 'bg-orange-500' : 'bg-blue-500'}`}>
+                                      <span className="text-[10px] font-bold uppercase">{new Date(evt.date).toLocaleDateString('es-ES', {month: 'short'})}</span>
+                                      <span className="text-sm font-black leading-none">{new Date(evt.date).getDate()}</span>
+                                  </div>
+                                  <div className="min-w-0">
+                                      <p className="text-sm font-bold text-text-main truncate">{evt.title}</p>
+                                      <p className="text-xs text-text-secondary truncate">{evt.time} • {evt.type === 'exam' ? 'Examen' : 'Evento'}</p>
+                                  </div>
+                              </div>
+                          ))
+                      ) : (
+                          <p className="text-xs text-gray-400 italic">No hay eventos próximos.</p>
+                      )}
+                  </div>
+              </div>
+
+              {/* Current Belt Card */}
+              {student && (
+                  <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm relative overflow-hidden flex flex-col justify-between min-h-[180px]">
+                      <div>
+                          <div className="flex justify-between items-start mb-2">
+                              <div>
+                                  <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
+                                      Tu Cinturón
+                                  </span>
+                                  <h3 className="text-xl font-black text-text-main mt-3 leading-none">
+                                      {student.rank}
+                                  </h3>
+                              </div>
+                              <div className="size-10 flex items-center justify-center rounded-full bg-gray-50 border border-gray-100">
+                                  <span className="material-symbols-outlined text-gray-400">workspace_premium</span>
+                              </div>
+                          </div>
+                          
+                          {/* Belt Visual */}
+                          <div className={`mt-4 h-12 w-full rounded-lg shadow-sm border flex items-center justify-end pr-3 relative overflow-hidden ${
+                              student.rankColor === 'white' ? 'bg-slate-50 border-slate-200' :
+                              student.rankColor === 'yellow' ? 'bg-yellow-300 border-yellow-400' :
+                              student.rankColor === 'orange' ? 'bg-orange-400 border-orange-500' :
+                              student.rankColor === 'green' ? 'bg-green-600 border-green-700' :
+                              student.rankColor === 'blue' ? 'bg-blue-600 border-blue-700' :
+                              student.rankColor === 'purple' ? 'bg-purple-600 border-purple-700' :
+                              student.rankColor === 'brown' ? 'bg-[#5D4037] border-[#3E2723]' :
+                              'bg-gray-900 border-black'
+                          }`}>
+                              {/* Texture overlay */}
+                              <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/fabric-of-squares.png')]"></div>
+                              
+                              <div className={`relative h-full w-16 ${student.rankColor === 'black' ? 'bg-red-600' : 'bg-black'} flex items-center justify-center gap-1 shadow-lg`}>
+                                  {Array.from({ length: student.stripes || 0 }).map((_, i) => (
+                                      <div key={i} className="w-1.5 h-7 bg-white/90 rounded-sm shadow-sm"></div>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between items-center text-xs">
+                          <span className="text-text-secondary font-medium">
+                              {student.stripes > 0 ? `${student.stripes} ${student.stripes === 1 ? 'Grado' : 'Grados'}` : 'Sin grados'}
+                          </span>
+                          {nextRankConfig && (
+                              <span className="text-primary font-bold">
+                                  Próximo: {nextRankConfig.name}
+                              </span>
+                          )}
+                      </div>
+                  </div>
+              )}
+          </div>
+      </div>
+
+      {/* --- EVENT MODAL (Reused) --- */}
       {selectedEvent && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setSelectedEvent(null)}>
               <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl relative overflow-hidden" onClick={e => e.stopPropagation()}>
                   
-                  {/* Modal Header with Dynamic Style */}
                   <div className={`p-8 pb-12 relative ${
                       selectedEvent.type === 'exam' ? 'bg-gray-900 text-white' : 
                       selectedEvent.type === 'tournament' ? 'bg-orange-500 text-white' : 
@@ -295,21 +376,16 @@ const StudentDashboard: React.FC = () => {
                       <div className="flex items-center gap-3 mb-4 opacity-90">
                           <span className="material-symbols-outlined text-2xl">{getEventIcon(selectedEvent.type)}</span>
                           <span className="text-sm font-bold uppercase tracking-wider">
-                              {selectedEvent.type === 'exam' ? 'Examen de Grado' : 
-                               selectedEvent.type === 'tournament' ? 'Torneo Oficial' : 'Seminario Técnico'}
+                              {selectedEvent.type === 'exam' ? 'Examen de Grado' : 'Evento Oficial'}
                           </span>
                       </div>
                       <h2 className="text-3xl font-black leading-tight">{selectedEvent.title}</h2>
                   </div>
 
-                  {/* Modal Body */}
                   <div className="p-8 -mt-6 bg-white rounded-t-[2rem] relative z-10 flex flex-col gap-6">
-                      
-                      {/* Info Grid */}
                       <div className="grid grid-cols-2 gap-4">
                           <div className="bg-gray-50 p-4 rounded-2xl">
                               <p className="text-xs font-bold text-gray-400 uppercase mb-1">Fecha</p>
-                              {/* FIXED DATE PARSING */}
                               <p className="font-bold text-text-main">{new Date(selectedEvent.date + 'T12:00:00').toLocaleDateString()}</p>
                           </div>
                           <div className="bg-gray-50 p-4 rounded-2xl">
@@ -318,54 +394,39 @@ const StudentDashboard: React.FC = () => {
                           </div>
                       </div>
 
-                      {/* Description */}
                       <div>
-                          <h4 className="text-sm font-bold text-text-main mb-2">Detalles del Evento</h4>
+                          <h4 className="text-sm font-bold text-text-main mb-2">Detalles</h4>
                           <p className="text-text-secondary text-sm leading-relaxed whitespace-pre-wrap">
                               {selectedEvent.description}
                           </p>
                       </div>
 
-                      {/* Action Area */}
                       <div className="pt-4 border-t border-gray-100">
                           {selectedEvent.type === 'exam' && !selectedEvent.registrants?.includes(student?.id || '') ? (
-                              // Unregistered Exam logic: Usually strictly controlled, but if public, allow request or show info
                               <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 flex items-start gap-3">
                                   <span className="material-symbols-outlined text-yellow-600">info</span>
                                   <div>
                                       <p className="text-sm font-bold text-yellow-800">Inscripción Controlada</p>
                                       <p className="text-xs text-yellow-700 mt-1">
-                                          Este es un evento de examen. Si es público, contacta a tu maestro para confirmar tu elegibilidad antes del día.
+                                          Contacta a tu maestro para confirmar tu elegibilidad.
                                       </p>
                                   </div>
                               </div>
                           ) : (
-                              // MARKETPLACE ACTIONS (Standard & Registered Exams)
                               <>
                                   {selectedEvent.registrants?.includes(student?.id || '') ? (
-                                      <div className="flex flex-col gap-3 items-center">
-                                          <div className="flex items-center gap-2 text-green-600 font-bold bg-green-50 px-4 py-2 rounded-full">
-                                              <span className="material-symbols-outlined">check_circle</span>
-                                              Ya estás inscrito
-                                          </div>
-                                          <p className="text-xs text-gray-400">Preséntate con tu uniforme limpio 15 minutos antes.</p>
+                                      <div className="flex items-center justify-center gap-2 text-green-600 font-bold bg-green-50 px-4 py-3 rounded-xl border border-green-100">
+                                          <span className="material-symbols-outlined">check_circle</span>
+                                          Ya estás inscrito
                                       </div>
                                   ) : (
-                                      <div className="flex flex-col gap-3">
-                                          <div className="flex items-center justify-between text-sm text-text-secondary mb-2">
-                                              <span>Cupos disponibles</span>
-                                              <span className="font-bold text-text-main">
-                                                  {(selectedEvent.capacity || 0) - (selectedEvent.registrants?.length || 0)}
-                                              </span>
-                                          </div>
-                                          <button 
-                                              onClick={handleRegister}
-                                              className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl shadow-lg shadow-primary/30 flex items-center justify-center gap-2 transition-all active:scale-95"
-                                          >
-                                              <span>Confirmar Inscripción</span>
-                                              <span className="material-symbols-outlined">how_to_reg</span>
-                                          </button>
-                                      </div>
+                                      <button 
+                                          onClick={handleRegister}
+                                          className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95"
+                                      >
+                                          <span>Confirmar Inscripción</span>
+                                          <span className="material-symbols-outlined">how_to_reg</span>
+                                      </button>
                                   )}
                               </>
                           )}
