@@ -15,26 +15,26 @@
           extend: {
             colors: {
               primary: {
-                DEFAULT: "#f97316", // Premium Orange
-                hover: "#ea580c",
-                light: "#fdba74",
-                dark: "#c2410c",
-                glass: "rgba(249, 115, 22, 0.15)"
+                DEFAULT: "#F97316", // Vibrant Orange
+                hover: "#EA580C",
+                light: "#FDBA74",
+                dark: "#C2410C",
+                glass: "rgba(249, 115, 22, 0.10)"
               },
               background: {
-                DEFAULT: "#0a0a0a", // Deepest Black
-                paper: "#141414",   // Card Surface
-                subtle: "#1f1f1f",  // Input/Hover
-                elevated: "#262626" // Dropdowns/Modals
+                DEFAULT: "#000000", // Absolute Black
+                paper: "#0D0D0D",   // Dark Surface
+                subtle: "#1A1A1A",  // Hover/Input
+                elevated: "#171717" // Modals
               },
               text: {
-                main: "#ffffff",
-                secondary: "#a3a3a3", // Neutral 400
-                muted: "#525252",     // Neutral 600
+                main: "#FFFFFF",
+                secondary: "#737373", // Metal Gray
+                muted: "#404040",     // Dark Gray
                 inverted: "#000000"
               },
               border: {
-                DEFAULT: "#262626", // Subtle border
+                DEFAULT: "#1A1A1A", // Subtle divider
                 hover: "#404040"
               },
               status: {
@@ -48,14 +48,20 @@
               sans: ["Inter", "sans-serif"],
             },
             boxShadow: {
-              glow: "0 0 20px rgba(249, 115, 22, 0.15)",
-              card: "0 1px 2px 0 rgba(0, 0, 0, 0.5)",
-              premium: "0 20px 40px -10px rgba(0, 0, 0, 0.8)",
+              glow: "0 0 0 1px rgba(249, 115, 22, 0.2)",
+              card: "0 0 0 1px #1A1A1A",
+              premium: "0 20px 40px -20px rgba(0, 0, 0, 1)",
             },
             borderRadius: {
-              xl: "0.75rem",
-              "2xl": "1rem",
-              "3xl": "1.5rem",
+              DEFAULT: "0px",
+              none: "0px",
+              sm: "0px",
+              md: "0px",
+              lg: "0px",
+              xl: "0px",
+              "2xl": "0px",
+              "3xl": "0px",
+              full: "0px", // Industrial Geometry
             }
           },
         },
@@ -64,33 +70,38 @@
     <style>
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #0a0a0a;
+        background-color: #000000;
         color: #ffffff;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
       
-      /* Scrollbar Dark Mode Premium */
+      /* Industrial Scrollbar */
       ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 4px;
+        height: 4px;
       }
       ::-webkit-scrollbar-track {
-        background: #0a0a0a; 
+        background: #000000; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #262626; 
-        border-radius: 99px;
+        background: #333333; 
+        border-radius: 0px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #404040; 
+        background: #F97316; 
       }
 
       .material-symbols-outlined {
-        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
       }
       .material-symbols-outlined.filled {
-        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+      }
+      
+      /* Force sharp corners everywhere */
+      * {
+        border-radius: 0 !important;
       }
       
       /* Form Autofill Fix for Dark Mode */
@@ -98,7 +109,7 @@
       input:-webkit-autofill:hover, 
       input:-webkit-autofill:focus, 
       input:-webkit-autofill:active{
-          -webkit-box-shadow: 0 0 0 30px #1f1f1f inset !important;
+          -webkit-box-shadow: 0 0 0 30px #0D0D0D inset !important;
           -webkit-text-fill-color: white !important;
           transition: background-color 5000s ease-in-out 0s;
       }
@@ -125,7 +136,7 @@
 }
 </script>
 </head>
-  <body class="bg-background text-text-main selection:bg-primary/30 selection:text-white">
+  <body class="bg-background text-text-main selection:bg-primary selection:text-black">
     <div id="root"></div>
   </body>
 </html>

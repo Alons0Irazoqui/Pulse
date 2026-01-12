@@ -49,50 +49,50 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
     <>
       {/* Mobile Overlay */}
       <div 
-        className={`fixed inset-0 bg-black/90 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/90 backdrop-blur-none z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
-      {/* Sidebar Content */}
+      {/* Sidebar Content - INDUSTRIAL DESIGN */}
       <aside 
         className={`
           fixed md:static inset-y-0 left-0 z-50
-          flex flex-col w-72 h-full bg-background border-r border-border
-          transform transition-transform duration-300 ease-out shadow-2xl md:shadow-none
+          flex flex-col w-72 h-full bg-[#000000] border-r border-primary
+          transform transition-transform duration-200 ease-linear shadow-none
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
         {/* LOGO */}
-        <div className="h-20 flex items-center px-8 border-b border-border">
+        <div className="h-20 flex items-center px-6 border-b border-border bg-[#000000]">
             <div className="flex items-center gap-3">
-                <div className="size-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-                    <span className="font-black text-white text-lg leading-none">A</span>
+                <div className="size-8 bg-primary flex items-center justify-center">
+                    <span className="font-black text-black text-lg leading-none">A</span>
                 </div>
-                <h1 className="text-lg font-bold tracking-tight text-white">
+                <h1 className="text-lg font-bold tracking-tighter text-white uppercase">
                     Academy<span className="text-primary">Pro</span>
                 </h1>
             </div>
         </div>
 
-        <div className="flex flex-col h-full p-6 justify-between overflow-y-auto">
-          <div className="flex flex-col gap-8">
+        <div className="flex flex-col h-full justify-between overflow-y-auto bg-[#000000]">
+          <div className="flex flex-col pt-6">
             
-            {/* User Info */}
-            <div className="flex items-center gap-3 px-2">
+            {/* User Info - Squared */}
+            <div className="flex items-center gap-4 px-6 mb-8">
                 <Avatar 
                     src={currentUser?.avatarUrl} 
                     name={displayName} 
-                    className="size-10 rounded-full ring-2 ring-border" 
+                    className="size-10 ring-1 ring-border" 
                 />
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold text-white truncate">{displayName}</span>
-                  <span className="text-xs text-text-secondary truncate">{displaySubtext}</span>
+                  <span className="text-sm font-bold text-white truncate uppercase tracking-wide">{displayName}</span>
+                  <span className="text-[10px] text-text-secondary truncate uppercase tracking-widest">{displaySubtext}</span>
                 </div>
             </div>
 
-            {/* Menu */}
-            <nav className="flex flex-col gap-1">
-              <p className="px-4 text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Menú Principal</p>
+            {/* Menu - Rectangular & Sharp */}
+            <nav className="flex flex-col gap-1 w-full">
+              <p className="px-6 text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">Navegación</p>
               {links.map((link) => {
                 const isActive = location.pathname.startsWith(link.path);
                 return (
@@ -100,19 +100,18 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
                     key={link.path}
                     to={link.path}
                     onClick={onClose}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group relative ${
+                    className={`flex items-center gap-4 px-6 py-4 transition-all group relative border-l-2 ${
                         isActive
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-text-secondary hover:bg-background-subtle hover:text-white'
+                            ? 'border-primary bg-background-paper text-white'
+                            : 'border-transparent text-text-secondary hover:bg-background-subtle hover:text-white'
                         }`}
                     >
-                        <span className={`material-symbols-outlined ${isActive ? 'filled' : ''} text-[20px]`}>
+                        <span className={`material-symbols-outlined text-[20px] ${isActive ? 'text-primary' : ''}`}>
                             {link.icon}
                         </span>
-                        <span className="font-medium text-sm">
+                        <span className="font-medium text-sm tracking-wide uppercase">
                             {link.name}
                         </span>
-                        {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full"></div>}
                     </Link>
                 );
               })}
@@ -120,13 +119,13 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
           </div>
 
           {/* Footer */}
-          <div className="pt-6 border-t border-border">
+          <div className="border-t border-border">
               <button 
                   onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 text-text-secondary hover:text-red-500 cursor-pointer transition-colors group w-full text-left"
+                  className="flex items-center gap-4 px-6 py-5 hover:bg-red-900/10 text-text-secondary hover:text-red-500 cursor-pointer transition-colors group w-full text-left"
               >
-                <span className="material-symbols-outlined group-hover:text-red-500 transition-colors">logout</span>
-                <span className="font-medium text-sm transition-colors">Cerrar Sesión</span>
+                <span className="material-symbols-outlined text-[20px]">logout</span>
+                <span className="font-medium text-sm uppercase tracking-wide">Cerrar Sesión</span>
               </button>
           </div>
         </div>
