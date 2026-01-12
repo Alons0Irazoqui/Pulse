@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAcademy } from '../../context/AcademyContext';
 import { useFinance } from '../../context/FinanceContext';
 import { useToast } from '../../context/ToastContext';
-import { Student, Event, ChargeCategory } from '../../types';
+import { ChargeCategory } from '../../types';
 import StudentSearch from '../ui/StudentSearch';
 import { getLocalDate } from '../../utils/dateUtils';
 
@@ -22,319 +22,191 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
     // --- FORM STATE ---
     const [studentId, setStudentId] = useState<string>('');
     const [categoryGroup, setCategoryGroup] = useState<CategoryGroup>('event');
-    
-    // Logic specific fields
     const [selectedEventId, setSelectedEventId] = useState<string>('');
     const [customTitle, setCustomTitle] = useState('');
     const [description, setDescription] = useState('');
-    
-    // Finance fields
     const [amount, setAmount] = useState<string>('');
     const [dueDate, setDueDate] = useState<string>(getLocalDate());
     const [canBePaidInParts, setCanBePaidInParts] = useState(false);
 
     // --- DERIVED STATE ---
-    
-    // 1. Available Events for the selected student
-    const availableEvents = useMemo(() => {
-        if (!studentId) return [];
-        return getStudentEnrolledEvents(studentId);
-    }, [studentId, getStudentEnrolledEvents]);
+    const availableEvents = useMemo(() => studentId ? getStudentEnrolledEvents(studentId) : [], [studentId, getStudentEnrolledEvents]);
+    const selectedEvent = useMemo(() => availableEvents.find(e => e.id === selectedEventId), [availableEvents, selectedEventId]);
 
-    // 2. Resolve final data based on selection
-    const selectedEvent = useMemo(() => {
-        return availableEvents.find(e => e.id === selectedEventId);
-    }, [availableEvents, selectedEventId]);
-
-    // Reset logic when Student changes
     useEffect(() => {
-        setSelectedEventId('');
-        setCustomTitle('');
-        setDescription('');
+        setSelectedEventId(''); setCustomTitle(''); setDescription('');
     }, [studentId]);
 
-    // Update fields when Event changes
     useEffect(() => {
-        if (categoryGroup === 'event' && selectedEvent) {
-            setCustomTitle(selectedEvent.title); // Auto-fill title
-        } else if (categoryGroup === 'event' && !selectedEvent) {
-            setCustomTitle('');
-        }
+        if (categoryGroup === 'event' && selectedEvent) setCustomTitle(selectedEvent.title);
+        else if (categoryGroup === 'event' && !selectedEvent) setCustomTitle('');
     }, [selectedEvent, categoryGroup]);
 
-
-    // --- HANDLERS ---
-
     const handleSubmit = () => {
-        // 1. Validation
         if (!studentId) return addToast('Debes seleccionar un alumno.', 'error');
         if (!amount || parseFloat(amount) <= 0) return addToast('Ingresa un monto válido.', 'error');
         
         let finalCategory: ChargeCategory = 'Otro';
-        let finalTitle = customTitle;
-
-        // 2. Logic Mapping
         if (categoryGroup === 'event') {
-            if (!selectedEventId) return addToast('Selecciona el evento a cobrar.', 'error');
-            
-            // Map Event Type to Charge Category
-            if (selectedEvent?.type === 'tournament') finalCategory = 'Torneo';
-            else if (selectedEvent?.type === 'exam') finalCategory = 'Examen/Promoción';
-            else finalCategory = 'Otro';
-            
+            if (!selectedEventId) return addToast('Selecciona el evento.', 'error');
+            finalCategory = selectedEvent?.type === 'tournament' ? 'Torneo' : selectedEvent?.type === 'exam' ? 'Examen/Promoción' : 'Otro';
         } else if (categoryGroup === 'equipment') {
             finalCategory = 'Equipo/Uniforme';
-            if (!finalTitle) return addToast('Ingresa el nombre del equipo (ej. Kimono).', 'error');
+            if (!customTitle) return addToast('Nombre del equipo requerido.', 'error');
         } else {
-            finalCategory = 'Otro';
-            if (!finalTitle) return addToast('Ingresa el concepto del cargo.', 'error');
+            if (!customTitle) return addToast('Concepto requerido.', 'error');
         }
 
-        // 3. Execution
         createManualCharge({
-            studentId,
-            category: finalCategory,
-            title: finalTitle,
-            description: description,
-            amount: parseFloat(amount),
-            dueDate: dueDate,
-            canBePaidInParts,
+            studentId, category: finalCategory, title: customTitle, description,
+            amount: parseFloat(amount), dueDate, canBePaidInParts,
             relatedEventId: categoryGroup === 'event' ? selectedEventId : undefined
         });
-
         handleClose();
     };
 
     const handleClose = () => {
-        // Reset Form
-        setStudentId('');
-        setCategoryGroup('event');
-        setAmount('');
-        setCustomTitle('');
-        setDescription('');
-        setCanBePaidInParts(false);
+        setStudentId(''); setCategoryGroup('event'); setAmount(''); setCustomTitle(''); setDescription(''); setCanBePaidInParts(false);
         onClose();
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-background-paper rounded-[2rem] w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-border" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onClick={handleClose}></div>
+            
+            <div className="relative w-full max-w-2xl apple-glass rounded-3xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh] border border-white/10 animate-in zoom-in-95 duration-300">
                 
                 {/* Header */}
-                <div className="px-8 py-6 border-b border-border flex justify-between items-center bg-background-subtle">
-                    <div className="flex items-center gap-4">
-                        <div className="size-12 bg-blue-500/10 text-blue-400 rounded-2xl flex items-center justify-center border border-blue-500/20">
-                            <span className="material-symbols-outlined text-2xl">point_of_sale</span>
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-black text-white leading-tight">Generar Cargo Manual</h2>
-                            <p className="text-sm text-text-secondary">Crea una deuda específica para un alumno.</p>
-                        </div>
-                    </div>
-                    <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-full text-text-secondary hover:text-white transition-colors">
-                        <span className="material-symbols-outlined">close</span>
+                <div className="px-6 py-5 border-b border-white/10 bg-white/5 flex justify-between items-center">
+                    <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">add_card</span>
+                        Generar Cargo
+                    </h2>
+                    <button onClick={handleClose} className="text-zinc-400 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-2 rounded-full">
+                        <span className="material-symbols-outlined text-lg">close</span>
                     </button>
                 </div>
 
-                {/* Scrollable Content */}
-                <div className="flex-1 overflow-y-auto p-8">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                        
-                        {/* LEFT COLUMN: CONTEXT */}
-                        <div className="space-y-8">
-                            
-                            {/* Step 1: Student */}
-                            <div className="space-y-3">
-                                <label className="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-wider">
-                                    <span className="bg-background-elevated text-white size-5 rounded-full flex items-center justify-center text-[10px]">1</span>
-                                    Seleccionar Alumno
-                                </label>
-                                <StudentSearch 
-                                    students={students}
-                                    value={studentId}
-                                    onChange={setStudentId}
-                                    placeholder="Buscar por nombre..."
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {/* 1. Student Selector */}
+                    <div>
+                        <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 ml-1">Alumno</label>
+                        <div className="bg-zinc-900/50 rounded-xl border border-white/5 p-1">
+                            <StudentSearch students={students} value={studentId} onChange={setStudentId} placeholder="Buscar alumno..." />
+                        </div>
+                    </div>
+
+                    {/* 2. Type Selector */}
+                    <div>
+                        <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 ml-1">Categoría</label>
+                        <div className="grid grid-cols-3 gap-3">
+                            {[
+                                { id: 'event', icon: 'emoji_events', label: 'Evento' },
+                                { id: 'equipment', icon: 'checkroom', label: 'Equipo' },
+                                { id: 'other', icon: 'receipt', label: 'Otro' }
+                            ].map(cat => (
+                                <button 
+                                    key={cat.id} 
+                                    onClick={() => setCategoryGroup(cat.id as any)}
+                                    className={`py-3 px-2 rounded-xl flex flex-col items-center gap-1 transition-all border ${
+                                        categoryGroup === cat.id 
+                                        ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
+                                        : 'bg-zinc-900/50 text-zinc-500 border-white/5 hover:bg-zinc-800 hover:text-zinc-300'
+                                    }`}
+                                >
+                                    <span className="material-symbols-outlined text-xl">{cat.icon}</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wide">{cat.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 3. Dynamic Fields */}
+                    <div className="bg-zinc-900/30 rounded-2xl p-5 border border-white/5 space-y-4">
+                        {categoryGroup === 'event' ? (
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Evento Inscrito</label>
+                                <div className="relative">
+                                    <select 
+                                        value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)}
+                                        className="w-full bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-3 appearance-none outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                                    >
+                                        <option value="">-- Seleccionar --</option>
+                                        {availableEvents.map(evt => <option key={evt.id} value={evt.id}>{evt.title}</option>)}
+                                    </select>
+                                    <span className="material-symbols-outlined absolute right-4 top-3.5 text-zinc-500 pointer-events-none text-lg">arrow_drop_down</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Concepto</label>
+                                <input 
+                                    value={customTitle} onChange={e => setCustomTitle(e.target.value)}
+                                    placeholder={categoryGroup === 'equipment' ? "Ej. Gi Blanco A2" : "Concepto del cobro"}
+                                    className="w-full bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-zinc-600 transition-all"
                                 />
                             </div>
-
-                            {/* Step 2: Category */}
-                            <div className="space-y-3">
-                                <label className="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-wider">
-                                    <span className="bg-background-elevated text-white size-5 rounded-full flex items-center justify-center text-[10px]">2</span>
-                                    Categoría del Cobro
-                                </label>
-                                <div className="grid grid-cols-3 gap-3">
-                                    <button 
-                                        onClick={() => setCategoryGroup('event')}
-                                        className={`p-3 rounded-xl border text-sm font-bold flex flex-col items-center gap-2 transition-all ${
-                                            categoryGroup === 'event' 
-                                            ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 shadow-sm' 
-                                            : 'bg-background-subtle border-border text-text-secondary hover:bg-background-elevated'
-                                        }`}
-                                    >
-                                        <span className="material-symbols-outlined">emoji_events</span>
-                                        Evento
-                                    </button>
-                                    <button 
-                                        onClick={() => setCategoryGroup('equipment')}
-                                        className={`p-3 rounded-xl border text-sm font-bold flex flex-col items-center gap-2 transition-all ${
-                                            categoryGroup === 'equipment' 
-                                            ? 'bg-purple-500/10 border-purple-500/30 text-purple-400 shadow-sm' 
-                                            : 'bg-background-subtle border-border text-text-secondary hover:bg-background-elevated'
-                                        }`}
-                                    >
-                                        <span className="material-symbols-outlined">checkroom</span>
-                                        Equipo
-                                    </button>
-                                    <button 
-                                        onClick={() => setCategoryGroup('other')}
-                                        className={`p-3 rounded-xl border text-sm font-bold flex flex-col items-center gap-2 transition-all ${
-                                            categoryGroup === 'other' 
-                                            ? 'bg-white/10 border-white/20 text-white shadow-sm' 
-                                            : 'bg-background-subtle border-border text-text-secondary hover:bg-background-elevated'
-                                        }`}
-                                    >
-                                        <span className="material-symbols-outlined">receipt</span>
-                                        Otro
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Step 3: Conditional Inputs */}
-                            <div className="space-y-3 animate-in fade-in slide-in-from-left-4 duration-300">
-                                <label className="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-wider">
-                                    <span className="bg-background-elevated text-white size-5 rounded-full flex items-center justify-center text-[10px]">3</span>
-                                    Detalle del Concepto
-                                </label>
-
-                                {categoryGroup === 'event' ? (
-                                    <div className="bg-blue-900/10 p-4 rounded-2xl border border-blue-500/20">
-                                        {availableEvents.length > 0 ? (
-                                            <>
-                                                <label className="block text-xs font-bold text-blue-300 mb-2">Selecciona el Evento Inscrito</label>
-                                                <select 
-                                                    value={selectedEventId}
-                                                    onChange={(e) => setSelectedEventId(e.target.value)}
-                                                    className="w-full rounded-xl border-border bg-background p-3 text-sm font-medium focus:ring-blue-500 focus:border-blue-500 text-white"
-                                                >
-                                                    <option value="">-- Seleccionar --</option>
-                                                    {availableEvents.map(evt => (
-                                                        <option key={evt.id} value={evt.id}>
-                                                            {evt.title} ({new Date(evt.date).toLocaleDateString()})
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <p className="text-[10px] text-blue-400 mt-2">
-                                                    * Solo se muestran eventos donde el alumno ya está registrado.
-                                                </p>
-                                            </>
-                                        ) : (
-                                            <div className="flex items-center gap-3 text-amber-500">
-                                                <span className="material-symbols-outlined">warning</span>
-                                                <p className="text-sm font-medium">Este alumno no está inscrito en eventos recientes.</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-text-secondary mb-1.5">Concepto Corto</label>
-                                            <input 
-                                                type="text"
-                                                value={customTitle}
-                                                onChange={(e) => setCustomTitle(e.target.value)}
-                                                placeholder={categoryGroup === 'equipment' ? "Ej. Gi Blanco Talla A2" : "Ej. Reposición de Credencial"}
-                                                className="w-full rounded-xl border-border bg-background-subtle p-3 text-sm font-medium focus:border-primary focus:ring-primary text-white"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-text-secondary mb-1.5">Descripción (Opcional)</label>
-                                            <textarea 
-                                                rows={2}
-                                                value={description}
-                                                onChange={(e) => setDescription(e.target.value)}
-                                                className="w-full rounded-xl border-border bg-background-subtle p-3 text-sm font-medium focus:border-primary focus:ring-primary resize-none text-white"
-                                                placeholder="Detalles adicionales para el recibo..."
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
+                        )}
+                        
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Notas / Descripción</label>
+                            <textarea 
+                                rows={2}
+                                value={description} onChange={e => setDescription(e.target.value)}
+                                placeholder="Detalles opcionales..."
+                                className="w-full bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-zinc-600 resize-none transition-all"
+                            />
                         </div>
-
-                        {/* RIGHT COLUMN: FINANCE */}
-                        <div className="flex flex-col h-full bg-background rounded-3xl p-8 border border-border">
-                            <div className="space-y-6 flex-1">
-                                <label className="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-wider">
-                                    <span className="bg-background-elevated text-white size-5 rounded-full flex items-center justify-center text-[10px]">4</span>
-                                    Configuración Financiera
-                                </label>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-text-secondary mb-2">Monto a Cobrar</label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-3 text-text-muted font-bold text-lg">$</span>
-                                        <input 
-                                            type="number"
-                                            min="0"
-                                            value={amount}
-                                            onChange={(e) => setAmount(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-4 rounded-xl border-border bg-background-paper text-2xl font-black text-white focus:border-green-500 focus:ring-green-500 placeholder-text-muted"
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-text-secondary mb-2">Fecha Límite de Pago</label>
-                                    <input 
-                                        type="date"
-                                        value={dueDate}
-                                        onChange={(e) => setDueDate(e.target.value)}
-                                        className="w-full p-3 rounded-xl border-border bg-background-paper text-sm font-medium focus:border-primary focus:ring-primary text-white"
-                                    />
-                                </div>
-
-                                <div className="bg-background-paper p-4 rounded-xl border border-border">
-                                    <label className="flex items-center justify-between cursor-pointer">
-                                        <div>
-                                            <span className="block text-sm font-bold text-white">Permitir Abonos</span>
-                                            <span className="text-xs text-text-secondary">El alumno podrá pagar en partes.</span>
-                                        </div>
-                                        <div className="relative inline-flex items-center cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={canBePaidInParts} 
-                                                onChange={(e) => setCanBePaidInParts(e.target.checked)} 
-                                                className="sr-only peer" 
-                                            />
-                                            <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 pt-6 border-t border-border flex gap-4">
-                                <button 
-                                    onClick={handleClose}
-                                    className="flex-1 py-3.5 rounded-xl border border-border font-bold text-text-secondary hover:bg-white/5 hover:text-white transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button 
-                                    onClick={handleSubmit}
-                                    className="flex-[2] py-3.5 rounded-xl bg-white text-black font-bold hover:bg-gray-200 shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                                >
-                                    <span>Generar Cargo</span>
-                                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                                </button>
-                            </div>
-                        </div>
-
                     </div>
+
+                    {/* 4. Financials */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Monto ($)</label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-3 text-zinc-500 font-mono text-lg">$</span>
+                                <input 
+                                    type="number" min="0" value={amount} onChange={e => setAmount(e.target.value)}
+                                    className="w-full bg-zinc-900 border border-white/10 text-white text-xl font-mono font-bold py-2.5 pl-8 pr-4 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-zinc-700 transition-all"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider ml-1">Fecha Límite</label>
+                            <input 
+                                type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+                                className="w-full bg-zinc-900 border border-white/10 text-white text-sm py-3 px-4 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-mono"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer" onClick={() => setCanBePaidInParts(!canBePaidInParts)}>
+                        <div className={`size-5 rounded border flex items-center justify-center transition-all ${canBePaidInParts ? 'bg-primary border-primary' : 'bg-transparent border-zinc-600'}`}>
+                            {canBePaidInParts && <span className="material-symbols-outlined text-white text-xs">check</span>}
+                        </div>
+                        <div>
+                            <span className="block text-sm font-bold text-zinc-200">Permitir Pagos Parciales</span>
+                            <span className="text-[10px] text-zinc-500">El alumno podrá abonar a esta deuda en partes.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-6 border-t border-white/10 bg-black/20 flex gap-3">
+                    <button 
+                        onClick={handleClose}
+                        className="flex-1 py-3.5 rounded-xl border border-white/10 font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-all text-xs uppercase tracking-wider"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={handleSubmit}
+                        className="flex-[2] py-3.5 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 text-xs uppercase tracking-wider active:scale-95"
+                    >
+                        Confirmar Cargo
+                    </button>
                 </div>
             </div>
         </div>

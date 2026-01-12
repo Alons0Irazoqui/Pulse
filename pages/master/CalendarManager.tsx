@@ -154,43 +154,43 @@ const CalendarManager: React.FC = () => {
   const calendarDays = getDaysInMonth(currentMonth);
 
   return (
-    <div className="p-6 md:p-10 max-w-[1600px] mx-auto h-full flex flex-col">
+    <div className="p-6 md:p-10 max-w-[1600px] mx-auto h-full flex flex-col text-zinc-200">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
             <div>
-                <h1 className="text-3xl font-black tracking-tight text-text-main">Calendario Maestro</h1>
-                <p className="text-text-secondary mt-1">Vista global de todas las clases.</p>
+                <h1 className="text-3xl font-black tracking-tight text-white">Calendario Maestro</h1>
+                <p className="text-zinc-500 mt-1 text-sm">Vista global de todas las clases.</p>
             </div>
             
-            <div className="flex items-center bg-white rounded-xl shadow-sm border border-gray-200 p-1">
-                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <div className="flex items-center bg-[#121212] rounded-xl shadow-sm border border-zinc-800 p-1">
+                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} className="p-2 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg transition-colors">
                     <span className="material-symbols-outlined">chevron_left</span>
                 </button>
-                <span className="w-48 text-center font-bold text-text-main capitalize">
+                <span className="w-48 text-center font-bold text-white capitalize">
                     {currentMonth.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
                 </span>
-                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} className="p-2 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg transition-colors">
                     <span className="material-symbols-outlined">chevron_right</span>
                 </button>
             </div>
         </div>
 
         {/* Calendar Grid */}
-        <div className="flex-1 bg-white rounded-3xl border border-gray-200 shadow-soft overflow-hidden flex flex-col">
+        <div className="flex-1 bg-[#121212] rounded-3xl border border-zinc-800 shadow-inner overflow-hidden flex flex-col">
             {/* Week Header */}
-            <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/50">
+            <div className="grid grid-cols-7 border-b border-zinc-800 bg-[#18181b]">
                 {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
-                    <div key={day} className="py-4 text-center text-xs font-bold text-text-secondary uppercase tracking-wider">
+                    <div key={day} className="py-4 text-center text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
                         {day}
                     </div>
                 ))}
             </div>
             
             {/* Days Grid */}
-            <div className="grid grid-cols-7 flex-1 auto-rows-fr">
+            <div className="grid grid-cols-7 flex-1 auto-rows-fr bg-[#09090b]">
                 {calendarDays.map((day, idx) => {
                     if (!day) {
-                        return <div key={`empty-${idx}`} className="border-b border-r border-gray-100 bg-gray-50/20"></div>;
+                        return <div key={`empty-${idx}`} className="border-b border-r border-zinc-800/50 bg-zinc-900/20"></div>;
                     }
 
                     const dateStr = day.toISOString().split('T')[0];
@@ -198,8 +198,8 @@ const CalendarManager: React.FC = () => {
                     const events = generateEventsForDay(day);
 
                     return (
-                        <div key={dateStr} className={`border-b border-r border-gray-100 p-2 min-h-[120px] flex flex-col gap-1 transition-colors ${isToday ? 'bg-blue-50/20' : 'hover:bg-gray-50'}`}>
-                            <span className={`text-xs font-bold mb-1 ml-1 ${isToday ? 'text-primary' : 'text-gray-400'}`}>
+                        <div key={dateStr} className={`border-b border-r border-zinc-800 p-2 min-h-[120px] flex flex-col gap-1 transition-colors ${isToday ? 'bg-primary/5' : 'hover:bg-zinc-900/50'}`}>
+                            <span className={`text-xs font-bold mb-1 ml-1 ${isToday ? 'text-primary' : 'text-zinc-600'}`}>
                                 {day.getDate()}
                             </span>
                             
@@ -208,19 +208,19 @@ const CalendarManager: React.FC = () => {
                                     <div 
                                         key={evt.id}
                                         onClick={() => handleSessionClick(evt)}
-                                        className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer truncate transition-all border ${
-                                            evt.type === 'cancelled' ? 'bg-red-50 text-red-400 border-red-100 line-through opacity-70' :
-                                            evt.type === 'ghost' ? 'bg-gray-50 text-gray-400 border-dashed border-gray-200 opacity-50' :
-                                            evt.type === 'moved_here' ? 'bg-purple-50 text-purple-700 border-purple-100' :
-                                            evt.type === 'modified' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                            'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'
+                                        className={`px-2 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer truncate transition-all border ${
+                                            evt.type === 'cancelled' ? 'bg-red-500/10 text-red-400 border-red-500/20 line-through opacity-70' :
+                                            evt.type === 'ghost' ? 'bg-zinc-800 text-zinc-600 border-dashed border-zinc-700 opacity-50' :
+                                            evt.type === 'moved_here' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                                            evt.type === 'modified' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                            'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20'
                                         }`}
                                     >
                                         <div className="flex justify-between">
-                                            <span>{evt.startTime}</span>
-                                            {evt.type === 'modified' && <span className="size-1.5 bg-amber-500 rounded-full"></span>}
+                                            <span className="font-mono opacity-80">{evt.startTime}</span>
+                                            {evt.type === 'modified' && <span className="size-1.5 bg-orange-500 rounded-full"></span>}
                                         </div>
-                                        <div className="truncate">{evt.name}</div>
+                                        <div className="truncate mt-0.5">{evt.name}</div>
                                     </div>
                                 ))}
                             </div>
@@ -230,36 +230,65 @@ const CalendarManager: React.FC = () => {
             </div>
         </div>
 
-        {/* Edit Modal */}
+        {/* Edit Modal (Apple Glass Dark) */}
         {selectedSession && (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onClick={() => setSelectedSession(null)}></div>
+                
+                <div className="relative bg-[#18181b] rounded-2xl shadow-2xl p-8 w-full max-w-md border border-white/10 animate-in zoom-in-95 duration-200">
                     <div className="flex justify-between items-center mb-6">
                         <div>
-                            <h3 className="text-xl font-bold text-text-main">Editar Sesión</h3>
-                            <p className="text-sm text-text-secondary">{selectedSession.date}</p>
+                            <h3 className="text-xl font-bold text-white">Editar Sesión</h3>
+                            <p className="text-sm text-zinc-500">{selectedSession.date}</p>
                         </div>
-                        <button onClick={() => setSelectedSession(null)} className="p-2 hover:bg-gray-100 rounded-full"><span className="material-symbols-outlined">close</span></button>
+                        <button onClick={() => setSelectedSession(null)} className="p-2 hover:bg-white/10 rounded-full text-zinc-400 hover:text-white transition-colors">
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
                     </div>
 
-                    <div className="flex flex-col gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Instructor</label>
-                            <input className="w-full rounded-xl border-gray-200 p-3 text-sm font-medium" value={editForm.instructor} onChange={e => setEditForm({...editForm, instructor: e.target.value})} />
+                    <div className="flex flex-col gap-5">
+                        <div className="space-y-1.5">
+                            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Instructor</label>
+                            <input 
+                                className="w-full bg-zinc-900 border border-white/10 rounded-xl p-3 text-sm font-medium text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" 
+                                value={editForm.instructor} 
+                                onChange={e => setEditForm({...editForm, instructor: e.target.value})} 
+                            />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Inicio</label>
-                                <input type="time" className="w-full rounded-xl border-gray-200 p-3 text-sm font-medium" value={editForm.startTime} onChange={e => setEditForm({...editForm, startTime: e.target.value})} />
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Inicio</label>
+                                <input 
+                                    type="time" 
+                                    className="w-full bg-zinc-900 border border-white/10 rounded-xl p-3 text-sm font-medium text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" 
+                                    value={editForm.startTime} 
+                                    onChange={e => setEditForm({...editForm, startTime: e.target.value})} 
+                                />
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Fin</label>
-                                <input type="time" className="w-full rounded-xl border-gray-200 p-3 text-sm font-medium" value={editForm.endTime} onChange={e => setEditForm({...editForm, endTime: e.target.value})} />
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Fin</label>
+                                <input 
+                                    type="time" 
+                                    className="w-full bg-zinc-900 border border-white/10 rounded-xl p-3 text-sm font-medium text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" 
+                                    value={editForm.endTime} 
+                                    onChange={e => setEditForm({...editForm, endTime: e.target.value})} 
+                                />
                             </div>
                         </div>
-                        <div className="flex gap-3 mt-4">
-                            <button onClick={handleCancelSession} className="flex-1 py-3 rounded-xl bg-red-50 text-red-600 font-bold hover:bg-red-100">Cancelar Clase</button>
-                            <button onClick={handleSaveChanges} className="flex-1 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover">Guardar</button>
+                        
+                        <div className="flex gap-3 mt-4 pt-4 border-t border-white/10">
+                            <button 
+                                onClick={handleCancelSession} 
+                                className="flex-1 py-3 rounded-xl border border-red-500/30 text-red-400 font-bold hover:bg-red-500/10 transition-colors text-xs uppercase tracking-wider"
+                            >
+                                Cancelar Clase
+                            </button>
+                            <button 
+                                onClick={handleSaveChanges} 
+                                className="flex-1 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all text-xs uppercase tracking-wider active:scale-95"
+                            >
+                                Guardar
+                            </button>
                         </div>
                     </div>
                 </div>

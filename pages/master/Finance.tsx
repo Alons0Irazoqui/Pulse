@@ -10,46 +10,47 @@ import { formatDateDisplay } from '../../utils/dateUtils';
 import EmptyState from '../../components/ui/EmptyState';
 import CreateChargeModal from '../../components/finance/CreateChargeModal';
 
-// --- HELPER COMPONENTS ---
-
+// --- MINIMALIST STATUS BADGE (DOT INDICATOR) ---
 const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: number }> = ({ status, amount, penalty }) => {
+    const baseClasses = "inline-flex items-center gap-2 px-2.5 py-1 rounded-md border text-[10px] font-medium uppercase tracking-wider transition-all";
+    
     switch (status) {
         case 'paid':
             return (
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
-                    <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                    PAGADO
+                <span className={`${baseClasses} bg-zinc-500/5 border-emerald-500/20 text-emerald-400`}>
+                    <div className="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]"></div>
+                    Pagado
                 </span>
             );
         case 'in_review':
             return (
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold tracking-wider uppercase rounded-lg animate-pulse">
-                    <span className="material-symbols-outlined text-[12px]">hourglass_top</span>
-                    REVISAR
+                <span className={`${baseClasses} bg-zinc-500/5 border-orange-500/20 text-orange-400 animate-pulse`}>
+                    <div className="size-1.5 rounded-full bg-orange-500"></div>
+                    Revisión
                 </span>
             );
         case 'overdue':
             return (
                 <div className="flex flex-col items-start gap-1">
-                    <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
-                        <span className="material-symbols-outlined text-[12px]">warning</span>
-                        VENCIDO
+                    <span className={`${baseClasses} bg-zinc-500/5 border-red-500/20 text-red-400`}>
+                        <div className="size-1.5 rounded-full bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)]"></div>
+                        Vencido
                     </span>
-                    {penalty > 0 && <span className="text-[10px] text-red-400 font-mono pl-1">+${penalty} Multa</span>}
+                    {penalty > 0 && <span className="text-[9px] text-red-500/80 font-mono ml-4">+${penalty} Multa</span>}
                 </div>
             );
         case 'partial':
             return (
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
-                    <span className="material-symbols-outlined text-[12px]">pie_chart</span>
-                    RESTANTE
+                <span className={`${baseClasses} bg-zinc-500/5 border-blue-500/20 text-blue-400`}>
+                    <div className="size-1.5 rounded-full bg-blue-500"></div>
+                    Parcial
                 </span>
             );
         default: // pending
             return (
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-zinc-800/50 border border-zinc-700 text-zinc-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
-                    <span className="material-symbols-outlined text-[12px]">pending</span>
-                    PENDIENTE
+                <span className={`${baseClasses} bg-zinc-500/5 border-zinc-700 text-zinc-400`}>
+                    <div className="size-1.5 rounded-full bg-zinc-500"></div>
+                    Pendiente
                 </span>
             );
     }
@@ -170,54 +171,6 @@ const Finance: React.FC = () => {
       };
   }, [records]);
 
-  // -- CALCULATE PREVIEW (The Visual Waterfall) --
-  const previewDistribution = useMemo(() => {
-      if (!selectedGroup) return [];
-      
-      const items = [...selectedGroup.records];
-      // Separate mandatory and splittable
-      const mandatory = items.filter(r => !r.canBePaidInParts);
-      const splittable = items.filter(r => r.canBePaidInParts)
-                              .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
-
-      // Use Declared Amount if available (what student claimed they paid), else default to full debt
-      let available = selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount;
-      
-      const preview = [];
-
-      // 1. Mandatory
-      for (const item of mandatory) {
-          const debt = item.amount + item.penaltyAmount;
-          if (available >= debt) {
-              preview.push({ ...item, _status: 'paid', _paid: debt, _remaining: 0 });
-              available -= debt;
-          } else {
-              preview.push({ ...item, _status: 'unpaid', _paid: 0, _remaining: debt });
-          }
-      }
-
-      // 2. Splittable
-      for (const item of splittable) {
-          const debt = item.amount + item.penaltyAmount;
-          if (available <= 0) {
-              preview.push({ ...item, _status: 'unpaid', _paid: 0, _remaining: debt });
-              continue;
-          }
-
-          if (available >= debt) {
-              preview.push({ ...item, _status: 'paid', _paid: debt, _remaining: 0 });
-              available -= debt;
-          } else {
-              // Partial
-              preview.push({ ...item, _status: 'partial', _paid: available, _remaining: debt - available });
-              available = 0;
-          }
-      }
-      
-      return preview;
-  }, [selectedGroup]);
-
-
   // -- ACTIONS --
 
   const handleApprove = () => {
@@ -239,7 +192,7 @@ const Finance: React.FC = () => {
   const handleReject = () => {
       if (!selectedGroup) return;
       confirm({
-          title: selectedGroup.isBatch ? 'Rechazar Lote Completo' : 'Rechazar Pago',
+          title: selectedGroup.isBatch ? 'Rechazar Lote' : 'Rechazar Pago',
           message: 'El estatus volverá a Pendiente/Vencido y se notificará al alumno.',
           type: 'danger',
           confirmText: 'Rechazar',
@@ -277,35 +230,24 @@ const Finance: React.FC = () => {
       addToast('Reporte descargado', 'success');
   };
 
-  const getTimeValidation = (record: TuitionRecord) => {
-      if (!record.paymentDate) return { isLate: false, diffDays: 0 };
-      const due = new Date(record.dueDate);
-      const paid = new Date(record.paymentDate);
-      due.setHours(23, 59, 59, 999); 
-      const isLate = paid > due;
-      const diffTime = Math.abs(paid.getTime() - due.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-      return { isLate, diffDays };
-  };
-
   return (
-    <div className="flex flex-col h-full bg-[#09090b] text-zinc-200">
+    <div className="flex flex-col h-full bg-[#121212] text-zinc-200 font-sans">
         
         {/* --- HEADER --- */}
-        <div className="bg-[#09090b]/80 backdrop-blur-xl border-b border-zinc-800 px-6 py-6 md:px-10 sticky top-0 z-20">
+        <div className="bg-[#121212]/80 backdrop-blur-xl border-b border-white/5 px-6 py-6 md:px-10 sticky top-0 z-20">
             <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-white">Control Financiero</h1>
-                    <p className="text-zinc-400 mt-1 font-medium">Valida pagos y gestiona cobros.</p>
+                    <p className="text-zinc-500 mt-1 font-medium text-sm">Valida pagos y gestiona cobros.</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                    <button onClick={handleExport} className="px-5 py-2.5 bg-[#18181b] border border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800 font-bold text-xs flex items-center gap-2 rounded-xl transition-all active:scale-95">
+                    <button onClick={handleExport} className="px-4 py-2 bg-transparent border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-bold text-xs flex items-center gap-2 rounded-lg transition-all active:scale-95">
                         <span className="material-symbols-outlined text-lg">download</span> Exportar
                     </button>
-                    <button onClick={() => setIsChargeModalOpen(true)} className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white font-bold text-xs flex items-center gap-2 transition-all rounded-xl shadow-lg shadow-primary/20 active:scale-95">
-                        <span className="material-symbols-outlined text-lg">add_circle</span> Nuevo Cargo
+                    <button onClick={() => setIsChargeModalOpen(true)} className="px-4 py-2 bg-zinc-100 hover:bg-white text-black font-bold text-xs flex items-center gap-2 transition-all rounded-lg shadow-lg shadow-white/5 active:scale-95">
+                        <span className="material-symbols-outlined text-lg">add</span> Nuevo Cargo
                     </button>
-                    <button onClick={handleGenerateBilling} className="px-5 py-2.5 bg-zinc-800 border border-zinc-700 text-white hover:border-primary/50 hover:bg-zinc-700 font-bold text-xs flex items-center gap-2 transition-all rounded-xl active:scale-95">
+                    <button onClick={handleGenerateBilling} className="px-4 py-2 bg-[#18181b] border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-600 font-bold text-xs flex items-center gap-2 transition-all rounded-lg active:scale-95">
                         <span className="material-symbols-outlined text-lg">payments</span> Mensualidad
                     </button>
                 </div>
@@ -313,29 +255,28 @@ const Finance: React.FC = () => {
 
             {/* --- TABS --- */}
             <div className="max-w-[1600px] mx-auto mt-8 flex flex-col md:flex-row gap-4 justify-between items-center">
-                <div className="flex bg-[#18181b] p-1.5 rounded-2xl border border-zinc-800 w-full md:w-auto overflow-x-auto no-scrollbar">
+                <div className="flex bg-[#18181b] p-1 rounded-xl border border-white/5 w-full md:w-auto overflow-x-auto no-scrollbar">
                     {[
-                        { id: 'review', label: 'Por Revisar', count: stats.review, icon: 'rate_review' },
-                        { id: 'pending', label: 'Pendientes', count: stats.pending, icon: 'pending' },
-                        { id: 'overdue', label: 'Vencidos', count: stats.overdue, icon: 'warning' },
-                        { id: 'paid', label: 'Historial', count: null, icon: 'history' },
-                        { id: 'all', label: 'Todos', count: null, icon: 'list' },
+                        { id: 'review', label: 'Por Revisar', count: stats.review },
+                        { id: 'pending', label: 'Pendientes', count: stats.pending },
+                        { id: 'overdue', label: 'Vencidos', count: stats.overdue },
+                        { id: 'paid', label: 'Historial', count: null },
+                        { id: 'all', label: 'Todos', count: null },
                     ].map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold transition-all whitespace-nowrap rounded-xl ${
+                            className={`flex items-center gap-2 px-4 py-1.5 text-[11px] font-bold transition-all whitespace-nowrap rounded-lg ${
                                 activeTab === tab.id 
                                 ? 'bg-zinc-700 text-white shadow-sm' 
-                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
+                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
                             }`}
                         >
-                            <span className={`material-symbols-outlined text-[18px] ${activeTab === tab.id ? 'filled' : ''}`}>{tab.icon}</span>
                             {tab.label}
                             {tab.count !== null && tab.count > 0 && (
-                                <span className={`ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
-                                    tab.id === 'review' ? 'bg-amber-500/20 text-amber-400' : 
-                                    tab.id === 'overdue' ? 'bg-red-500/20 text-red-400' : 'bg-zinc-600 text-white'
+                                <span className={`ml-1 px-1.5 py-0.5 text-[9px] rounded-md ${
+                                    tab.id === 'review' ? 'bg-orange-500/20 text-orange-400' : 
+                                    tab.id === 'overdue' ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-zinc-400'
                                 }`}>
                                     {tab.count}
                                 </span>
@@ -344,14 +285,14 @@ const Finance: React.FC = () => {
                     ))}
                 </div>
 
-                <div className="relative w-full md:w-80">
-                    <span className="absolute left-3 top-2.5 text-zinc-500 material-symbols-outlined text-[20px]">search</span>
+                <div className="relative w-full md:w-72">
+                    <span className="absolute left-3 top-2.5 text-zinc-600 material-symbols-outlined text-[18px]">search</span>
                     <input 
                         type="text" 
                         value={searchQuery} 
                         onChange={e => setSearchQuery(e.target.value)} 
-                        placeholder="Buscar transacciones..." 
-                        className="w-full pl-10 pr-4 py-2.5 bg-[#18181b] border border-zinc-800 text-sm text-zinc-200 focus:border-primary focus:ring-1 focus:ring-primary placeholder-zinc-600 transition-all rounded-xl" 
+                        placeholder="Buscar..." 
+                        className="w-full pl-10 pr-4 py-2 bg-[#18181b] border border-white/5 text-xs text-zinc-300 focus:border-zinc-700 focus:ring-0 placeholder-zinc-600 transition-all rounded-lg" 
                     />
                 </div>
             </div>
@@ -359,90 +300,90 @@ const Finance: React.FC = () => {
 
         {/* --- LIST CONTENT --- */}
         <div className="flex-1 overflow-y-auto p-6 md:px-10">
-            <div className="max-w-[1600px] mx-auto bg-[#18181b] rounded-3xl border border-zinc-800 shadow-card min-h-[400px] overflow-hidden">
+            <div className="max-w-[1600px] mx-auto min-h-[400px]">
                 {groupedTransactions.length === 0 ? (
                     <EmptyState 
                         title="Sin movimientos" 
-                        description={activeTab === 'review' ? "No tienes pagos pendientes de revisar." : "No se encontraron registros con estos filtros."}
+                        description={activeTab === 'review' ? "No tienes pagos pendientes de revisar." : "No se encontraron registros."}
                         icon="check_circle"
                     />
                 ) : (
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-zinc-900/50 border-b border-zinc-800 sticky top-0 z-10 backdrop-blur-sm">
+                        <thead className="sticky top-0 z-10 backdrop-blur-md bg-[#121212]/90 border-b border-white/5">
                             <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Fecha</th>
-                                <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Alumno</th>
-                                <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Concepto</th>
-                                <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Estado</th>
-                                <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider text-right">Monto</th>
-                                <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider text-right">Acción</th>
+                                <th className="px-6 py-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Fecha</th>
+                                <th className="px-6 py-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Alumno</th>
+                                <th className="px-6 py-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Concepto</th>
+                                <th className="px-6 py-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Estado</th>
+                                <th className="px-6 py-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest text-right">Monto</th>
+                                <th className="px-6 py-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest text-right">Acción</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-zinc-800/50">
-                            {groupedTransactions.map((group, idx) => {
+                        <tbody className="divide-y divide-white/5">
+                            {groupedTransactions.map((group) => {
                                 const { mainRecord, isBatch, totalAmount, declaredAmount } = group;
                                 const displayAmount = declaredAmount !== undefined ? declaredAmount : totalAmount;
                                 
                                 return (
-                                    <tr key={group.id} className="hover:bg-zinc-800/30 transition-colors group">
+                                    <tr key={group.id} className="hover:bg-white/5 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
-                                                <span className="font-medium text-zinc-200 text-sm">{formatDateDisplay(mainRecord.dueDate)}</span>
+                                                <span className="font-medium text-zinc-300 text-xs">{formatDateDisplay(mainRecord.dueDate)}</span>
                                                 {mainRecord.paymentDate && (
-                                                    <span className="text-[10px] text-zinc-500 mt-0.5">
-                                                        Pagado: {formatDateDisplay(mainRecord.paymentDate)}
+                                                    <span className="text-[10px] text-zinc-600 mt-0.5 font-mono">
+                                                        {formatDateDisplay(mainRecord.paymentDate)}
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="font-bold text-white text-sm">{mainRecord.studentName}</div>
+                                            <div className="font-bold text-zinc-200 text-sm">{mainRecord.studentName}</div>
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-zinc-400">
+                                        <td className="px-6 py-4 text-xs text-zinc-400">
                                             {isBatch ? (
                                                 <div className="flex flex-col">
-                                                    <span className="font-bold text-primary text-xs uppercase tracking-wide flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-[14px]">layers</span>
+                                                    <span className="font-bold text-orange-400 text-[10px] uppercase tracking-wide flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[12px]">layers</span>
                                                         Lote ({group.itemCount})
                                                     </span>
-                                                    <span className="text-[11px] mt-0.5 truncate max-w-[200px] opacity-70">
+                                                    <span className="text-[10px] mt-0.5 truncate max-w-[200px] opacity-60">
                                                         {group.records.map(r => r.concept).join(', ')}
                                                     </span>
                                                 </div>
                                             ) : (
                                                 <span className="font-medium">{mainRecord.concept}</span>
                                             )}
-                                            {mainRecord.method && <span className="ml-2 text-[10px] border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400 uppercase">{mainRecord.method}</span>}
+                                            {mainRecord.method && <span className="ml-2 text-[9px] border border-white/10 bg-white/5 px-1.5 py-0.5 rounded text-zinc-500 uppercase">{mainRecord.method}</span>}
                                         </td>
                                         <td className="px-6 py-4">
                                             <StatusBadge status={mainRecord.status} amount={mainRecord.amount} penalty={mainRecord.penaltyAmount} />
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <span className={`font-mono font-bold text-sm ${mainRecord.status === 'paid' ? 'text-emerald-400' : 'text-white'}`}>
+                                            <span className={`font-mono font-bold text-sm ${mainRecord.status === 'paid' ? 'text-emerald-500' : 'text-zinc-200'}`}>
                                                 ${displayAmount.toFixed(2)}
                                             </span>
                                             {declaredAmount !== undefined && declaredAmount < totalAmount && (
-                                                <div className="text-[10px] text-orange-400 font-bold uppercase tracking-wider mt-1">Parcial (Deuda: ${totalAmount})</div>
+                                                <div className="text-[9px] text-orange-500 font-bold uppercase tracking-wider mt-0.5">Parcial</div>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             {mainRecord.status === 'in_review' ? (
                                                 <button 
                                                     onClick={() => setSelectedGroup(group)}
-                                                    className="bg-primary hover:bg-primary-hover text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg shadow-primary/20 transition-all active:scale-95"
+                                                    className="bg-zinc-100 hover:bg-white text-black text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95"
                                                 >
                                                     Revisar
                                                 </button>
                                             ) : mainRecord.status === 'paid' ? (
                                                 <button 
                                                     onClick={() => generateReceipt(mainRecord, academySettings, currentUser)}
-                                                    className="text-zinc-500 hover:text-white p-2 transition-colors border border-transparent hover:bg-zinc-800 rounded-lg"
-                                                    title="Descargar Recibo"
+                                                    className="text-zinc-600 hover:text-white p-1.5 transition-colors rounded-lg hover:bg-white/5"
+                                                    title="Recibo"
                                                 >
-                                                    <span className="material-symbols-outlined">receipt_long</span>
+                                                    <span className="material-symbols-outlined text-[18px]">receipt_long</span>
                                                 </button>
                                             ) : (
-                                                <span className="text-zinc-600 text-xs">-</span>
+                                                <span className="text-zinc-700 text-xs">-</span>
                                             )}
                                         </td>
                                     </tr>
@@ -454,124 +395,68 @@ const Finance: React.FC = () => {
             </div>
         </div>
 
-        {/* --- REVIEW MODAL (IMPROVED ZINC STYLE) --- */}
+        {/* --- REVIEW MODAL --- */}
         {selectedGroup && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-[#121212] w-full max-w-5xl h-[85vh] flex overflow-hidden border border-zinc-800/50 shadow-2xl rounded-2xl">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-in fade-in duration-200">
+                <div className="bg-[#09090b] w-full max-w-5xl h-[85vh] flex overflow-hidden border border-white/10 shadow-2xl rounded-2xl">
                     
-                    {/* Left: Proof Image */}
-                    <div className="w-1/2 bg-[#09090b] flex items-center justify-center relative p-8 border-r border-zinc-800">
+                    {/* Left: Proof */}
+                    <div className="w-1/2 bg-black/30 flex items-center justify-center relative p-8 border-r border-white/5">
                         {selectedGroup.mainRecord.proofUrl ? (
                             selectedGroup.mainRecord.proofType?.includes('pdf') ? (
-                                <iframe src={selectedGroup.mainRecord.proofUrl} className="w-full h-full border border-zinc-800 rounded-xl" />
+                                <iframe src={selectedGroup.mainRecord.proofUrl} className="w-full h-full border border-white/10 rounded-xl" />
                             ) : (
-                                <img src={selectedGroup.mainRecord.proofUrl} className="max-w-full max-h-full object-contain border border-zinc-800 rounded-xl shadow-lg" />
+                                <img src={selectedGroup.mainRecord.proofUrl} className="max-w-full max-h-full object-contain border border-white/10 rounded-xl" />
                             )
                         ) : (
-                            <div className="text-zinc-600 flex flex-col items-center">
-                                <span className="material-symbols-outlined text-6xl mb-2 opacity-50">broken_image</span>
-                                <p className="font-medium text-xs uppercase tracking-wider">Sin comprobante visual</p>
+                            <div className="text-zinc-700 flex flex-col items-center">
+                                <span className="material-symbols-outlined text-6xl mb-2 opacity-20">broken_image</span>
+                                <p className="font-bold text-xs uppercase tracking-wider">Sin imagen</p>
                             </div>
                         )}
-                        <div className="absolute top-6 left-6 bg-zinc-900/90 backdrop-blur text-white px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-zinc-700 rounded-lg shadow-sm">
-                            Evidencia {selectedGroup.isBatch ? 'LOTE' : 'ÚNICA'}
-                        </div>
                     </div>
 
-                    {/* Right: Validation & Waterfall Preview */}
-                    <div className="w-1/2 flex flex-col bg-[#121212]">
-                        <div className="p-6 border-b border-zinc-800 flex justify-between items-start bg-[#18181b]">
+                    {/* Right: Actions */}
+                    <div className="w-1/2 flex flex-col bg-[#09090b]">
+                        <div className="p-6 border-b border-white/5 flex justify-between items-start">
                             <div>
-                                <h2 className="text-xl font-bold text-white mb-1">Revisión de Pago</h2>
-                                <p className="text-sm text-zinc-400">Valida y distribuye el monto recibido.</p>
+                                <h2 className="text-lg font-bold text-white mb-1">Validar Pago</h2>
+                                <p className="text-xs text-zinc-500">Confirma los fondos recibidos.</p>
                             </div>
-                            <button onClick={() => setSelectedGroup(null)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors">
-                                <span className="material-symbols-outlined">close</span>
+                            <button onClick={() => setSelectedGroup(null)} className="p-2 hover:bg-white/5 rounded-full text-zinc-500 hover:text-white transition-colors">
+                                <span className="material-symbols-outlined text-[18px]">close</span>
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                            
-                            {/* Total Amount Display */}
-                            <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
-                                <div className="flex items-center justify-between mb-2">
-                                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Monto Declarado</p>
-                                    <span className="bg-zinc-800 border border-zinc-700 px-3 py-1 text-xs font-bold text-zinc-300 rounded-lg shadow-sm">
-                                        {selectedGroup.mainRecord.method?.toUpperCase()}
-                                    </span>
-                                </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            <div className="bg-[#18181b] p-6 rounded-xl border border-white/5">
+                                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Monto Declarado</p>
                                 <p className="text-4xl font-black text-white tracking-tight">
                                     ${(selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount).toFixed(2)}
                                 </p>
-                                {selectedGroup.declaredAmount !== undefined && selectedGroup.declaredAmount < selectedGroup.totalAmount && (
-                                    <p className="text-xs text-orange-400 font-bold mt-2 flex items-center gap-1 uppercase tracking-wider">
-                                        <span className="material-symbols-outlined text-[14px]">warning</span>
-                                        Pago parcial detectado (Total: ${selectedGroup.totalAmount})
-                                    </p>
-                                )}
+                                <span className="inline-block mt-3 px-2 py-1 rounded border border-white/10 bg-black/20 text-zinc-400 text-[10px] font-bold uppercase tracking-wider">
+                                    {selectedGroup.mainRecord.method}
+                                </span>
                             </div>
 
-                            {/* PREVIEW: Waterfall Distribution */}
-                            <div>
-                                <h4 className="text-xs font-bold text-zinc-500 uppercase mb-3 ml-1 tracking-widest">Aplicación de Fondos</h4>
-                                <div className="space-y-2">
-                                    {previewDistribution.map((item: any) => (
-                                        <div key={item.id} className="flex flex-col p-4 bg-[#18181b] border border-zinc-800 rounded-xl relative overflow-hidden group hover:border-zinc-700 transition-colors">
-                                            {/* Status Indicator Bar */}
-                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                                                item._status === 'paid' ? 'bg-emerald-500' : item._status === 'partial' ? 'bg-orange-500' : 'bg-red-500'
-                                            }`}></div>
-                                            
-                                            <div className="flex justify-between items-start pl-3">
-                                                <div>
-                                                    <span className="text-sm font-bold text-white block">{item.concept}</span>
-                                                    <span className="text-[10px] text-zinc-500 font-mono">DEUDA: ${(item.amount + item.penaltyAmount).toFixed(2)}</span>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className={`font-mono font-bold text-sm ${item._status === 'paid' ? 'text-emerald-400' : 'text-orange-400'}`}>
-                                                        ${item._paid.toFixed(2)}
-                                                    </span>
-                                                    <div className={`text-[9px] font-black uppercase mt-1 tracking-widest ${
-                                                        item._status === 'paid' ? 'text-emerald-600' : item._status === 'partial' ? 'text-orange-600' : 'text-red-600'
-                                                    }`}>
-                                                        {item._status === 'paid' ? 'CUBIERTO' : item._status === 'partial' ? 'PARCIAL' : 'PENDIENTE'}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {item._remaining > 0 && (
-                                                <div className="mt-3 pl-3 pt-2 border-t border-zinc-800 flex items-center gap-2 text-[10px] text-orange-400 font-bold uppercase tracking-wider">
-                                                    <span className="material-symbols-outlined text-[12px]">pie_chart</span>
-                                                    Restan ${item._remaining.toFixed(2)}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Time Validation */}
-                            {(() => {
-                                const { isLate, diffDays } = getTimeValidation(selectedGroup.mainRecord);
-                                return (
-                                    <div className={`p-4 border rounded-xl text-xs font-mono uppercase tracking-wide flex items-center gap-4 ${isLate ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
-                                        <span className="material-symbols-outlined text-xl">{isLate ? 'history_toggle_off' : 'verified_user'}</span>
-                                        <div>
-                                            <span className="font-bold block mb-1">{isLate ? 'Pago Tardío' : 'A Tiempo'}</span>
-                                            <span className="opacity-70">{isLate ? `+${diffDays} días de retraso` : `Dentro del plazo`}</span>
-                                        </div>
+                            {/* Simple List */}
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest ml-1">Conceptos en este pago</p>
+                                {selectedGroup.records.map(r => (
+                                    <div key={r.id} className="flex justify-between items-center p-3 bg-[#121212] border border-white/5 rounded-lg">
+                                        <span className="text-xs text-zinc-300 font-medium">{r.concept}</span>
+                                        <span className="text-xs text-zinc-500 font-mono">${(r.amount + r.penaltyAmount).toFixed(2)}</span>
                                     </div>
-                                );
-                            })()}
+                                ))}
+                            </div>
                         </div>
 
-                        <div className="p-6 border-t border-zinc-800 bg-[#18181b] flex gap-4">
-                            <button onClick={handleReject} className="flex-1 py-3.5 border border-red-500/30 bg-red-500/5 text-red-400 font-bold uppercase tracking-wider hover:bg-red-500/10 transition-all rounded-xl text-xs hover:border-red-500/50">
+                        <div className="p-6 border-t border-white/5 bg-[#09090b] flex gap-3">
+                            <button onClick={handleReject} className="flex-1 py-3 border border-red-900/30 text-red-500 font-bold uppercase tracking-wider hover:bg-red-900/10 transition-all rounded-lg text-[10px]">
                                 Rechazar
                             </button>
-                            <button onClick={handleApprove} className="flex-[2] py-3.5 bg-primary hover:bg-primary-hover text-white font-bold uppercase tracking-wider transition-all rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-95">
-                                <span className="material-symbols-outlined">check_circle</span>
-                                Confirmar Distribución
+                            <button onClick={handleApprove} className="flex-[2] py-3 bg-white text-black font-bold uppercase tracking-wider transition-all rounded-lg text-[10px] hover:bg-zinc-200">
+                                Aprobar Pago
                             </button>
                         </div>
                     </div>

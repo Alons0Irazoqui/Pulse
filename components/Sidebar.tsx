@@ -36,9 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
   ];
 
   const links = role === 'master' ? masterLinks : studentLinks;
-
   const displayName = currentUser?.name || (role === 'master' ? 'Sensei' : 'Alumno');
-  const displaySubtext = role === 'master' ? academySettings.name : 'Estudiante';
   
   const handleLogout = () => {
       logout();
@@ -53,48 +51,47 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
         onClick={onClose}
       />
 
-      {/* Sidebar Content - ZINC / LINEAR STYLE */}
+      {/* Sidebar Content - Apple Pro Glass */}
       <aside 
         className={`
           fixed md:static inset-y-0 left-0 z-50
-          flex flex-col w-72 h-full
-          bg-[#09090b]/95 backdrop-blur-2xl md:bg-transparent md:backdrop-blur-none
-          border-r border-white/5
-          transform transition-transform duration-300 ease-out shadow-2xl md:shadow-none
+          flex flex-col w-64 h-full
+          apple-glass
+          transform transition-transform duration-300 ease-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
         {/* LOGO */}
-        <div className="h-24 flex items-center px-8">
+        <div className="h-16 flex items-center px-6 border-b border-white/5">
             <div className="flex items-center gap-3">
-                <div className="size-8 rounded-lg bg-gradient-to-br from-primary to-orange-600 flex items-center justify-center text-white shadow-lg shadow-primary/20">
-                    <span className="font-bold text-lg leading-none">A</span>
+                <div className="size-7 rounded-lg bg-gradient-to-b from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-[0_2px_10px_rgba(10,132,255,0.4)]">
+                    <span className="font-bold text-sm leading-none">A</span>
                 </div>
-                <h1 className="text-lg font-semibold tracking-tight text-white">
-                    Academy<span className="text-zinc-500">Pro</span>
+                <h1 className="text-sm font-semibold tracking-wide text-white">
+                    Academy<span className="text-blue-500">Pro</span>
                 </h1>
             </div>
         </div>
 
-        <div className="flex flex-col h-full justify-between overflow-y-auto px-4 pb-6">
-          <div className="flex flex-col gap-8">
+        <div className="flex flex-col h-full justify-between overflow-y-auto px-4 py-6">
+          <div className="flex flex-col gap-6">
             
-            {/* User Info - Glass Card */}
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
+            {/* User Info - Card */}
+            <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-white/5 border border-white/5 shadow-inner">
                 <Avatar 
                     src={currentUser?.avatarUrl} 
                     name={displayName} 
-                    className="size-10 rounded-xl ring-1 ring-white/10" 
+                    className="size-8 rounded-full ring-2 ring-white/10" 
                 />
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-semibold text-zinc-100 truncate group-hover:text-white transition-colors">{displayName}</span>
-                  <span className="text-xs text-zinc-500 truncate">{displaySubtext}</span>
+                  <span className="text-xs font-semibold text-gray-200 truncate">{displayName}</span>
+                  <span className="text-[10px] text-gray-500 truncate font-medium uppercase tracking-wide">{role}</span>
                 </div>
             </div>
 
-            {/* Navigation - Floating Items */}
-            <nav className="flex flex-col gap-1 w-full">
-              <p className="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Menu</p>
+            {/* Navigation */}
+            <nav className="flex flex-col gap-1.5 w-full">
+              <p className="px-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 pl-1">Menu</p>
               {links.map((link) => {
                 const isActive = location.pathname.startsWith(link.path);
                 return (
@@ -103,22 +100,17 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
                     to={link.path}
                     onClick={onClose}
                     className={`
-                        flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group
+                        flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative
                         ${isActive
-                            ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/5'
-                            : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5'
+                            ? 'bg-[#0A84FF] text-white shadow-[0_4px_12px_rgba(10,132,255,0.3)]'
+                            : 'text-gray-400 hover:text-gray-100 hover:bg-white/5'
                         }
                     `}
                     >
-                        <span className={`material-symbols-outlined text-[20px] transition-colors ${isActive ? 'text-primary' : 'text-zinc-500 group-hover:text-zinc-300'}`}>
+                        <span className={`material-symbols-outlined text-[20px] ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>
                             {link.icon}
                         </span>
-                        <span>
-                            {link.name}
-                        </span>
-                        {isActive && (
-                            <div className="ml-auto size-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(249,115,22,0.6)]"></div>
-                        )}
+                        <span>{link.name}</span>
                     </Link>
                 );
               })}
@@ -126,13 +118,13 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
           </div>
 
           {/* Footer */}
-          <div className="pt-6 border-t border-white/5 mt-auto">
+          <div className="pt-4 border-t border-white/5">
               <button 
                   onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all group"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-left text-gray-500 hover:text-white hover:bg-white/5 transition-all group"
               >
-                <span className="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">logout</span>
-                <span className="font-medium text-sm">Cerrar Sesión</span>
+                <span className="material-symbols-outlined text-[20px] group-hover:text-red-400 transition-colors">logout</span>
+                <span className="font-medium text-xs">Cerrar Sesión</span>
               </button>
           </div>
         </div>

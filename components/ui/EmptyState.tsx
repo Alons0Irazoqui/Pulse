@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 
@@ -15,19 +14,22 @@ interface EmptyStateProps {
 const EmptyState: React.FC<EmptyStateProps> = ({ icon = 'inbox', title, description, action }) => {
   return (
     <MotionDiv 
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center justify-center py-20 px-4 text-center h-full min-h-[300px]"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="flex flex-col items-center justify-center py-24 px-6 text-center h-full w-full"
     >
-      <div className="size-24 bg-gray-50 rounded-full flex items-center justify-center mb-6 shadow-inner border border-gray-100">
-        <span className="material-symbols-outlined text-5xl text-gray-300">{icon}</span>
+      <div className="size-24 bg-zinc-900/50 rounded-3xl flex items-center justify-center mb-6 border border-zinc-800 shadow-inner group">
+        <span className="material-symbols-outlined text-5xl text-zinc-700 group-hover:text-zinc-600 transition-colors duration-500">{icon}</span>
       </div>
-      <h3 className="text-xl font-bold text-text-main mb-2">{title}</h3>
-      <p className="text-text-secondary max-w-md mb-8 leading-relaxed">
+      
+      <h3 className="text-lg font-bold text-zinc-300 mb-2 tracking-tight">{title}</h3>
+      <p className="text-zinc-500 text-sm max-w-xs mb-8 leading-relaxed font-medium">
         {description}
       </p>
+      
       {action && (
-        <div className="mt-2">
+        <div className="mt-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
           {action}
         </div>
       )}

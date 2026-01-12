@@ -7,48 +7,23 @@ import { generateReceipt } from '../../utils/pdfGenerator';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Fix for type errors with motion components
 const MotionDiv = motion.div as any;
 
-// --- SUB-COMPONENTS ---
-
+// --- MINIMAL BADGE ---
 const StatusBadge: React.FC<{ status: TuitionRecord['status'] }> = ({ status }) => {
+    const baseClasses = "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide border";
+    
     switch (status) {
         case 'paid':
-            return (
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
-                    <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                    PAGADO
-                </span>
-            );
+            return <span className={`${baseClasses} bg-zinc-500/5 border-emerald-500/20 text-emerald-500`}><div className="size-1 rounded-full bg-emerald-500"></div>Pagado</span>;
         case 'in_review':
-            return (
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
-                    <span className="material-symbols-outlined text-[12px]">hourglass_top</span>
-                    REVISIÓN
-                </span>
-            );
+            return <span className={`${baseClasses} bg-zinc-500/5 border-orange-500/20 text-orange-400`}><div className="size-1 rounded-full bg-orange-500"></div>Revisión</span>;
         case 'overdue':
-            return (
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold tracking-wider uppercase rounded-lg animate-pulse">
-                    <span className="material-symbols-outlined text-[12px]">warning</span>
-                    VENCIDO
-                </span>
-            );
+            return <span className={`${baseClasses} bg-zinc-500/5 border-red-500/20 text-red-400`}><div className="size-1 rounded-full bg-red-500"></div>Vencido</span>;
         case 'partial':
-            return (
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
-                    <span className="material-symbols-outlined text-[12px]">pie_chart</span>
-                    RESTANTE
-                </span>
-            );
+            return <span className={`${baseClasses} bg-zinc-500/5 border-blue-500/20 text-blue-400`}><div className="size-1 rounded-full bg-blue-500"></div>Parcial</span>;
         default:
-            return (
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-zinc-800 border border-zinc-700 text-zinc-400 text-[10px] font-bold tracking-wider uppercase rounded-lg">
-                    <span className="material-symbols-outlined text-[12px]">pending</span>
-                    POR PAGAR
-                </span>
-            );
+            return <span className={`${baseClasses} bg-zinc-500/5 border-zinc-700 text-zinc-400`}><div className="size-1 rounded-full bg-zinc-500"></div>Por Pagar</span>;
     }
 };
 
@@ -67,49 +42,26 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
     // -- STATE --
     const [method, setMethod] = useState<'Transferencia' | 'Efectivo'>('Transferencia');
     const [file, setFile] = useState<File | null>(null);
-    
-    // Batch Logic
     const [selectedDebts, setSelectedDebts] = useState<TuitionRecord[]>([]);
-    
-    // Amount Logic
     const [isPartialEnabled, setIsPartialEnabled] = useState(false);
     const [customAmount, setCustomAmount] = useState<string>('');
 
-    // Determine Mode
     const isSinglePaymentMode = !!preSelectedRecord;
 
-    // -- INITIALIZATION --
     useEffect(() => {
         if (isOpen) {
             setFile(null);
             setMethod('Transferencia');
             setIsPartialEnabled(false);
             setCustomAmount('');
-            
-            if (preSelectedRecord) {
-                setSelectedDebts([preSelectedRecord]);
-            } else {
-                setSelectedDebts([]);
-            }
+            if (preSelectedRecord) setSelectedDebts([preSelectedRecord]);
+            else setSelectedDebts([]);
         }
     }, [isOpen, preSelectedRecord]);
 
-    // -- DERIVED VALUES --
-    
-    const totalDebtSum = useMemo(() => {
-        return selectedDebts.reduce((sum, d) => sum + d.amount + d.penaltyAmount, 0);
-    }, [selectedDebts]);
-
-    const mandatorySum = useMemo(() => {
-        return selectedDebts
-            .filter(d => !d.canBePaidInParts)
-            .reduce((sum, d) => sum + d.amount + d.penaltyAmount, 0);
-    }, [selectedDebts]);
-
-    const canCustomizeAmount = useMemo(() => {
-        return selectedDebts.some(d => d.canBePaidInParts);
-    }, [selectedDebts]);
-
+    const totalDebtSum = useMemo(() => selectedDebts.reduce((sum, d) => sum + d.amount + d.penaltyAmount, 0), [selectedDebts]);
+    const mandatorySum = useMemo(() => selectedDebts.filter(d => !d.canBePaidInParts).reduce((sum, d) => sum + d.amount + d.penaltyAmount, 0), [selectedDebts]);
+    const canCustomizeAmount = useMemo(() => selectedDebts.some(d => d.canBePaidInParts), [selectedDebts]);
     const finalAmount = isPartialEnabled && customAmount ? parseFloat(customAmount) : totalDebtSum;
     
     const isAmountValid = useMemo(() => {
@@ -117,31 +69,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
         return finalAmount >= mandatorySum - 0.01 && finalAmount <= totalDebtSum + 0.01;
     }, [finalAmount, mandatorySum, totalDebtSum, isPartialEnabled]);
 
-    const availableOptions = useMemo(() => {
-        return pendingDebts.filter(d => !selectedDebts.find(s => s.id === d.id));
-    }, [pendingDebts, selectedDebts]);
-
-    // -- HANDLERS --
-
-    const handlePartialToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const checked = e.target.checked;
-        setIsPartialEnabled(checked);
-        if (checked) {
-            setCustomAmount(totalDebtSum.toFixed(2));
-        } else {
-            setCustomAmount('');
-        }
-    };
+    const availableOptions = useMemo(() => pendingDebts.filter(d => !selectedDebts.find(s => s.id === d.id)), [pendingDebts, selectedDebts]);
 
     const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const id = e.target.value;
-        if (!id) return;
-        
         const debt = pendingDebts.find(d => d.id === id);
         if (debt) {
             setSelectedDebts(prev => [...prev, debt]);
-            setIsPartialEnabled(false); 
-            setCustomAmount('');
+            setIsPartialEnabled(false); setCustomAmount('');
         }
         e.target.value = "";
     };
@@ -149,28 +84,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
     const handleRemoveDebt = (id: string) => {
         if (isSinglePaymentMode) return; 
         setSelectedDebts(prev => prev.filter(d => d.id !== id));
-        setIsPartialEnabled(false);
-        setCustomAmount('');
+        setIsPartialEnabled(false); setCustomAmount('');
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
-        }
+        if (e.target.files && e.target.files[0]) setFile(e.target.files[0]);
     };
 
     const handleSubmit = () => {
         if (selectedDebts.length === 0) return;
         if (method === 'Transferencia' && !file) return;
         if (!isAmountValid) {
-            if (finalAmount > totalDebtSum) {
-                addToast('El monto no puede ser mayor a la deuda total.', 'error');
-            } else {
-                addToast(`El monto mínimo a cubrir es $${mandatorySum.toFixed(2)}`, 'error');
-            }
+            addToast('Monto inválido para los conceptos seleccionados.', 'error');
             return;
         }
-
         const ids = selectedDebts.map(d => d.id);
         onConfirm(ids, file, method, finalAmount);
     };
@@ -178,445 +105,178 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#121212] w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-zinc-800 rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+            <div className="bg-[#09090b] w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-white/10 rounded-2xl" onClick={(e) => e.stopPropagation()}>
                 
-                {/* Header */}
-                <div className="p-6 border-b border-zinc-800 flex justify-between items-start shrink-0 bg-[#18181b]">
+                <div className="p-6 border-b border-white/5 flex justify-between items-start bg-[#09090b]">
                     <div>
-                        <h3 className="text-xl font-bold text-white tracking-tight">Reportar Pago</h3>
-                        <p className="text-sm text-zinc-400">Adjunta comprobante o notifica efectivo.</p>
+                        <h3 className="text-lg font-bold text-white">Reportar Pago</h3>
+                        <p className="text-xs text-zinc-500 mt-1">Adjunta comprobante o notifica efectivo.</p>
                     </div>
-                    <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors bg-zinc-800/50 rounded-full p-2 hover:bg-zinc-800">
+                    <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-full">
                         <span className="material-symbols-outlined text-[20px]">close</span>
                     </button>
                 </div>
 
-                <div className="p-6 overflow-y-auto flex flex-col gap-8 bg-[#121212]">
-                    
-                    {/* 1. DEBT SELECTOR */}
-                    <div className="space-y-3">
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block">Conceptos a Pagar</label>
-                        
+                <div className="p-6 overflow-y-auto flex flex-col gap-6 bg-[#09090b]">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Conceptos</label>
                         {!isSinglePaymentMode && (
                             <div className="relative">
                                 <select 
                                     defaultValue=""
                                     onChange={handleSelectChange}
-                                    className="w-full border border-zinc-800 bg-zinc-950 py-3 pl-4 pr-10 text-sm font-medium text-white focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all appearance-none outline-none rounded-xl"
+                                    className="w-full border border-white/10 bg-[#18181b] py-3 pl-4 pr-10 text-sm font-medium text-white focus:border-zinc-500 focus:ring-0 transition-all appearance-none outline-none rounded-xl"
                                 >
-                                    <option value="" disabled>+ Agregar otro concepto...</option>
+                                    <option value="" disabled>+ Agregar concepto</option>
                                     {availableOptions.map(debt => (
-                                        <option key={debt.id} value={debt.id}>
-                                            {debt.concept} - ${debt.amount + debt.penaltyAmount}
-                                        </option>
+                                        <option key={debt.id} value={debt.id}>{debt.concept} - ${debt.amount + debt.penaltyAmount}</option>
                                     ))}
                                 </select>
-                                <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500">
-                                    <span className="material-symbols-outlined text-xl">arrow_drop_down</span>
-                                </div>
                             </div>
                         )}
-
-                        {/* Selected Items List */}
                         <div className="flex flex-col gap-2">
                             <AnimatePresence>
                                 {selectedDebts.map(debt => (
-                                    <MotionDiv 
-                                        key={debt.id}
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: 10 }}
-                                        className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-xl"
-                                    >
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${debt.canBePaidInParts ? 'bg-blue-500/10 text-blue-400' : 'bg-orange-500/10 text-orange-400'}`}>
-                                                <span className="material-symbols-outlined text-[18px]">
-                                                    {debt.canBePaidInParts ? 'payments' : 'lock'}
-                                                </span>
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-bold text-white truncate">{debt.concept}</p>
-                                                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide">
-                                                    {debt.canBePaidInParts ? 'Abonable' : 'Pago Exacto'}
-                                                </p>
-                                            </div>
+                                    <MotionDiv key={debt.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center justify-between p-3 bg-[#121212] border border-white/5 rounded-xl">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-zinc-300 truncate">{debt.concept}</p>
+                                            <p className="text-[10px] text-zinc-600 font-bold uppercase">{debt.canBePaidInParts ? 'Abonable' : 'Pago Exacto'}</p>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <span className="font-mono font-bold text-sm text-zinc-300">${(debt.amount + debt.penaltyAmount).toFixed(2)}</span>
+                                            <span className="font-mono font-bold text-sm text-zinc-400">${(debt.amount + debt.penaltyAmount).toFixed(2)}</span>
                                             {!isSinglePaymentMode && (
-                                                <button 
-                                                    onClick={() => handleRemoveDebt(debt.id)}
-                                                    className="text-zinc-600 hover:text-red-400 transition-colors p-1"
-                                                >
-                                                    <span className="material-symbols-outlined text-lg">close</span>
-                                                </button>
+                                                <button onClick={() => handleRemoveDebt(debt.id)} className="text-zinc-600 hover:text-red-500"><span className="material-symbols-outlined text-lg">close</span></button>
                                             )}
                                         </div>
                                     </MotionDiv>
                                 ))}
                             </AnimatePresence>
-                            
-                            {selectedDebts.length === 0 && (
-                                <div className="text-center py-6 border-2 border-dashed border-zinc-800 rounded-xl text-zinc-600 text-sm">
-                                    No hay conceptos seleccionados
-                                </div>
-                            )}
                         </div>
                     </div>
 
-                    {/* 2. TOTALS & CUSTOM AMOUNT */}
-                    <div className="space-y-4 pt-6 border-t border-zinc-800">
+                    <div className="space-y-4 pt-4 border-t border-white/5">
                         <div className="flex items-center justify-between">
-                            <label className="flex items-center gap-3 cursor-pointer group">
-                                <input 
-                                    type="checkbox" 
-                                    checked={isPartialEnabled}
-                                    onChange={handlePartialToggle}
-                                    disabled={!canCustomizeAmount || selectedDebts.length === 0}
-                                    className="size-4 rounded border-zinc-600 bg-zinc-900 text-primary focus:ring-primary focus:ring-offset-0 disabled:opacity-50 cursor-pointer"
-                                />
-                                <span className={`text-xs font-bold uppercase tracking-wide ${!canCustomizeAmount ? 'text-zinc-600' : 'text-zinc-400 group-hover:text-zinc-200'}`}>
-                                    Editar Monto a Pagar
-                                </span>
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input type="checkbox" checked={isPartialEnabled} onChange={(e) => {setIsPartialEnabled(e.target.checked); if(e.target.checked) setCustomAmount(totalDebtSum.toFixed(2)); else setCustomAmount('');}} disabled={!canCustomizeAmount || selectedDebts.length === 0} className="size-4 rounded border-zinc-700 bg-[#121212] text-zinc-500 focus:ring-0 cursor-pointer" />
+                                <span className={`text-xs font-bold uppercase tracking-wide ${!canCustomizeAmount ? 'text-zinc-700' : 'text-zinc-400'}`}>Editar Monto</span>
                             </label>
                         </div>
-
                         <div className="relative">
-                            <span className="absolute left-4 top-3.5 text-zinc-500 font-bold text-lg">$</span>
+                            <span className="absolute left-4 top-3.5 text-zinc-500 font-bold">$</span>
                             <input 
                                 type="number" 
                                 value={isPartialEnabled ? customAmount : totalDebtSum.toFixed(2)}
                                 onChange={(e) => setCustomAmount(e.target.value)}
                                 disabled={!isPartialEnabled}
-                                className={`w-full border py-3 pl-10 pr-4 text-xl font-bold text-white focus:ring-1 transition-all rounded-xl font-mono ${
-                                    !isPartialEnabled 
-                                    ? 'bg-zinc-900 border-zinc-800 text-zinc-500 cursor-not-allowed' 
-                                    : isAmountValid 
-                                        ? 'bg-zinc-950 border-primary focus:border-primary focus:ring-primary/50' 
-                                        : 'bg-red-950/20 border-red-500 text-red-400 focus:border-red-500 focus:ring-red-500/50'
-                                }`}
+                                className={`w-full border py-3 pl-8 pr-4 text-lg font-bold text-white focus:ring-0 transition-all rounded-xl font-mono ${!isPartialEnabled ? 'bg-[#121212] border-white/5 text-zinc-500' : 'bg-[#18181b] border-zinc-700'}`}
                                 placeholder="0.00"
                             />
                         </div>
-
-                        {!isAmountValid && isPartialEnabled && (
-                            <div className="flex items-center gap-2 text-xs text-red-400 font-medium bg-red-500/10 p-3 rounded-lg border border-red-500/20">
-                                <span className="material-symbols-outlined text-sm">error</span>
-                                {finalAmount > totalDebtSum 
-                                    ? `Excede el total ($${totalDebtSum.toFixed(2)})`
-                                    : `Mínimo requerido: $${mandatorySum.toFixed(2)}`
-                                }
-                            </div>
-                        )}
                     </div>
 
-                    {/* 3. METHOD */}
                     <div className="space-y-3">
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block">Método de Pago</label>
-                        <div className="flex gap-4">
-                            <button 
-                                onClick={() => setMethod('Transferencia')}
-                                className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-all rounded-xl border ${
-                                    method === 'Transferencia' 
-                                    ? 'bg-white text-black border-white shadow-lg shadow-white/10' 
-                                    : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:border-zinc-600 hover:text-zinc-300'
-                                }`}
-                            >
-                                Transferencia
-                            </button>
-                            <button 
-                                onClick={() => setMethod('Efectivo')}
-                                className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-all rounded-xl border ${
-                                    method === 'Efectivo' 
-                                    ? 'bg-white text-black border-white shadow-lg shadow-white/10' 
-                                    : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:border-zinc-600 hover:text-zinc-300'
-                                }`}
-                            >
-                                Efectivo
-                            </button>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Método</label>
+                        <div className="flex gap-2">
+                            {['Transferencia', 'Efectivo'].map((m) => (
+                                <button 
+                                    key={m}
+                                    onClick={() => setMethod(m as any)}
+                                    className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded-lg border ${method === m ? 'bg-white text-black border-white' : 'bg-[#121212] text-zinc-500 border-white/5 hover:border-zinc-700'}`}
+                                >
+                                    {m}
+                                </button>
+                            ))}
                         </div>
-
-                        {method === 'Transferencia' ? (
-                            <div 
-                                onClick={() => fileInputRef.current?.click()}
-                                className={`border-2 border-dashed p-8 text-center cursor-pointer transition-all mt-2 group rounded-xl ${
-                                    file 
-                                    ? 'border-emerald-500 bg-emerald-500/10' 
-                                    : 'border-zinc-800 bg-zinc-900/50 hover:border-primary hover:bg-primary/5'
-                                }`}
-                            >
-                                <input 
-                                    type="file" 
-                                    ref={fileInputRef}
-                                    className="hidden" 
-                                    accept="image/*,.pdf"
-                                    onChange={handleFileChange}
-                                />
-                                {file ? (
-                                    <div className="flex flex-col items-center">
-                                        <div className="size-10 rounded-full bg-emerald-500 flex items-center justify-center text-white mb-2 shadow-lg shadow-emerald-500/30">
-                                            <span className="material-symbols-outlined text-xl">check</span>
-                                        </div>
-                                        <p className="text-sm font-bold text-emerald-400 break-all">{file.name}</p>
-                                        <p className="text-xs text-emerald-600 mt-1 font-medium">Clic para cambiar archivo</p>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center text-zinc-500 group-hover:text-primary transition-colors">
-                                        <span className="material-symbols-outlined text-3xl mb-2">cloud_upload</span>
-                                        <p className="text-xs font-bold uppercase tracking-widest">Subir Comprobante</p>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex gap-4 items-center mt-2">
-                                <div className="size-10 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
-                                    <span className="material-symbols-outlined text-zinc-400 text-[20px]">storefront</span>
-                                </div>
-                                <p className="text-xs text-zinc-400 font-medium leading-relaxed">
-                                    Notifica tu pago ahora y acude a recepción para liquidar. El cargo quedará como "Pendiente" hasta confirmar el efectivo.
-                                </p>
+                        {method === 'Transferencia' && (
+                            <div onClick={() => fileInputRef.current?.click()} className={`border border-dashed p-6 text-center cursor-pointer transition-all mt-2 rounded-xl ${file ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/10 bg-[#121212] hover:bg-[#18181b]'}`}>
+                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*,.pdf" onChange={handleFileChange} />
+                                {file ? <p className="text-xs font-bold text-emerald-500">{file.name}</p> : <p className="text-xs font-bold text-zinc-500 uppercase">Adjuntar Comprobante</p>}
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="p-6 border-t border-zinc-800 bg-[#18181b] flex gap-4 shrink-0">
-                    <button onClick={onClose} className="flex-1 py-3.5 border border-zinc-700 font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all uppercase tracking-wider text-xs rounded-xl">Cancelar</button>
-                    <button 
-                        onClick={handleSubmit} 
-                        disabled={selectedDebts.length === 0 || (method === 'Transferencia' && !file) || !isAmountValid}
-                        className="flex-[2] py-3.5 bg-primary text-white font-bold hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20 transition-all uppercase tracking-wider text-xs flex items-center justify-center gap-2 rounded-xl active:scale-95"
-                    >
-                        {method === 'Efectivo' ? 'Notificar Pago' : 'Enviar Comprobante'}
-                    </button>
+                <div className="p-6 border-t border-white/5 bg-[#09090b] flex gap-3 shrink-0">
+                    <button onClick={onClose} className="flex-1 py-3 border border-white/10 font-bold text-zinc-400 hover:text-white hover:bg-[#18181b] transition-all uppercase tracking-wider text-[10px] rounded-xl">Cancelar</button>
+                    <button onClick={handleSubmit} disabled={selectedDebts.length === 0 || (method === 'Transferencia' && !file)} className="flex-[2] py-3 bg-white text-black font-bold disabled:opacity-50 transition-all uppercase tracking-wider text-[10px] rounded-xl hover:bg-zinc-200">Confirmar</button>
                 </div>
             </div>
         </div>
     );
 };
 
-// --- MAIN COMPONENT ---
+// --- MAIN PAGE ---
 
 const StudentPayments: React.FC = () => {
   const { currentUser, records, academySettings, getStudentPendingDebts, registerBatchPayment } = useStore();
   const { addToast } = useToast();
-  
   const [selectedRecord, setSelectedRecord] = useState<TuitionRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Filter only my records for display
-  const myRecords = useMemo(() => {
-      return records
-        .filter(r => r.studentId === currentUser?.studentId)
-        .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
-  }, [records, currentUser]);
-
-  // Data for Select (Pending Debts Only)
-  const pendingDebts = useMemo(() => {
-      return currentUser?.studentId ? getStudentPendingDebts(currentUser.studentId) : [];
-  }, [records, currentUser]);
-
-  // Grouping for UI Lists
+  const myRecords = useMemo(() => records.filter(r => r.studentId === currentUser?.studentId).sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()), [records, currentUser]);
+  const pendingDebts = useMemo(() => currentUser?.studentId ? getStudentPendingDebts(currentUser.studentId) : [], [records, currentUser]);
   const activeRecords = myRecords.filter(r => ['pending', 'overdue', 'charged', 'partial'].includes(r.status));
-  const inReviewRecords = myRecords.filter(r => r.status === 'in_review');
-  const historyRecords = myRecords.filter(r => r.status === 'paid');
-
-  // Calculate Total Debt
-  const totalDebt = activeRecords.reduce((acc, r) => {
-      const currentAmount = r.status === 'overdue' ? r.amount + r.penaltyAmount : r.amount;
-      return acc + currentAmount;
-  }, 0);
-
-  // Bank Info
-  const bankInfo = academySettings.bankDetails;
-
-  const handleOpenPaymentModal = (record?: TuitionRecord) => {
-      setSelectedRecord(record || null);
-      setIsModalOpen(true);
-  };
-
-  const handleConfirmPayment = (recordIds: string[], file: File | null, method: 'Transferencia' | 'Efectivo', totalAmount: number) => {
-      if (!file && method === 'Transferencia') return;
-
-      const fileToSend = file || new File([""], "pago_efectivo.txt", { type: "text/plain" });
-      registerBatchPayment(recordIds, fileToSend, method, totalAmount);
-      
-      setIsModalOpen(false);
-      setSelectedRecord(null);
-  };
-
-  const handleDownloadReceipt = (record: TuitionRecord) => {
-      generateReceipt(record, academySettings, currentUser);
-  };
+  const historyRecords = myRecords.filter(r => r.status === 'paid' || r.status === 'in_review');
+  const totalDebt = activeRecords.reduce((acc, r) => acc + (r.status === 'overdue' ? r.amount + r.penaltyAmount : r.amount), 0);
 
   return (
-    <div className="max-w-[1200px] mx-auto p-4 md:p-10 w-full min-h-full flex flex-col gap-10 pb-24 text-zinc-200">
-      
-      {/* Header & Balance */}
-      <header className="flex flex-wrap md:flex-nowrap justify-between items-start md:items-end gap-6 bg-[#18181b] p-8 border border-zinc-800 rounded-3xl relative overflow-hidden shadow-card">
-          <div className="relative z-10 w-full md:w-auto md:max-w-xl">
-            <h1 className="text-3xl font-black tracking-tight text-white">Mis Pagos</h1>
-            <p className="text-zinc-400 mt-2 text-sm leading-relaxed font-medium">
-                Mantén tus cuotas al día para asegurar tu acceso al dojo.
-            </p>
+    <div className="max-w-[1200px] mx-auto p-6 md:p-10 w-full min-h-full flex flex-col gap-10 pb-24 text-zinc-200">
+      <header className="flex flex-wrap justify-between items-end gap-6 bg-gradient-to-r from-[#18181b] to-[#121212] p-8 border border-white/5 rounded-3xl relative overflow-hidden">
+          <div className="relative z-10">
+            <h1 className="text-2xl font-black text-white">Mis Pagos</h1>
+            <p className="text-zinc-500 mt-1 text-sm font-medium">Historial y deudas pendientes.</p>
           </div>
-          
-          <div className="flex flex-col items-end relative z-10 min-w-[140px] ml-auto">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Deuda Total</span>
-            <div className={`text-4xl font-black font-mono tracking-tight ${totalDebt > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+          <div className="text-right relative z-10">
+            <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest block mb-1">Deuda Total</span>
+            <div className={`text-4xl font-black font-mono tracking-tighter ${totalDebt > 0 ? 'text-red-400' : 'text-emerald-500'}`}>
                 ${totalDebt.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </div>
-            {totalDebt > 0 ? (
-                <span className="text-[10px] font-bold text-red-400 mt-2 bg-red-500/10 px-2 py-1 border border-red-500/20 rounded-lg uppercase tracking-wider">Pendiente de pago</span>
-            ) : (
-                <span className="text-[10px] font-bold text-emerald-400 mt-2 bg-emerald-500/10 px-2 py-1 border border-emerald-500/20 rounded-lg uppercase tracking-wider flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[12px]">check</span> Al corriente
-                </span>
-            )}
           </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
-          
-          {/* LEFT COL: PAYMENTS LIST */}
-          <div className="lg:col-span-2 flex flex-col gap-10">
-              
-              {/* --- ACTIVE DEBTS SECTION --- */}
-              <div className="flex flex-col gap-4">
-                  <div className="flex justify-between items-center px-1 border-b border-zinc-800 pb-4">
-                      <h3 className="text-lg font-bold text-white flex items-center gap-3">
-                          <span className="material-symbols-outlined text-primary">payments</span>
-                          Por Pagar
-                      </h3>
+          <div className="lg:col-span-2 flex flex-col gap-8">
+              {activeRecords.length === 0 && (
+                  <div className="p-8 border border-dashed border-white/10 rounded-2xl text-center text-zinc-600 text-sm">
+                      No tienes pagos pendientes.
                   </div>
-                  
-                  {activeRecords.length === 0 && inReviewRecords.length === 0 ? (
-                      <div className="bg-[#18181b] border border-zinc-800 p-12 text-center rounded-3xl">
-                          <div className="size-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
-                              <span className="material-symbols-outlined text-4xl">celebration</span>
+              )}
+              {activeRecords.map((record) => (
+                  <MotionDiv key={record.id} layout className="bg-[#121212] p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-all flex justify-between items-center group">
+                      <div>
+                          <div className="flex items-center gap-3 mb-2">
+                              <StatusBadge status={record.status} />
+                              <span className="text-[10px] text-zinc-600 font-mono uppercase">Vence: {formatDateDisplay(record.dueDate)}</span>
                           </div>
-                          <h4 className="font-bold text-white text-lg">¡Estás al día!</h4>
-                          <p className="text-zinc-500 text-sm mt-1">No tienes pagos pendientes.</p>
+                          <h4 className="text-base font-bold text-white">{record.concept}</h4>
+                          {record.status === 'overdue' && <p className="text-[10px] text-red-500 mt-1 font-mono">+${record.penaltyAmount} Recargo</p>}
                       </div>
-                  ) : (
-                      <div className="flex flex-col gap-4">
-                          {/* Render Active (Pending/Overdue/Partial) */}
-                          <AnimatePresence>
-                              {activeRecords.map((record) => {
-                                  const isOverdue = record.status === 'overdue';
-                                  const amountDisplay = isOverdue ? record.amount + record.penaltyAmount : record.amount;
-
-                                  return (
-                                      <MotionDiv 
-                                          key={record.id}
-                                          layout
-                                          initial={{ opacity: 0, y: 10 }}
-                                          animate={{ opacity: 1, y: 0 }}
-                                          exit={{ opacity: 0, scale: 0.95 }}
-                                          className={`bg-[#18181b] p-6 rounded-2xl border flex flex-col sm:flex-row gap-6 justify-between items-start sm:items-center transition-all hover:border-zinc-600 group shadow-sm ${
-                                              isOverdue ? 'border-red-500/50 bg-red-500/5' : 
-                                              record.status === 'partial' ? 'border-orange-500/50' :
-                                              'border-zinc-800'
-                                          }`}
-                                      >
-                                          <div className="flex-1 w-full">
-                                              <div className="flex justify-between items-start mb-3">
-                                                  <StatusBadge status={record.status} />
-                                                  <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">Vence: {formatDateDisplay(record.dueDate)}</span>
-                                              </div>
-                                              <h4 className="text-lg font-bold text-white tracking-tight">{record.concept}</h4>
-                                              {isOverdue && (
-                                                  <p className="text-xs text-red-400 font-bold mt-2 flex items-center gap-1">
-                                                      <span className="material-symbols-outlined text-[14px]">error</span>
-                                                      + ${record.penaltyAmount} Recargo
-                                                  </p>
-                                              )}
-                                              {record.status === 'partial' && (
-                                                  <p className="text-xs text-orange-400 font-bold mt-2 flex items-center gap-1">
-                                                      <span className="material-symbols-outlined text-[14px]">pie_chart</span>
-                                                      Saldo Restante
-                                                  </p>
-                                              )}
-                                          </div>
-
-                                          <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-zinc-800 pt-4 sm:pt-0">
-                                              <div className="text-right">
-                                                  <span className="block text-[9px] text-zinc-500 uppercase tracking-widest font-black mb-1">Total</span>
-                                                  <span className={`text-2xl font-black font-mono ${isOverdue ? 'text-red-400' : 'text-white'}`}>
-                                                      ${amountDisplay.toFixed(2)}
-                                                  </span>
-                                              </div>
-                                              <button 
-                                                  onClick={() => handleOpenPaymentModal(record)}
-                                                  className="bg-white text-black hover:bg-zinc-200 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all active:scale-95 whitespace-nowrap shadow-lg"
-                                              >
-                                                  <span className="material-symbols-outlined text-[18px]">upload_file</span>
-                                                  <span className="hidden sm:inline">Pagar</span>
-                                              </button>
-                                          </div>
-                                      </MotionDiv>
-                                  );
-                              })}
-                          </AnimatePresence>
-
-                          {/* Render In Review */}
-                          {inReviewRecords.map((record) => (
-                              <MotionDiv 
-                                  key={record.id}
-                                  layout
-                                  className="bg-[#18181b]/50 p-6 rounded-2xl border border-dashed border-amber-500/30 flex flex-col sm:flex-row gap-4 justify-between items-center opacity-80"
-                              >
-                                  <div className="flex-1 w-full">
-                                      <div className="flex justify-between items-start mb-2">
-                                          <StatusBadge status="in_review" />
-                                          <span className="text-[10px] text-zinc-500 font-mono uppercase">Enviado: {formatDateDisplay(record.paymentDate || '')}</span>
-                                      </div>
-                                      <h4 className="text-lg font-bold text-zinc-400">{record.concept}</h4>
-                                      <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-1 inline-block mt-2 rounded border border-amber-500/20 uppercase tracking-wider">
-                                          Método: {record.method || 'Transferencia'}
-                                      </span>
-                                  </div>
-                                  <div className="text-right w-full sm:w-auto flex justify-between sm:block items-center">
-                                      <span className="text-xl font-bold font-mono text-zinc-500">${record.amount.toFixed(2)}</span>
-                                      <p className="text-[10px] text-amber-500 font-bold mt-1 uppercase tracking-widest animate-pulse">Verificando...</p>
-                                  </div>
-                              </MotionDiv>
-                          ))}
+                      <div className="text-right">
+                          <span className="block text-xl font-black text-white font-mono mb-2">${(record.amount + record.penaltyAmount).toFixed(2)}</span>
+                          <button onClick={() => { setSelectedRecord(record); setIsModalOpen(true); }} className="bg-white text-black px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-zinc-200">
+                              Pagar
+                          </button>
                       </div>
-                  )}
-              </div>
+                  </MotionDiv>
+              ))}
 
-              {/* --- HISTORY SECTION --- */}
               {historyRecords.length > 0 && (
-                  <div className="flex flex-col gap-4 mt-4">
-                      <h3 className="text-lg font-bold text-zinc-500 flex items-center gap-2 px-1">
-                          <span className="material-symbols-outlined">history</span>
-                          Historial
-                      </h3>
-                      <div className="flex flex-col gap-3">
+                  <div className="pt-8 border-t border-white/5">
+                      <h3 className="text-xs font-bold text-zinc-600 uppercase tracking-widest mb-4">Historial Reciente</h3>
+                      <div className="flex flex-col gap-2">
                           {historyRecords.map((record) => (
-                              <div key={record.id} className="bg-[#18181b] p-5 rounded-xl border border-zinc-800 flex justify-between items-center group hover:bg-[#202023] transition-all hover:border-zinc-700">
-                                  <div>
-                                      <div className="flex items-center gap-3 mb-1">
-                                          <span className="text-sm font-bold text-white">{record.concept}</span>
-                                          <StatusBadge status="paid" />
+                              <div key={record.id} className="flex justify-between items-center p-4 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
+                                  <div className="flex items-center gap-4">
+                                      <div className={`size-8 rounded-full flex items-center justify-center ${record.status === 'paid' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-orange-500/10 text-orange-500'}`}>
+                                          <span className="material-symbols-outlined text-sm">{record.status === 'paid' ? 'check' : 'hourglass_top'}</span>
                                       </div>
-                                      <p className="text-[10px] text-zinc-500 font-mono uppercase">
-                                          Pagado: {formatDateDisplay(record.paymentDate || '')} • {record.method}
-                                      </p>
+                                      <div>
+                                          <p className="text-sm font-bold text-zinc-300">{record.concept}</p>
+                                          <p className="text-[10px] text-zinc-600 uppercase">{formatDateDisplay(record.paymentDate || '')}</p>
+                                      </div>
                                   </div>
-                                  <div className="flex items-center gap-6">
-                                      <span className="font-bold font-mono text-emerald-400">${(record.originalAmount || record.amount).toFixed(2)}</span>
-                                      <button 
-                                          onClick={() => handleDownloadReceipt(record)}
-                                          className="size-9 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 flex items-center justify-center transition-colors"
-                                          title="Descargar Recibo"
-                                      >
-                                          <span className="material-symbols-outlined text-lg">receipt_long</span>
-                                      </button>
-                                  </div>
+                                  <span className="font-mono text-sm font-bold text-zinc-500">${(record.originalAmount || record.amount).toFixed(2)}</span>
                               </div>
                           ))}
                       </div>
@@ -624,71 +284,34 @@ const StudentPayments: React.FC = () => {
               )}
           </div>
 
-          {/* RIGHT COL: ACTIONS & BANK */}
-          <div className="flex flex-col gap-6 lg:sticky lg:top-10">
-              
-              {/* QUICK ACTION: PAY BATCH */}
-              <button 
-                  onClick={() => handleOpenPaymentModal()}
-                  className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-bold uppercase tracking-wider text-xs rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95 flex items-center justify-center gap-3"
-              >
-                  <span className="material-symbols-outlined text-xl">add_shopping_cart</span>
-                  Pagar Varios Conceptos
+          <div className="flex flex-col gap-4">
+              <button onClick={() => { setSelectedRecord(null); setIsModalOpen(true); }} className="w-full py-4 bg-white text-black font-bold uppercase tracking-wider text-[10px] rounded-xl hover:bg-zinc-200 transition-all shadow-lg active:scale-95">
+                  Pagar Múltiples Conceptos
               </button>
-
-              {/* BANK INFO CARD */}
-              <div className="bg-[#18181b] p-8 text-white shadow-card rounded-3xl relative overflow-hidden border border-zinc-800">
-                  <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
-                      <span className="material-symbols-outlined text-[150px]">account_balance</span>
-                  </div>
-                  <div className="relative z-10">
-                      <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                          <span className="material-symbols-outlined text-zinc-500">account_balance_wallet</span>
-                          Datos Bancarios
+              
+              {academySettings.bankDetails && (
+                  <div className="bg-[#18181b] p-6 rounded-2xl border border-white/5 text-zinc-400 text-xs">
+                      <h3 className="text-zinc-200 font-bold mb-4 flex items-center gap-2 uppercase tracking-wider text-[10px]">
+                          <span className="material-symbols-outlined text-sm">account_balance</span> Datos Bancarios
                       </h3>
-                      
-                      {bankInfo ? (
-                          <div className="space-y-6">
-                              <div>
-                                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Banco</p>
-                                  <p className="text-xl font-bold tracking-tight text-white">{bankInfo.bankName}</p>
-                              </div>
-                              <div>
-                                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Beneficiario</p>
-                                  <p className="text-lg font-medium tracking-tight text-white">{bankInfo.accountHolder}</p>
-                              </div>
-                              <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800">
-                                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-2">CLABE Interbancaria</p>
-                                  <div className="flex items-center justify-between">
-                                      <p className="font-mono text-lg tracking-wider select-all text-white">{bankInfo.clabe}</p>
-                                      <button 
-                                          onClick={() => {navigator.clipboard.writeText(bankInfo.clabe); addToast('CLABE copiada', 'success')}}
-                                          className="text-zinc-500 hover:text-white transition-colors"
-                                      >
-                                          <span className="material-symbols-outlined text-lg">content_copy</span>
-                                      </button>
-                                  </div>
-                              </div>
-                              {bankInfo.instructions && (
-                                  <div className="text-xs text-zinc-400 leading-relaxed bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
-                                      <span className="font-bold text-zinc-300 block mb-1">Instrucciones:</span>
-                                      {bankInfo.instructions}
-                                  </div>
-                              )}
-                          </div>
-                      ) : (
-                          <p className="text-zinc-500 text-sm">Sin información bancaria configurada.</p>
-                      )}
+                      <div className="space-y-3 font-mono">
+                          <div className="flex justify-between border-b border-white/5 pb-2"><span>Banco:</span> <span className="text-white">{academySettings.bankDetails.bankName}</span></div>
+                          <div className="flex justify-between border-b border-white/5 pb-2"><span>Cuenta:</span> <span className="text-white select-all">{academySettings.bankDetails.accountNumber}</span></div>
+                          <div className="flex justify-between"><span>CLABE:</span> <span className="text-white select-all">{academySettings.bankDetails.clabe}</span></div>
+                      </div>
                   </div>
-              </div>
+              )}
           </div>
-
       </div>
 
       <PaymentModal 
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          onConfirm={handleConfirmPayment}
+          onConfirm={(ids, file, method, total) => {
+              const fileToSend = file || new File([""], "pago_efectivo.txt", { type: "text/plain" });
+              registerBatchPayment(ids, fileToSend, method, total);
+              setIsModalOpen(false); setSelectedRecord(null);
+          }}
           preSelectedRecord={selectedRecord}
           pendingDebts={pendingDebts}
       />

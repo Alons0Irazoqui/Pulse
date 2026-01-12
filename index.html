@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AcademyPro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script>
@@ -15,105 +15,46 @@
           extend: {
             colors: {
               primary: {
-                DEFAULT: "#F97316", // Orange remains as accent
-                hover: "#EA580C",
-                glass: "rgba(249, 115, 22, 0.15)"
+                DEFAULT: "#0A84FF", // Apple Blue (System Blue Dark Mode)
+                hover: "#0071e3",   // Slightly darker blue
+                glass: "rgba(10, 132, 255, 0.15)"
               },
               background: {
-                DEFAULT: "#09090b", // Zinc 950 (Canvas)
-                paper: "#18181b",   // Zinc 900 (Cards/Surfaces)
-                subtle: "#27272a",  // Zinc 800 (Hover/Inputs)
-                elevated: "#3f3f46" // Zinc 700 (Modals/Popovers)
+                DEFAULT: "#09090b", // Zinc 950 (Deep Background)
+                paper: "#1c1c1e",   // Zinc 900 (Apple Surfaces)
+                subtle: "#2c2c2e",  // Zinc 800 (Elevated/Inputs)
+                elevated: "#3a3a3c" // Zinc 700 (Modals/Popovers)
               },
               text: {
-                main: "#E4E4E7",      // Zinc 200
-                secondary: "#A1A1AA", // Zinc 400
-                muted: "#52525B",     // Zinc 600
+                main: "#f5f5f7",      // Off-white standard
+                secondary: "#86868b", // Apple Grey Text
+                muted: "#6e6e73",     // Darker Grey
                 inverted: "#000000"
               },
               border: {
-                DEFAULT: "rgba(255, 255, 255, 0.08)", // Very subtle divider
-                hover: "rgba(255, 255, 255, 0.15)"
-              },
-              zinc: {
-                800: "#27272a",
-                900: "#18181b",
-                950: "#09090b"
+                DEFAULT: "rgba(255, 255, 255, 0.08)", // Ultra subtle
+                hover: "rgba(255, 255, 255, 0.12)"
               }
             },
             fontFamily: {
-              sans: ["Inter", "sans-serif"],
+              sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+              mono: ["JetBrains Mono", "monospace"],
             },
             boxShadow: {
-              glow: "0 0 20px -5px rgba(249, 115, 22, 0.3)",
-              card: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
-              glass: "0 8px 32px 0 rgba(0, 0, 0, 0.3)",
+              glow: "0 0 20px -5px rgba(10, 132, 255, 0.3)",
+              card: "0 4px 24px -1px rgba(0, 0, 0, 0.2)",
+              glass: "0 8px 32px 0 rgba(0, 0, 0, 0.5)",
             },
-            // Restoring default border radius capabilities
             borderRadius: {
-              'xl': '0.75rem',
-              '2xl': '1rem',
-              '3xl': '1.5rem',
+              'lg': '0.5rem',   // 8px
+              'xl': '0.75rem',  // 12px (Standard Apple)
+              '2xl': '1rem',    // 16px
+              '3xl': '1.5rem',  // 24px
             }
           },
         },
       }
     </script>
-    <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        background-color: #09090b; /* Zinc 950 */
-        color: #E4E4E7; /* Zinc 200 */
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-      }
-      
-      /* Smooth Dark Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #27272a; 
-        border-radius: 99px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #3f3f46; 
-      }
-
-      .material-symbols-outlined {
-        font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
-      }
-      .material-symbols-outlined.filled {
-        font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
-      }
-      
-      /* Remove the forced sharp corners override */
-      
-      /* Form Autofill Fix for Dark Mode - Updated to Zinc */
-      input:-webkit-autofill,
-      input:-webkit-autofill:hover, 
-      input:-webkit-autofill:focus, 
-      input:-webkit-autofill:active{
-          -webkit-box-shadow: 0 0 0 30px #18181b inset !important;
-          -webkit-text-fill-color: #E4E4E7 !important;
-          transition: background-color 5000s ease-in-out 0s;
-      }
-
-      .no-scrollbar::-webkit-scrollbar { display: none; }
-      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      
-      /* Glass effect utility class */
-      .glass-panel {
-        background: rgba(24, 24, 27, 0.6);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-      }
-    </style>
   <script type="importmap">
 {
   "imports": {
@@ -133,7 +74,7 @@
 }
 </script>
 </head>
-  <body class="bg-background text-text-main selection:bg-primary/30 selection:text-white">
+  <body class="bg-background text-text-main antialiased selection:bg-primary/30 selection:text-white">
     <div id="root"></div>
   </body>
 </html>

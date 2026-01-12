@@ -1,0 +1,166 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-canvas: #09090b;
+  --bg-panel: #1c1c1e;
+  --border-subtle: #27272a; /* Zinc 800 */
+  --text-main: #f5f5f7;
+  --primary-blue: #0A84FF;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-canvas);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* --- APPLE PRO GLASS EFFECT --- */
+.apple-glass {
+  background: rgba(28, 28, 30, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* --- SCROLLBAR --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+::selection {
+  background-color: rgba(10, 132, 255, 0.3); 
+  color: #fff;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* --- CALENDAR PRO DARK OVERRIDES --- */
+
+/* Base Container */
+.rbc-calendar {
+  color: #a1a1aa !important; /* Zinc 400 */
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* Header (Days of week) */
+.rbc-header {
+  border-bottom: 1px solid var(--border-subtle) !important;
+  color: #d4d4d8 !important; /* Zinc 300 */
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 16px 0 !important;
+  background-color: #09090b !important;
+}
+
+/* Main Grid Backgrounds */
+.rbc-month-view, .rbc-time-view {
+  background-color: #09090b !important; /* Deep Black */
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 1rem !important;
+  overflow: hidden;
+}
+
+/* Grid Lines */
+.rbc-day-bg {
+  border-left: 1px solid var(--border-subtle) !important;
+}
+.rbc-month-row + .rbc-month-row {
+  border-top: 1px solid var(--border-subtle) !important;
+}
+.rbc-day-slot .rbc-time-slot {
+  border-top: 1px solid var(--border-subtle) !important;
+}
+.rbc-time-view .rbc-header {
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+.rbc-time-view .rbc-allday-cell {
+  display: none; /* Hide all day cell if not needed to clean UI */
+}
+.rbc-time-content {
+  border-top: 1px solid var(--border-subtle) !important;
+}
+.rbc-timeslot-group {
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+.rbc-day-slot {
+  border-left: 1px solid var(--border-subtle) !important;
+}
+
+/* Off Range Days */
+.rbc-off-range-bg {
+  background-color: #121212 !important; /* Slightly lighter stripes */
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(255,255,255,0.01) 10px,
+    rgba(255,255,255,0.01) 20px
+  );
+}
+
+/* Today Highlight */
+.rbc-today {
+  background-color: rgba(10, 132, 255, 0.03) !important;
+}
+
+/* Date Number */
+.rbc-date-cell {
+  padding: 8px !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: right;
+  color: #71717a;
+}
+.rbc-now .rbc-date-cell {
+  color: #0A84FF; /* Current day blue text */
+}
+
+/* --- EVENTS (Apple Pill Style) --- */
+.rbc-event {
+  background-color: rgba(10, 132, 255, 0.15) !important; 
+  border: 1px solid rgba(10, 132, 255, 0.3) !important;
+  color: #fff !important;
+  border-radius: 9999px !important; /* Pill shape */
+  padding: 2px 10px !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+  margin: 1px 4px !important;
+  backdrop-filter: blur(4px);
+}
+
+.rbc-event:focus {
+  outline: none;
+}
+
+.rbc-event-content {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Reset Inputs */
+input, select, textarea {
+  color-scheme: dark;
+}
