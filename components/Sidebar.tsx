@@ -1,7 +1,9 @@
+
 import React, { memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAcademy } from '../context/AcademyContext';
+import Avatar from './ui/Avatar';
 
 interface SidebarProps {
   role: 'master' | 'student';
@@ -21,7 +23,6 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
     { name: 'Schedule', icon: 'calendar_month', path: '/master/schedule' },
     { name: 'Library', icon: 'video_library', path: '/master/library' },
     { name: 'Finance', icon: 'account_balance_wallet', path: '/master/finance' },
-    { name: 'Communication', icon: 'mail', path: '/master/communication' },
     { name: 'Settings', icon: 'settings', path: '/master/settings' },
   ];
 
@@ -38,8 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
   const displayName = currentUser?.name || (role === 'master' ? 'Sensei' : 'Alumno');
   const displaySubtext = role === 'master' ? academySettings.name : 'Estudiante';
-  const displayAvatar = currentUser?.avatarUrl || `https://i.pravatar.cc/150?u=${role}`;
-
+  
   const handleLogout = () => {
       logout();
       navigate('/');
@@ -67,10 +67,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
             {/* Header */}
             <div className="flex justify-between items-center px-2 pt-2">
               <div className="flex gap-4 items-center">
-                <div 
-                    className="bg-center bg-no-repeat bg-cover rounded-full h-12 w-12 shadow-sm ring-2 ring-white" 
-                    style={{ backgroundImage: `url("${displayAvatar}")` }}
-                ></div>
+                <Avatar 
+                    src={currentUser?.avatarUrl} 
+                    name={displayName} 
+                    className="size-12 rounded-full shadow-sm ring-2 ring-white" 
+                />
                 <div className="flex flex-col">
                   <h1 className="text-text-main text-lg font-bold leading-tight truncate max-w-[140px]">
                       {displayName}

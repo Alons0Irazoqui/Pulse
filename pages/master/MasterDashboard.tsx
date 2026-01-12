@@ -1,7 +1,9 @@
+
 import React, { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useStore } from '../../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
+import Avatar from '../../components/ui/Avatar';
 
 const MasterDashboard: React.FC = () => {
   const { stats, students, isLoading } = useStore();
@@ -199,19 +201,12 @@ const MasterDashboard: React.FC = () => {
                         criticalDebtors.map(debtor => (
                             <div key={debtor.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-red-100 hover:bg-red-50/30 transition-all group">
                                 <div className="flex items-center gap-3 overflow-hidden">
-                                    <img src={debtor.avatarUrl} className="size-10 rounded-full object-cover bg-gray-200 shrink-0" />
+                                    <Avatar src={debtor.avatarUrl} name={debtor.name} className="size-10 rounded-full shrink-0" />
                                     <div className="min-w-0">
                                         <p className="text-sm font-bold text-text-main truncate">{debtor.name}</p>
                                         <p className="text-xs text-red-500 font-bold">${debtor.balance.toLocaleString()}</p>
                                     </div>
                                 </div>
-                                <button 
-                                    onClick={() => navigate('/master/communication', { state: { recipientId: debtor.id } })}
-                                    className="size-8 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 flex items-center justify-center transition-colors shadow-sm"
-                                    title="Enviar mensaje de cobro"
-                                >
-                                    <span className="material-symbols-outlined text-sm">send</span>
-                                </button>
                             </div>
                         ))
                     )}

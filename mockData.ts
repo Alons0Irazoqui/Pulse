@@ -1,5 +1,5 @@
 
-import { Student, ClassSession, FinanceStat, ScheduleItem, Invoice, Message, LibraryResource, AcademySettings, CalendarEvent } from './types';
+import { Student, ClassSession, ScheduleItem, Message, LibraryResource, AcademySettings, CalendarEvent, TuitionRecord } from './types';
 
 export const defaultRanks = [
     { id: 'rank-1', name: 'White Belt', color: 'white' as const, order: 1, requiredAttendance: 50 },
@@ -100,7 +100,7 @@ export const mockStudents: Student[] = [
         joinDate: 'Jan 10, 2022',
         avatarUrl: 'https://i.pravatar.cc/150?u=lucia',
         stripes: 1,
-        balance: 150,
+        balance: 950, // Updated to reflect mockTuitionRecords
         classesId: [],
         attendanceHistory: [],
         promotionHistory: [
@@ -123,6 +123,90 @@ export const mockStudents: Student[] = [
                 city: 'CDMX'
             }
         }
+    }
+];
+
+// --- MOCK FINANCIAL RECORDS (Single Record Model) ---
+const today = new Date();
+const currentYear = today.getFullYear();
+const currentMonth = today.getMonth();
+
+const getRelativeDate = (monthsOffset: number, day: number) => {
+    const d = new Date(currentYear, currentMonth + monthsOffset, day);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${da}`;
+};
+
+export const mockTuitionRecords: TuitionRecord[] = [
+    // 1. PAID: Historical record for Mateo
+    {
+        id: 'tx-001',
+        academyId: 'acad-1',
+        studentId: '8821', // Mateo
+        studentName: 'Mateo Silva',
+        concept: 'Mensualidad Enero',
+        month: `${currentYear}-01`,
+        amount: 800,
+        penaltyAmount: 0,
+        dueDate: getRelativeDate(-1, 5), // Due last month
+        paymentDate: getRelativeDate(-1, 4), // Paid on time
+        status: 'paid',
+        proofUrl: null,
+        method: 'Transferencia',
+        type: 'charge',
+        canBePaidInParts: false
+    },
+    // 2. OVERDUE: Record for Lucia (Late)
+    {
+        id: 'tx-002',
+        academyId: 'acad-1',
+        studentId: '7442', // Lucia
+        studentName: 'Lucia Mendez',
+        concept: 'Mensualidad Febrero',
+        month: `${currentYear}-02`,
+        amount: 800,
+        penaltyAmount: 150, // Penalty Applied
+        dueDate: getRelativeDate(0, 1), // Due 1st of this month (assume we are mid-month)
+        paymentDate: null,
+        status: 'overdue', // SYSTEM SETS THIS
+        proofUrl: null,
+        type: 'charge',
+        canBePaidInParts: false
+    },
+    // 3. IN_REVIEW: Record for Mateo (Just uploaded)
+    {
+        id: 'tx-003',
+        academyId: 'acad-1',
+        studentId: '8821', // Mateo
+        studentName: 'Mateo Silva',
+        concept: 'Uniforme Gi',
+        amount: 1500,
+        penaltyAmount: 0,
+        dueDate: getRelativeDate(0, 15),
+        paymentDate: new Date().toISOString(), // Uploaded Just Now
+        status: 'in_review',
+        proofUrl: 'https://via.placeholder.com/150', // Mock Proof
+        method: 'Transferencia',
+        type: 'charge',
+        canBePaidInParts: true
+    },
+    // 4. PENDING: Future record for Lucia
+    {
+        id: 'tx-004',
+        academyId: 'acad-1',
+        studentId: '7442', // Lucia
+        studentName: 'Lucia Mendez',
+        concept: 'Torneo Estatal',
+        amount: 500,
+        penaltyAmount: 0,
+        dueDate: getRelativeDate(1, 10), // Next Month
+        paymentDate: null,
+        status: 'pending',
+        proofUrl: null,
+        type: 'charge',
+        canBePaidInParts: true
     }
 ];
 
@@ -163,27 +247,9 @@ export const mockClassSession: ClassSession = {
     attendees: []
 };
 
-export const financeStats: FinanceStat[] = [
-    { label: 'Monthly Revenue', value: '$12,450', trend: 12, trendLabel: 'vs last month', icon: 'payments', color: 'green' },
-    { label: 'Active Students', value: '142', trend: 5, trendLabel: 'new enrollments', icon: 'groups', color: 'blue' },
-];
-
-export const revenueData = [
-    { name: 'Aug', value: 4000 },
-    { name: 'Sep', value: 3000 },
-    { name: 'Oct', value: 5000 },
-    { name: 'Nov', value: 7000 },
-    { name: 'Dec', value: 6000 },
-    { name: 'Jan', value: 9000 },
-];
-
 export const mockSchedule: ScheduleItem[] = [
     { id: '1', day: 'Monday', startTime: '07:00 AM', endTime: '08:00 AM', title: 'Morning Drilling', instructor: 'Prof. Miguel', level: 'All Levels', type: 'gi', enrolled: true },
     { id: '2', day: 'Monday', startTime: '06:00 PM', endTime: '07:30 PM', title: 'Fundamentals', instructor: 'Coach Sarah', level: 'White Belt', type: 'gi', enrolled: false },
-];
-
-export const mockInvoices: Invoice[] = [
-    { id: 'INV-2023-001', date: 'Dec 01, 2023', amount: 150.00, status: 'pending', description: 'Monthly Membership - Unlimited' },
 ];
 
 export const mockMessages: Message[] = [

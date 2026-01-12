@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Student, ClassCategory, Event, LibraryResource, AcademySettings, Message, AttendanceRecord, SessionModification, ClassException, PromotionHistoryItem, CalendarEvent } from '../types';
+import { Student, ClassCategory, Event, LibraryResource, AcademySettings, Message, AttendanceRecord, SessionModification, ClassException, PromotionHistoryItem, CalendarEvent, Rank } from '../types';
 import { PulseService } from '../services/pulseService';
 import { mockMessages, mockCalendarEvents } from '../mockData';
 import { getLocalDate, formatDateDisplay } from '../utils/dateUtils';
@@ -58,6 +58,7 @@ interface AcademyContextType {
 
   registerForEvent: (studentId: string, eventId: string) => void;
   updateEventRegistrants: (eventId: string, studentIds: string[]) => void;
+  getStudentEnrolledEvents: (studentId: string) => Event[]; // New Helper
   
   addLibraryResource: (resource: LibraryResource) => void;
   deleteLibraryResource: (id: string) => void;
@@ -65,6 +66,8 @@ interface AcademyContextType {
   
   updateAcademySettings: (settings: AcademySettings) => void;
   updatePaymentDates: (billingDay: number, lateFeeDay: number) => void;
+  addRank: (rank: Rank) => void;
+  deleteRank: (id: string) => void;
   
   sendMessage: (msg: Omit<Message, 'id' | 'read' | 'date'>) => void;
   markMessageRead: (id: string) => void;
@@ -553,6 +556,18 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast('Lista de asistentes actualizada', 'success');
   };
 
+  const getStudentEnrolledEvents = (studentId: string) => {
+      // Return events where student is registered AND date is future OR recent past (30 days)
+      const now = new Date();
+      const threshold = new Date();
+      threshold.setDate(threshold.getDate() - 30); 
+
+      return events.filter(e => 
+          e.registrants?.includes(studentId) && 
+          new Date(e.date) >= threshold
+      ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
+
   const addLibraryResource = (resource: LibraryResource) => {
       if (currentUser?.role !== 'master') return;
       const newResource = { ...resource, id: resource.id || generateId('lib'), academyId: currentUser.academyId };
@@ -599,6 +614,23 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast('Fechas de facturación actualizadas', 'success');
   };
 
+  const addRank = (rank: Rank) => {
+      if (currentUser?.role !== 'master') return;
+      setAcademySettings(prev => ({
+          ...prev,
+          ranks: [...prev.ranks, rank]
+      }));
+      // addToast handled by consumer usually, but we can add generic here
+  };
+
+  const deleteRank = (id: string) => {
+      if (currentUser?.role !== 'master') return;
+      setAcademySettings(prev => ({
+          ...prev,
+          ranks: prev.ranks.filter(r => r.id !== id)
+      }));
+  };
+
   const sendMessage = (msg: Omit<Message, 'id' | 'read' | 'date'>) => {
       const dateStr = formatDateDisplay(getLocalDate(), { month: 'short', day: 'numeric' });
       const newMessage: Message = { ...msg, id: generateId('msg'), read: false, date: dateStr };
@@ -618,9 +650,9 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         markAttendance, bulkMarkPresent, promoteStudent, 
         addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
         addEvent, updateEvent, deleteEvent, registerForEvent, updateEventRegistrants,
-        addCalendarEvent, updateCalendarEvent, deleteCalendarEvent, // NEW EXPORTS
+        addCalendarEvent, updateCalendarEvent, deleteCalendarEvent, getStudentEnrolledEvents, // NEW EXPORT
         addLibraryResource, deleteLibraryResource, toggleResourceCompletion, 
-        updateAcademySettings, updatePaymentDates,
+        updateAcademySettings, updatePaymentDates, addRank, deleteRank,
         sendMessage, markMessageRead
     }}>
       {children}

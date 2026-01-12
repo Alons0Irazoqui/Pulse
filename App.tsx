@@ -15,10 +15,9 @@ import MasterDashboard from './pages/master/MasterDashboard';
 import StudentsList from './pages/master/StudentsList';
 import ClassesManager from './pages/master/ClassesManager';
 import MasterAttendanceDetail from './pages/master/MasterAttendanceDetail';
-import MasterEventDetail from './pages/master/MasterEventDetail'; // Import new page
+import MasterEventDetail from './pages/master/MasterEventDetail'; 
 import MasterLibrary from './pages/master/MasterLibrary';
 import Finance from './pages/master/Finance';
-import Communication from './pages/master/Communication';
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentClasses from './pages/student/StudentClasses';
 import StudentClassDetail from './pages/student/StudentClassDetail';
@@ -57,10 +56,9 @@ const App: React.FC = () => {
                                     <Route path="students" element={<StudentsList />} />
                                     <Route path="schedule" element={<ClassesManager />} />
                                     <Route path="attendance/:classId" element={<MasterAttendanceDetail />} />
-                                    <Route path="event/:eventId" element={<MasterEventDetail />} /> {/* New Route */}
+                                    <Route path="event/:eventId" element={<MasterEventDetail />} /> 
                                     <Route path="library" element={<MasterLibrary />} />
                                     <Route path="finance" element={<Finance />} />
-                                    <Route path="communication" element={<Communication />} />
                                     <Route path="settings" element={<Settings />} />
                                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                                 </Routes>

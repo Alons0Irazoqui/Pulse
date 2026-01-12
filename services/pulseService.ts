@@ -1,5 +1,5 @@
 
-import { Student, ClassCategory, FinancialRecord, UserProfile, LibraryResource, Event, AcademySettings } from '../types';
+import { Student, ClassCategory, TuitionRecord, UserProfile, LibraryResource, Event, AcademySettings } from '../types';
 import { mockStudents, mockLibraryResources, defaultAcademySettings } from '../mockData';
 
 const STORAGE_KEYS = {
@@ -65,7 +65,7 @@ export const PulseService = {
             name: data.name,
             role: 'master',
             academyId: academyId,
-            avatarUrl: `https://i.pravatar.cc/150?u=${userId}`
+            avatarUrl: '' // Empty to trigger initial avatar
         };
 
         // 3. Commit to DB
@@ -102,7 +102,7 @@ export const PulseService = {
             name: data.name,
             role: 'student',
             academyId: academy.id,
-            avatarUrl: `https://i.pravatar.cc/150?u=${userId}`,
+            avatarUrl: '', // Empty to trigger initial avatar
             studentId: userId 
         };
 
@@ -142,23 +142,28 @@ export const PulseService = {
             balance: initialAmount, // Set initial balance reference (will be recalculated by Store)
             classesId: [],
             attendanceHistory: [],
-            avatarUrl: newUser.avatarUrl
+            avatarUrl: ''
         };
 
         // Create the initial CHARGE record
         if (initialAmount > 0) {
-            const initialCharge: FinancialRecord = {
+            const initialCharge: TuitionRecord = {
                 id: uuid(),
                 academyId: academy.id,
                 studentId: userId,
                 studentName: data.name,
                 amount: initialAmount,
-                date: new Date().toISOString().split('T')[0],
+                penaltyAmount: 0,
+                dueDate: new Date().toISOString().split('T')[0],
                 status: 'charged', // STRICT STATUS
                 type: 'charge', 
                 description: 'Mensualidad (Inscripción)',
+                concept: 'Mensualidad (Inscripción)',
                 category: 'Mensualidad',
-                method: 'System'
+                method: 'System',
+                paymentDate: null,
+                proofUrl: null,
+                canBePaidInParts: false
             };
             payments.push(initialCharge);
             localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
@@ -195,7 +200,7 @@ export const PulseService = {
             name: studentData.name,
             role: 'student',
             academyId: studentData.academyId,
-            avatarUrl: studentData.avatarUrl || `https://i.pravatar.cc/150?u=${userId}`,
+            avatarUrl: studentData.avatarUrl || '', // Empty fallback
             studentId: userId
         };
 
@@ -409,15 +414,15 @@ export const PulseService = {
         localStorage.setItem(STORAGE_KEYS.LIBRARY, JSON.stringify(resources));
     },
 
-    getPayments: (academyId?: string): FinancialRecord[] => {
+    getPayments: (academyId?: string): TuitionRecord[] => {
         const data = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
-        let payments: FinancialRecord[] = data ? JSON.parse(data) : [];
+        let payments: TuitionRecord[] = data ? JSON.parse(data) : [];
         payments = payments.map(p => ({...p, academyId: p.academyId || 'acad-1'}));
         if (academyId) return payments.filter(p => p.academyId === academyId);
         return payments;
     },
 
-    savePayments: (payments: FinancialRecord[]) => {
+    savePayments: (payments: TuitionRecord[]) => {
         localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
     },
     

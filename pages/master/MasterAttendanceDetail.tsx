@@ -7,6 +7,7 @@ import { useConfirmation } from '../../context/ConfirmationContext'; // Importar
 import { Student } from '../../types';
 import { getLocalDate, formatDateDisplay } from '../../utils/dateUtils';
 import DateNavigator from '../../components/ui/DateNavigator';
+import Avatar from '../../components/ui/Avatar';
 
 const MasterAttendanceDetail: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
@@ -210,7 +211,7 @@ const MasterAttendanceDetail: React.FC = () => {
                                       <td className="px-6 py-3">
                                           <div className="flex items-center gap-4">
                                               <div className="relative">
-                                                  <img src={student.avatarUrl} className="size-12 rounded-full object-cover bg-gray-100 border border-gray-100 shadow-sm" />
+                                                  <Avatar src={student.avatarUrl} name={student.name} className="size-12 rounded-full border border-gray-100 shadow-sm" />
                                                   <div className={`absolute -bottom-1 -right-1 size-4 rounded-full border-2 border-white ${student.balance > 0 ? 'bg-red-500' : 'bg-green-500'}`} title={student.balance > 0 ? 'Con Adeudo' : 'Al Corriente'}></div>
                                               </div>
                                               <div>
@@ -324,7 +325,7 @@ const MasterAttendanceDetail: React.FC = () => {
                       {availableStudents.map(student => (
                           <div key={student.id} className="flex justify-between items-center p-3 rounded-xl border border-gray-100 hover:bg-blue-50 hover:border-blue-200 transition-all cursor-pointer group" onClick={() => { enrollStudent(student.id, classId!); addToast('Alumno inscrito', 'success'); }}>
                               <div className="flex items-center gap-3">
-                                  <img src={student.avatarUrl} className="size-12 rounded-full object-cover border border-gray-100" />
+                                  <Avatar src={student.avatarUrl} name={student.name} className="size-12 rounded-full border border-gray-100" />
                                   <div>
                                       <div className="flex items-center gap-2">
                                           <p className="font-bold text-base text-text-main">{student.name}</p>

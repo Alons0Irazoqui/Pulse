@@ -10,9 +10,16 @@ import { motion } from 'framer-motion';
 import EmptyState from '../../components/ui/EmptyState';
 import EmergencyCard from '../../components/ui/EmergencyCard';
 import { PulseService } from '../../services/pulseService';
+import { formatDateDisplay } from '../../utils/dateUtils';
+import Avatar from '../../components/ui/Avatar';
+
+// Fix for type errors with motion components
+const MotionDiv = motion.div as any;
+const MotionTbody = motion.tbody as any;
+const MotionTr = motion.tr as any;
 
 const StudentsList: React.FC = () => {
-  const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, payments, isLoading } = useStore();
+  const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, records, isLoading } = useStore();
   const { addToast } = useToast();
   const { confirm } = useConfirmation();
   const navigate = useNavigate();
@@ -85,20 +92,20 @@ const StudentsList: React.FC = () => {
       return students.find(s => s.id === viewingStudent.id) || viewingStudent;
   }, [students, viewingStudent]);
 
-  const financialHistory = useMemo(() => {
-      if (!reactiveViewingStudent) return { charges: [], payments: [] };
+  // Unified Financial Records (Correct Logic)
+  const studentFinancialRecords = useMemo(() => {
+      if (!reactiveViewingStudent || !records) return [];
       
-      const records = payments.filter(p => p.studentId === reactiveViewingStudent.id);
-      
-      return {
-          charges: records
-              .filter(r => r.type === 'charge')
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-          payments: records
-              .filter(r => r.type === 'payment')
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      };
-  }, [reactiveViewingStudent, payments]);
+      // Filter records for this student and sort by date descending
+      return records
+          .filter(r => r.studentId === reactiveViewingStudent.id)
+          .sort((a, b) => {
+              // Use paymentDate if available (transaction happened), else dueDate
+              const dateA = new Date(a.paymentDate || a.dueDate).getTime();
+              const dateB = new Date(b.paymentDate || b.dueDate).getTime();
+              return dateB - dateA;
+          });
+  }, [reactiveViewingStudent, records]);
 
   const handleExport = () => {
       const dataToExport = filteredStudents.map(s => ({
@@ -155,7 +162,7 @@ const StudentsList: React.FC = () => {
 
   const handleCreate = () => {
       setEditingStudent(null);
-      setFormData({ ...initialFormState, avatarUrl: `https://i.pravatar.cc/150?u=${Date.now()}` });
+      setFormData({ ...initialFormState, avatarUrl: '' }); // Default empty for initial
       setShowModal(true);
   };
 
@@ -164,7 +171,7 @@ const StudentsList: React.FC = () => {
       
       // Basic validation
       if (!formData.name || !formData.email || !formData.cellPhone || !formData.guardian.fullName || !formData.guardian.phones.main) {
-          addToast("Por favor completa los campos obligatorios (*)", 'error');
+          addToast("Por favor completa el los campos obligatorios (*)", 'error');
           return;
       }
 
@@ -288,12 +295,12 @@ const StudentsList: React.FC = () => {
         ) : (
             <>
                 {viewMode === 'grid' && (
-                    <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <MotionDiv variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredStudents.map((student) => (
-                            <motion.div key={student.id} variants={itemVariants} className="bg-white p-6 rounded-[1.5rem] shadow-card border border-gray-100 flex flex-col gap-4 group hover:-translate-y-1 transition-all relative overflow-hidden" onClick={(e) => handleViewDetails(student, e)}>
+                            <MotionDiv key={student.id} variants={itemVariants} className="bg-white p-6 rounded-[1.5rem] shadow-card border border-gray-100 flex flex-col gap-4 group hover:-translate-y-1 transition-all relative overflow-hidden" onClick={(e: React.MouseEvent) => handleViewDetails(student, e)}>
                                 <div className={`absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(student.status)}`}>{student.status}</div>
                                 <div className="flex gap-4 items-center">
-                                    <img src={student.avatarUrl} className="size-16 rounded-2xl object-cover bg-gray-100 shadow-sm" />
+                                    <Avatar src={student.avatarUrl} name={student.name} className="size-16 rounded-2xl shadow-sm text-xl" />
                                     <div>
                                         <h3 className="text-lg font-bold text-text-main leading-tight line-clamp-1">{student.name}</h3>
                                         <p className="text-sm text-text-secondary font-medium">{student.rank}</p>
@@ -303,9 +310,9 @@ const StudentsList: React.FC = () => {
                                     <p className="flex items-center gap-2"><span className="material-symbols-outlined text-[14px]">smartphone</span> {student.cellPhone}</p>
                                     <p className="flex items-center gap-2 truncate"><span className="material-symbols-outlined text-[14px]">supervisor_account</span> {student.guardian.fullName}</p>
                                 </div>
-                            </motion.div>
+                            </MotionDiv>
                         ))}
-                    </motion.div>
+                    </MotionDiv>
                 )}
 
                 {viewMode === 'table' && (
@@ -322,12 +329,12 @@ const StudentsList: React.FC = () => {
                                         <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Acciones</th>
                                     </tr>
                                 </thead>
-                                <motion.tbody variants={containerVariants} initial="hidden" animate="show" className="divide-y divide-gray-50">
+                                <MotionTbody variants={containerVariants} initial="hidden" animate="show" className="divide-y divide-gray-50">
                                     {filteredStudents.map((student) => (
-                                        <motion.tr variants={itemVariants} key={student.id} className="hover:bg-blue-50/30 transition-colors group cursor-pointer" onClick={(e) => handleViewDetails(student, e)}>
+                                        <MotionTr variants={itemVariants} key={student.id} className="hover:bg-blue-50/30 transition-colors group cursor-pointer" onClick={(e: React.MouseEvent) => handleViewDetails(student, e)}>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <img src={student.avatarUrl} className="size-10 rounded-full object-cover bg-gray-100" />
+                                                    <Avatar src={student.avatarUrl} name={student.name} className="size-10 rounded-full" />
                                                     <div>
                                                         <p className="font-bold text-sm text-text-main">{student.name}</p>
                                                         <p className="text-xs text-text-secondary">{student.rank}</p>
@@ -361,9 +368,9 @@ const StudentsList: React.FC = () => {
                                                     <button onClick={(e) => handleDelete(student.id, e)} className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"><span className="material-symbols-outlined text-[18px]">delete</span></button>
                                                 </div>
                                             </td>
-                                        </motion.tr>
+                                        </MotionTr>
                                     ))}
-                                </motion.tbody>
+                                </MotionTbody>
                             </table>
                         </div>
                     </div>
@@ -524,7 +531,7 @@ const StudentsList: React.FC = () => {
                       </button>
                       
                       <div className="absolute -bottom-10 left-8 flex items-end gap-6">
-                          <img src={reactiveViewingStudent.avatarUrl} className="size-28 rounded-full border-4 border-white shadow-xl object-cover bg-white" />
+                          <Avatar src={reactiveViewingStudent.avatarUrl} name={reactiveViewingStudent.name} className="size-28 rounded-full border-4 border-white shadow-xl bg-white text-4xl" />
                           <div className="pb-10">
                               <h2 className="text-3xl font-bold text-white drop-shadow-md leading-none">{reactiveViewingStudent.name}</h2>
                               <div className="flex items-center gap-2 mt-2">
@@ -541,7 +548,7 @@ const StudentsList: React.FC = () => {
                   <div className="pt-14 px-8 border-b border-gray-100 flex gap-6 shrink-0 overflow-x-auto">
                       <button onClick={() => setActiveTab('info')} className={`pb-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === 'info' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Datos & Emergencia</button>
                       <button onClick={() => setActiveTab('attendance')} className={`pb-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === 'attendance' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Historial Asistencia</button>
-                      <button onClick={() => setActiveTab('finance')} className={`pb-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === 'finance' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Finanzas ({financialHistory.charges.length + financialHistory.payments.length})</button>
+                      <button onClick={() => setActiveTab('finance')} className={`pb-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === 'finance' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Finanzas ({studentFinancialRecords.length})</button>
                   </div>
 
                   <div className="p-8 overflow-y-auto">
@@ -585,10 +592,6 @@ const StudentsList: React.FC = () => {
                                   
                                   {/* Actions */}
                                   <div className="flex flex-col gap-3">
-                                      <button onClick={() => { navigate('/master/communication', { state: { recipientId: reactiveViewingStudent.id } }) }} className="w-full py-3 px-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all flex items-center justify-between group active:scale-95">
-                                          <span className="font-semibold text-sm">Enviar Mensaje</span>
-                                          <span className="material-symbols-outlined text-gray-400 group-hover:text-blue-500">mail</span>
-                                      </button>
                                       <button onClick={handlePromote} className="w-full py-3 px-4 rounded-xl border border-gray-200 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-all flex items-center justify-between group active:scale-95">
                                           <span className="font-semibold text-sm">Promover de Rango</span>
                                           <span className="material-symbols-outlined text-gray-400 group-hover:text-purple-500">workspace_premium</span>
@@ -633,22 +636,78 @@ const StudentsList: React.FC = () => {
                           </div>
                       )}
 
-                      {/* --- TAB: FINANCE (Simplified Reuse) --- */}
+                      {/* --- TAB: FINANCE (Improved Unified View) --- */}
                       {activeTab === 'finance' && (
                           <div className="space-y-4">
-                              <h4 className="text-xs font-bold text-text-secondary uppercase">Historial Financiero</h4>
-                              {financialHistory.charges.map(c => (
-                                  <div key={c.id} className="p-3 bg-red-50 rounded-lg flex justify-between">
-                                      <span>{c.description}</span>
-                                      <span className="font-bold text-red-600">-${c.amount}</span>
+                              <div className="flex justify-between items-center mb-2">
+                                  <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Historial de Movimientos</h4>
+                                  <span className="text-xs font-bold text-text-secondary bg-gray-100 px-2 py-1 rounded-md">{studentFinancialRecords.length} Registros</span>
+                              </div>
+                              
+                              {studentFinancialRecords.length === 0 ? (
+                                  <div className="text-center py-10 text-gray-400">
+                                      <span className="material-symbols-outlined text-4xl mb-2 opacity-50">account_balance_wallet</span>
+                                      <p className="text-sm">Sin historial financiero.</p>
                                   </div>
-                              ))}
-                              {financialHistory.payments.map(p => (
-                                  <div key={p.id} className="p-3 bg-green-50 rounded-lg flex justify-between">
-                                      <span>Pago: {p.method}</span>
-                                      <span className="font-bold text-green-600">+${p.amount}</span>
+                              ) : (
+                                  <div className="space-y-3">
+                                      {studentFinancialRecords.map(record => {
+                                          const isPaid = record.status === 'paid';
+                                          const isOverdue = record.status === 'overdue';
+                                          const isPending = record.status === 'pending';
+                                          
+                                          // Determine visual style
+                                          let icon = 'receipt';
+                                          let iconBg = 'bg-gray-100 text-gray-500';
+                                          let amountColor = 'text-text-main';
+                                          
+                                          if (isPaid) {
+                                              icon = 'check_circle';
+                                              iconBg = 'bg-green-100 text-green-600';
+                                              amountColor = 'text-green-600';
+                                          } else if (isOverdue) {
+                                              icon = 'warning';
+                                              iconBg = 'bg-red-100 text-red-600';
+                                              amountColor = 'text-red-600';
+                                          } else if (record.status === 'in_review') {
+                                              icon = 'hourglass_top';
+                                              iconBg = 'bg-amber-100 text-amber-600';
+                                          }
+
+                                          return (
+                                              <div key={record.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl hover:shadow-sm transition-shadow">
+                                                  <div className="flex items-center gap-4">
+                                                      <div className={`size-10 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}>
+                                                          <span className="material-symbols-outlined text-[20px]">{icon}</span>
+                                                      </div>
+                                                      <div>
+                                                          <p className="font-bold text-text-main text-sm">{record.concept}</p>
+                                                          <div className="flex items-center gap-2 text-xs text-text-secondary mt-0.5">
+                                                              <span>{formatDateDisplay(record.paymentDate || record.dueDate)}</span>
+                                                              {record.method && (
+                                                                  <>
+                                                                      <span>•</span>
+                                                                      <span className="bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200">{record.method}</span>
+                                                                  </>
+                                                              )}
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                                  <div className="text-right">
+                                                      <span className={`font-black text-sm block ${amountColor}`}>
+                                                          {isPaid ? '+' : '-'}${record.amount.toFixed(2)}
+                                                      </span>
+                                                      <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                                          isPaid ? 'text-green-600' : isOverdue ? 'text-red-500' : 'text-gray-400'
+                                                      }`}>
+                                                          {record.status === 'in_review' ? 'Revisión' : record.status}
+                                                      </span>
+                                                  </div>
+                                              </div>
+                                          );
+                                      })}
                                   </div>
-                              ))}
+                              )}
                           </div>
                       )}
                   </div>

@@ -18,25 +18,27 @@ export interface BankDetails {
     instructions?: string;
 }
 
+export interface PaymentSettings {
+    lateFeeAmount: number;
+    lateFeeGracePeriod: number;
+    monthlyTuition: number;
+    billingDay: number;
+    lateFeeDay: number;
+}
+
 export interface AcademySettings {
     id: string;
     name: string;
     code: string;
+    ownerId: string;
     modules: {
         library: boolean;
         payments: boolean;
         attendance: boolean;
     };
-    paymentSettings: {
-        lateFeeAmount: number;
-        lateFeeGracePeriod: number;
-        monthlyTuition: number;
-        billingDay: number;
-        lateFeeDay: number;
-    };
+    paymentSettings: PaymentSettings;
     bankDetails?: BankDetails;
     ranks: Rank[];
-    ownerId: string;
 }
 
 export interface PromotionHistoryItem {
@@ -46,7 +48,7 @@ export interface PromotionHistoryItem {
 }
 
 export interface AttendanceRecord {
-    date: string;
+    date: string; // YYYY-MM-DD
     classId: string;
     status: 'present' | 'late' | 'excused' | 'absent';
     timestamp: string;
@@ -197,30 +199,56 @@ export interface Event extends CalendarEvent {
     isVisibleToStudents?: boolean; // Control visibility in student dashboard
 }
 
-export type PaymentCategory = 'Mensualidad' | 'Torneo' | 'Examen/Promoción' | 'Equipo/Uniforme' | 'Otro' | 'Late Fee';
+// --- NEW FINANCIAL ARCHITECTURE (Single Record / Mutable State) ---
 
-export type TransactionType = 'charge' | 'payment';
-export type TransactionStatus = 'charged' | 'pending_approval' | 'paid' | 'rejected';
+// 'partial' added for waterfall logic
+export type TuitionStatus = 'pending' | 'overdue' | 'in_review' | 'paid' | 'charged' | 'partial';
+export type ChargeCategory = 'Mensualidad' | 'Torneo' | 'Examen/Promoción' | 'Equipo/Uniforme' | 'Otro' | 'Late Fee';
 
-export interface FinancialRecord {
+export interface TuitionRecord {
     id: string;
     academyId: string;
     studentId: string;
-    studentName?: string;
-    amount: number;
-    date: string; 
-    type: TransactionType;
-    status: TransactionStatus;
-    description: string;
-    category: PaymentCategory;
+    studentName?: string; // Denormalized for easier display
+    
+    concept: string; // "Mensualidad Enero", "Uniforme"
+    month?: string; // "2024-01" (Optional context)
+    
+    amount: number; // Current remaining debt
+    originalAmount?: number; // Audit trail: initial debt before partial payments
+    penaltyAmount: number; // Late fee
+    
+    dueDate: string; // ISO String (YYYY-MM-DD)
+    paymentDate: string | null; // ISO String (YYYY-MM-DDTHH:mm:ss) - Frozen on upload
+    
+    status: TuitionStatus;
+    proofUrl: string | null;
+    proofType?: string; // 'image/png', 'application/pdf'
+    
     method?: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'System';
-    proofUrl?: string; 
-    proofType?: string; 
-    processedBy?: string;
-    processedAt?: string;
+
+    // Optional fields for extended functionality
+    type?: 'charge' | 'payment';
+    description?: string;
+    category?: ChargeCategory; // Strongly typed now
+    
+    // New Fields for Batch & Waterfall Logic
+    batchPaymentId?: string; // Links multiple records to one single proof/transaction
+    canBePaidInParts: boolean; // Priority flag: False = Must be paid fully (e.g. Tuition)
+    relatedEventId?: string; // Links to an Event ID (Tournament/Exam)
+    declaredAmount?: number; // What the student claims to have paid in total for this batch
 }
 
-export type Payment = FinancialRecord; 
+export interface ManualChargeData {
+    studentId: string;
+    category: ChargeCategory;
+    title: string; // Maps to concept
+    description?: string;
+    amount: number;
+    dueDate: string;
+    canBePaidInParts: boolean;
+    relatedEventId?: string;
+}
 
 export interface UserProfile {
     id: string;
@@ -245,15 +273,6 @@ export interface LibraryResource {
     level: string;
     videoUrl: string;
     completedBy: string[];
-}
-
-export interface FinanceStat {
-    label: string;
-    value: string;
-    trend: number;
-    trendLabel: string;
-    icon: string;
-    color: string;
 }
 
 export interface ClassSession {
@@ -283,15 +302,6 @@ export interface ScheduleItem {
     level: string;
     type: 'gi' | 'nogi' | 'striking';
     enrolled: boolean;
-}
-
-export interface Invoice {
-    id: string;
-    date: string;
-    amount: number;
-    status: 'paid' | 'pending' | 'failed';
-    description: string;
-    method?: string;
 }
 
 export interface Message {

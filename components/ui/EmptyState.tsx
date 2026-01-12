@@ -1,5 +1,9 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
+
+// Fix for type errors with motion components
+const MotionDiv = motion.div as any;
 
 interface EmptyStateProps {
   icon?: string;
@@ -10,7 +14,7 @@ interface EmptyStateProps {
 
 const EmptyState: React.FC<EmptyStateProps> = ({ icon = 'inbox', title, description, action }) => {
   return (
-    <motion.div 
+    <MotionDiv 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className="flex flex-col items-center justify-center py-20 px-4 text-center h-full min-h-[300px]"
@@ -27,7 +31,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ icon = 'inbox', title, descript
           {action}
         </div>
       )}
-    </motion.div>
+    </MotionDiv>
   );
 };
 

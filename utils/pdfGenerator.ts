@@ -1,7 +1,7 @@
 
-import { Payment, AcademySettings, UserProfile } from '../types';
+import { TuitionRecord, AcademySettings, UserProfile } from '../types';
 
-export const generateReceipt = (payment: Payment, academy: AcademySettings, user?: UserProfile | null) => {
+export const generateReceipt = (payment: TuitionRecord, academy: AcademySettings, user?: UserProfile | null) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
         alert("Por favor habilita los pop-ups para generar el recibo.");
@@ -9,8 +9,9 @@ export const generateReceipt = (payment: Payment, academy: AcademySettings, user
     }
 
     // CRITICAL FIX: Manually parse date string YYYY-MM-DD to avoid UTC shift
-    const [year, month, day] = payment.date.split('-').map(Number);
-    const localDate = new Date(year, month - 1, day);
+    // Handle both paymentDate (ISO timestamp) and dueDate (YYYY-MM-DD)
+    const dateToUse = payment.paymentDate || payment.dueDate;
+    const localDate = new Date(dateToUse);
     const displayDate = localDate.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
 
     const html = `
@@ -117,9 +118,9 @@ export const generateReceipt = (payment: Payment, academy: AcademySettings, user
                 <tbody>
                     <tr>
                         <td>
-                            <span style="font-weight: 600;">${payment.description}</span>
+                            <span style="font-weight: 600;">${payment.concept || payment.description}</span>
                         </td>
-                        <td>${payment.category}</td>
+                        <td>${payment.category || 'General'}</td>
                         <td>$${payment.amount.toFixed(2)}</td>
                     </tr>
                 </tbody>

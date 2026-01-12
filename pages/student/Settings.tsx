@@ -5,11 +5,12 @@ import { useToast } from '../../context/ToastContext';
 import { RankColor, Rank, Student } from '../../types';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import EmergencyCard from '../../components/ui/EmergencyCard';
+import Avatar from '../../components/ui/Avatar';
 
 const Settings: React.FC = () => {
   const { currentUser, students, updateStudent, academySettings, updateAcademySettings, updateUserProfile, changePassword } = useStore();
   const { addToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'profile' | 'emergency' | 'academy' | 'notifications'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'emergency' | 'academy'>('profile');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Get Current Student Data (Extended)
@@ -32,9 +33,6 @@ const Settings: React.FC = () => {
   const [academyData, setAcademyData] = useState(academySettings);
   const [bankData, setBankData] = useState(academySettings.bankDetails || { bankName: '', accountHolder: '', accountNumber: '', clabe: '', instructions: '' });
   
-  // Notifications State
-  const [notifications, setNotifications] = useState({ payments: true, attendance: false, events: true, newsletter: false });
-
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void}>({
       isOpen: false, title: '', message: '', action: () => {}
@@ -132,7 +130,6 @@ const Settings: React.FC = () => {
                   { id: 'profile', label: 'Perfil y Seguridad', icon: 'security' },
                   ...(student ? [{ id: 'emergency', label: 'Contacto Emergencia', icon: 'contact_emergency' }] : []),
                   ...(currentUser?.role === 'master' ? [{ id: 'academy', label: 'Academia & Banco', icon: 'domain' }] : []),
-                  { id: 'notifications', label: 'Notificaciones', icon: 'notifications' },
               ].map(item => (
                   <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === item.id ? 'bg-white text-primary shadow-sm ring-1 ring-black/5' : 'text-text-secondary hover:bg-white/50 hover:text-text-main'}`}>
                       <span className={`material-symbols-outlined text-[20px] ${activeTab === item.id ? 'filled' : ''}`}>{item.icon}</span>
@@ -150,7 +147,11 @@ const Settings: React.FC = () => {
                            <h3 className="text-lg font-bold text-text-main mb-6">Información Básica</h3>
                            <div className="flex items-center gap-6 mb-8">
                                <div className="relative group cursor-pointer" onClick={triggerFileInput}>
-                                   <img src={profileData.avatarUrl} className="size-24 rounded-full object-cover ring-4 ring-gray-50 bg-gray-100" />
+                                   <Avatar 
+                                        src={profileData.avatarUrl} 
+                                        name={profileData.name} 
+                                        className="size-24 rounded-full ring-4 ring-gray-50 text-2xl" 
+                                   />
                                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-[2px]">
                                        <span className="material-symbols-outlined text-white">photo_camera</span>
                                    </div>
@@ -287,26 +288,6 @@ const Settings: React.FC = () => {
                           <button type="submit" className="px-8 py-3 rounded-xl bg-primary text-white text-sm font-bold shadow-lg hover:bg-primary-hover">Guardar Configuración</button>
                       </div>
                   </form>
-              )}
-
-              {/* Notifications Tab */}
-              {activeTab === 'notifications' && (
-                  <div className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
-                      <h3 className="text-lg font-bold text-text-main mb-6">Preferencias de Notificación</h3>
-                      <div className="space-y-6">
-                          {[{ key: 'payments', label: 'Alertas de Pago', desc: 'Recibe correos cuando un pago es aprobado.' }, { key: 'events', label: 'Nuevos Eventos', desc: 'Notificaciones sobre seminarios y exámenes.' }].map((setting) => (
-                              <div key={setting.key} className="flex items-center justify-between">
-                                  <div>
-                                      <p className="font-semibold text-text-main text-sm">{setting.label}</p>
-                                      <p className="text-text-secondary text-xs">{setting.desc}</p>
-                                  </div>
-                                  <button onClick={() => setNotifications(prev => ({ ...prev, [setting.key]: !prev[setting.key as keyof typeof notifications] }))} className={`w-12 h-7 rounded-full transition-colors relative ${notifications[setting.key as keyof typeof notifications] ? 'bg-primary' : 'bg-gray-200'}`}>
-                                      <div className={`size-5 bg-white rounded-full shadow-sm absolute top-1 transition-transform ${notifications[setting.key as keyof typeof notifications] ? 'left-6' : 'left-1'}`}></div>
-                                  </button>
-                              </div>
-                          ))}
-                      </div>
-                  </div>
               )}
           </div>
       </div>

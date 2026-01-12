@@ -1,5 +1,7 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Student } from '../../types';
+import Avatar from './Avatar';
 
 interface StudentSearchProps {
   students: Student[];
@@ -96,15 +98,13 @@ const StudentSearch: React.FC<StudentSearchProps> = ({ students, value, onChange
           }}
           onFocus={() => {
               setIsOpen(true);
-              // Optional: Select text on focus for easy replacement
-              // inputRef.current?.select(); 
           }}
           onKeyDown={handleKeyDown}
           autoComplete="off"
         />
         <div className="absolute left-3 top-3 pointer-events-none">
             {selectedStudent ? (
-                <img src={selectedStudent.avatarUrl} className="size-6 rounded-full object-cover border border-gray-200" alt="" />
+                <Avatar src={selectedStudent.avatarUrl} name={selectedStudent.name} className="size-6 rounded-full border border-gray-200 text-xs" />
             ) : (
                 <span className="material-symbols-outlined text-gray-400">search</span>
             )}
@@ -149,7 +149,7 @@ const StudentSearch: React.FC<StudentSearchProps> = ({ students, value, onChange
                 onMouseEnter={() => setHighlightedIndex(index)}
               >
                 <div className="flex items-center gap-3">
-                    <img src={student.avatarUrl} className="size-8 rounded-full object-cover bg-gray-200" alt={student.name} />
+                    <Avatar src={student.avatarUrl} name={student.name} className="size-8 rounded-full" />
                     <div className="flex flex-col">
                         <span className={`font-bold truncate ${index === highlightedIndex ? 'text-primary' : 'text-gray-900'}`}>
                             {student.name}
