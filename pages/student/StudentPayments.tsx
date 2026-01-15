@@ -177,6 +177,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
         }
     };
 
+    const handleManualUpdate = () => {
+        if (isAmountValid) {
+            addToast('Monto actualizado correctamente', 'success');
+        } else {
+            // Re-use logic from isAmountValid for the toast message
+            if (finalAmount > totalDebtSum + 0.01) {
+                addToast('El monto no puede ser mayor a la deuda total.', 'error');
+            } else {
+                addToast(`Debes cubrir al menos $${mandatorySum.toFixed(2)} de los conceptos obligatorios.`, 'error');
+            }
+        }
+    };
+
     const handleSubmit = () => {
         if (selectedDebts.length === 0) return;
         if (method === 'Transferencia' && !file) return;
@@ -338,6 +351,17 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                                 </span>
                             )}
                         </div>
+
+                        {/* NEW BUTTON: Update Amount */}
+                        {isPartialEnabled && (
+                            <button 
+                                onClick={handleManualUpdate}
+                                className="w-full mt-2 py-2 text-sm font-bold border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
+                            >
+                                <span className="material-symbols-outlined text-lg">sync</span>
+                                Actualizar Monto
+                            </button>
+                        )}
 
                         {!isAmountValid && isPartialEnabled && (
                             <div className="flex items-center gap-3 text-xs text-red-600 font-medium bg-red-50 p-3 rounded-xl border border-red-100 animate-in slide-in-from-top-1">

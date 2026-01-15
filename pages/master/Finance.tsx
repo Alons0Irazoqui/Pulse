@@ -55,6 +55,60 @@ const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: nu
     }
 };
 
+const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (id: string, val: number) => void }) => {
+    const [val, setVal] = useState(item.amount.toString());
+    
+    // Sync internal state if the prop changes from outside (e.g. another update)
+    useEffect(() => {
+        setVal(item.amount.toString());
+    }, [item.amount]);
+
+    const handleSave = () => {
+        const num = parseFloat(val);
+        if (!isNaN(num) && num >= 0) {
+            onUpdate(item.id, num);
+        }
+    };
+
+    const hasChanged = parseFloat(val) !== item.amount;
+
+    return (
+        <div className="flex items-center gap-2 mt-2" onClick={e => e.stopPropagation()}>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Deuda:</span>
+            <div className="relative flex items-center group/input">
+                <span className="absolute left-2 text-gray-400 text-xs font-bold pointer-events-none">$</span>
+                <input 
+                    type="number"
+                    className={`w-24 pl-5 pr-2 py-1 text-xs font-bold rounded-lg border outline-none transition-all ${
+                        hasChanged 
+                        ? 'bg-white border-orange-300 text-orange-600 ring-2 ring-orange-100' 
+                        : 'bg-gray-50 border-gray-200 text-gray-700 focus:bg-white focus:border-orange-400'
+                    }`}
+                    value={val}
+                    onChange={(e) => setVal(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                />
+            </div>
+            
+            {hasChanged && (
+                <button 
+                    onClick={handleSave}
+                    className="size-7 flex items-center justify-center bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all animate-in zoom-in shadow-sm border border-green-200"
+                    title="Guardar nuevo monto"
+                >
+                    <span className="material-symbols-outlined text-sm font-bold">save</span>
+                </button>
+            )}
+
+            {item.penaltyAmount > 0 && (
+                <span className="text-[10px] text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[10px]">add</span> ${item.penaltyAmount} recargo
+                </span>
+            )}
+        </div>
+    );
+};
+
 interface GroupedTransaction {
     id: string; // BatchID or RecordID
     isBatch: boolean;
@@ -74,7 +128,8 @@ const Finance: React.FC = () => {
       academySettings, 
       currentUser,
       approveBatchPayment,
-      rejectBatchPayment 
+      rejectBatchPayment,
+      updateRecordAmount // New capability
   } = useStore();
   
   const { addToast } = useToast();
@@ -177,6 +232,27 @@ const Finance: React.FC = () => {
 
   }, [rawFilteredRecords, activeTab]);
 
+  // -- REACTIVE ACTIVE GROUP (CRITICAL FIX) --
+  // Rebuilds the selected group data from fresh `records` to support live editing in modal
+  const activeGroup = useMemo(() => {
+      if (!selectedGroup) return null;
+      
+      // Find updated records that match the IDs in the selected group
+      const freshRecords = records.filter(r => selectedGroup.records.some(old => old.id === r.id));
+      
+      if (freshRecords.length === 0) return null; // Should not happen unless deleted externally
+
+      const mainRecord = freshRecords.find(r => r.id === selectedGroup.mainRecord.id) || freshRecords[0];
+      const totalAmount = freshRecords.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0);
+
+      return {
+          ...selectedGroup,
+          records: freshRecords,
+          mainRecord,
+          totalAmount
+      };
+  }, [selectedGroup, records]);
+
   // -- STATS --
   const stats = useMemo(() => {
       return {
@@ -188,9 +264,9 @@ const Finance: React.FC = () => {
 
   // -- CALCULATE PREVIEW (The Visual Waterfall) --
   const previewDistribution = useMemo(() => {
-      if (!selectedGroup) return [];
+      if (!activeGroup) return [];
       
-      const items = [...selectedGroup.records];
+      const items = [...activeGroup.records];
       // Separate mandatory and splittable
       const mandatory = items.filter(r => !r.canBePaidInParts);
       const splittable = items.filter(r => r.canBePaidInParts)
@@ -198,10 +274,10 @@ const Finance: React.FC = () => {
 
       // Use adjustmentValue if editing, otherwise fallbacks
       let available = 0;
-      if (selectedGroup.mainRecord.category === 'Mensualidad' && adjustmentValue) {
+      if (activeGroup.mainRecord.category === 'Mensualidad' && adjustmentValue) {
           available = parseFloat(adjustmentValue);
       } else {
-          available = selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount;
+          available = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalAmount;
       }
       
       const preview = [];
@@ -236,51 +312,51 @@ const Finance: React.FC = () => {
       }
       
       return preview;
-  }, [selectedGroup, adjustmentValue]);
+  }, [activeGroup, adjustmentValue]);
 
 
   // -- ACTIONS --
 
   const handleApprove = () => {
-      if (!selectedGroup) return;
+      if (!activeGroup) return;
       
       // Determine final amount to approve
-      const isMensualidad = selectedGroup.mainRecord.category === 'Mensualidad';
+      const isMensualidad = activeGroup.mainRecord.category === 'Mensualidad';
       let amountToApprove = 0;
 
       if (isMensualidad && adjustmentValue) {
           amountToApprove = parseFloat(adjustmentValue);
       } else {
-          amountToApprove = selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount;
+          amountToApprove = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalAmount;
       }
 
-      if (selectedGroup.isBatch) {
-          approveBatchPayment(selectedGroup.id, amountToApprove);
+      if (activeGroup.isBatch) {
+          approveBatchPayment(activeGroup.id, amountToApprove);
       } else {
           // If single record, use special approvePayment logic which handles adjustment if category matches
-          if (!isMensualidad && amountToApprove < selectedGroup.totalAmount) {
+          if (!isMensualidad && amountToApprove < activeGroup.totalAmount) {
                // Treat as 1-item batch to trigger waterfall partial logic for NON-mensualidad items
-               approveBatchPayment(selectedGroup.records[0].batchPaymentId || `temp-${selectedGroup.records[0].id}`, amountToApprove);
+               approveBatchPayment(activeGroup.records[0].batchPaymentId || `temp-${activeGroup.records[0].id}`, amountToApprove);
           } else {
                // For Mensualidad or Full Payment
-               approvePayment(selectedGroup.id, isMensualidad ? amountToApprove : undefined);
+               approvePayment(activeGroup.id, isMensualidad ? amountToApprove : undefined);
           }
       }
       setSelectedGroup(null);
   };
 
   const handleReject = () => {
-      if (!selectedGroup) return;
+      if (!activeGroup) return;
       confirm({
-          title: selectedGroup.isBatch ? 'Rechazar Lote Completo' : 'Rechazar Pago',
+          title: activeGroup.isBatch ? 'Rechazar Lote Completo' : 'Rechazar Pago',
           message: 'El estatus volverá a Pendiente/Vencido y se notificará al alumno.',
           type: 'danger',
           confirmText: 'Rechazar',
           onConfirm: () => {
-              if (selectedGroup.isBatch) {
-                  rejectBatchPayment(selectedGroup.id);
+              if (activeGroup.isBatch) {
+                  rejectBatchPayment(activeGroup.id);
               } else {
-                  rejectPayment(selectedGroup.id);
+                  rejectPayment(activeGroup.id);
               }
               setSelectedGroup(null);
           }
@@ -491,17 +567,17 @@ const Finance: React.FC = () => {
         </div>
 
         {/* --- REVIEW MODAL --- */}
-        {selectedGroup && (
+        {activeGroup && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white rounded-[2rem] w-full max-w-4xl h-[85vh] shadow-2xl flex overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
                     
                     {/* Left: Proof Image */}
                     <div className="w-1/2 bg-gray-50 flex items-center justify-center relative p-6 border-r border-gray-100">
-                        {selectedGroup.mainRecord.proofUrl ? (
-                            selectedGroup.mainRecord.proofType?.includes('pdf') ? (
-                                <iframe src={selectedGroup.mainRecord.proofUrl} className="w-full h-full rounded-2xl border border-gray-200 shadow-sm" />
+                        {activeGroup.mainRecord.proofUrl ? (
+                            activeGroup.mainRecord.proofType?.includes('pdf') ? (
+                                <iframe src={activeGroup.mainRecord.proofUrl} className="w-full h-full rounded-2xl border border-gray-200 shadow-sm" />
                             ) : (
-                                <img src={selectedGroup.mainRecord.proofUrl} className="max-w-full max-h-full object-contain rounded-xl shadow-lg" />
+                                <img src={activeGroup.mainRecord.proofUrl} className="max-w-full max-h-full object-contain rounded-xl shadow-lg" />
                             )
                         ) : (
                             <div className="text-gray-300 flex flex-col items-center">
@@ -510,7 +586,7 @@ const Finance: React.FC = () => {
                             </div>
                         )}
                         <div className="absolute top-6 left-6 bg-white/80 backdrop-blur-md text-gray-900 px-4 py-1.5 rounded-full text-xs font-bold border border-gray-200 shadow-sm">
-                            Comprobante {selectedGroup.isBatch ? '(Lote)' : ''}
+                            Comprobante {activeGroup.isBatch ? '(Lote)' : ''}
                         </div>
                     </div>
 
@@ -533,22 +609,22 @@ const Finance: React.FC = () => {
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Monto Declarado</p>
                                     <span className="bg-white border border-gray-200 px-3 py-1 rounded-lg text-xs font-bold text-gray-700 shadow-sm">
-                                        {selectedGroup.mainRecord.method}
+                                        {activeGroup.mainRecord.method}
                                     </span>
                                 </div>
                                 <p className="text-4xl font-black text-gray-900 tracking-tight">
-                                    ${(selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount).toFixed(2)}
+                                    ${(activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalAmount).toFixed(2)}
                                 </p>
-                                {selectedGroup.declaredAmount !== undefined && selectedGroup.declaredAmount < selectedGroup.totalAmount && (
+                                {activeGroup.declaredAmount !== undefined && activeGroup.declaredAmount < activeGroup.totalAmount && (
                                     <p className="text-xs text-orange-600 font-bold mt-2 flex items-center gap-1 bg-orange-50 w-fit px-2 py-1 rounded-lg border border-orange-100">
                                         <span className="material-symbols-outlined text-[14px]">warning</span>
-                                        Pago parcial. Deuda total era ${selectedGroup.totalAmount}
+                                        Pago parcial. Deuda total era ${activeGroup.totalAmount}
                                     </p>
                                 )}
                             </div>
 
                             {/* Adjustment Input for Mensualidades */}
-                            {selectedGroup.mainRecord.category === 'Mensualidad' && (
+                            {activeGroup.mainRecord.category === 'Mensualidad' && (
                                 <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm relative overflow-hidden group focus-within:ring-2 focus-within:ring-orange-100 focus-within:border-orange-300 transition-all">
                                     <div className="absolute top-0 right-0 p-3 opacity-10">
                                         <span className="material-symbols-outlined text-4xl text-orange-500">edit_note</span>
@@ -575,7 +651,7 @@ const Finance: React.FC = () => {
                                 <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 ml-1 tracking-wider">Aplicación de Fondos</h4>
                                 <div className="space-y-3">
                                     {previewDistribution.map((item: any) => (
-                                        <div key={item.id} className="flex flex-col p-4 bg-white border border-gray-100 rounded-2xl relative overflow-hidden shadow-sm">
+                                        <div key={item.id} className="flex flex-col p-4 bg-white border border-gray-100 rounded-2xl relative overflow-hidden shadow-sm transition-all hover:border-gray-200">
                                             {/* Status Indicator Bar */}
                                             <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
                                                 item._status === 'paid' ? 'bg-green-500' : item._status === 'partial' ? 'bg-orange-500' : 'bg-red-300'
@@ -584,7 +660,14 @@ const Finance: React.FC = () => {
                                             <div className="flex justify-between items-start pl-3">
                                                 <div>
                                                     <span className="text-sm font-bold text-gray-900 block">{item.concept}</span>
-                                                    <span className="text-xs text-gray-500 font-medium">Deuda Total: ${(item.amount + item.penaltyAmount).toFixed(2)}</span>
+                                                    {/* EDITABLE DEBT COMPONENT */}
+                                                    <DebtAmountEditor 
+                                                        item={item} 
+                                                        onUpdate={(id, val) => {
+                                                            updateRecordAmount(id, val);
+                                                            addToast('Monto de deuda actualizado', 'success');
+                                                        }} 
+                                                    />
                                                 </div>
                                                 <div className="text-right">
                                                     <span className={`font-mono font-bold text-sm ${item._status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>
@@ -609,7 +692,7 @@ const Finance: React.FC = () => {
 
                             {/* Time Validation */}
                             {(() => {
-                                const { isLate, diffDays } = getTimeValidation(selectedGroup.mainRecord);
+                                const { isLate, diffDays } = getTimeValidation(activeGroup.mainRecord);
                                 return (
                                     <div className={`rounded-2xl p-4 border text-xs ${isLate ? 'bg-red-50 border-red-100 text-red-700' : 'bg-green-50 border-green-100 text-green-700'}`}>
                                         <div className="flex items-center gap-2 font-bold mb-1 uppercase tracking-wide">

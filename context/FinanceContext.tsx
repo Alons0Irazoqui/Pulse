@@ -49,6 +49,9 @@ interface FinanceContextType {
   approvePayment: (recordId: string, adjustedAmount?: number) => void; 
   rejectPayment: (recordId: string) => void;
   
+  // New Architecture: Mutability for Scholarships/Adjustments
+  updateRecordAmount: (recordId: string, newAmount: number) => void;
+
   generateMonthlyBilling: () => void; 
   checkOverdueStatus: () => void;
   getStudentPendingDebts: (studentId: string) => TuitionRecord[];
@@ -108,8 +111,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // --- CALCULATED METRICS (MEMOIZED) ---
 
   // 1. Total Revenue: Sum of all PAID records
-  // CRITICAL: This depends on `originalAmount` or `amount` of paid records.
-  // When approvePayment adjusts the amount, it updates `originalAmount`, so this sum automatically reflects the discount.
   const totalRevenue = useMemo(() => {
       if (isFinanceLoading) return 0;
       return records.reduce((acc, r) => {
@@ -132,7 +133,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       records.forEach(r => {
           if (r.status === 'paid') {
-              // Priority: Payment Date (Real Cash Flow) -> Due Date (Accrual fallback)
               const dateStr = r.paymentDate || r.dueDate;
               if (dateStr) {
                   const dateObj = new Date(dateStr);
@@ -261,6 +261,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const approveBatchPayment = (batchId: string, totalPaidAmount: number) => {
+      const EPSILON = 0.01; // Tolerance for float comparison
+
       setRecords(prev => {
           const batchRecords = prev.filter(r => r.batchPaymentId === batchId);
           const otherRecords = prev.filter(r => r.batchPaymentId !== batchId);
@@ -274,10 +276,21 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           let remainingMoney = totalPaidAmount;
           const processedBatch: TuitionRecord[] = [];
 
+          // Distribution Logic 2.0 (Strict "Principal Covered = Paid")
           for (const item of mandatoryItems) {
-              const totalCost = item.amount + item.penaltyAmount;
-              if (remainingMoney >= totalCost) {
-                  remainingMoney -= totalCost;
+              const principal = item.amount;
+              const totalDebt = item.amount + item.penaltyAmount;
+              
+              // CRITICAL: We check if payment covers PRINCIPAL (item.amount). 
+              // If it does, we assume the intention is to fully pay, waiving remainder penalty if funds are short.
+              if (remainingMoney >= principal - EPSILON) {
+                  // Determine actual deduction: Prefer taking full debt, fallback to whatever is left (principal + part of penalty)
+                  let deduction = totalDebt;
+                  if (remainingMoney < totalDebt) {
+                      deduction = remainingMoney; // Consumes all rest, implicitly waiving the unpaid penalty portion
+                  }
+                  
+                  remainingMoney -= deduction;
                   processedBatch.push({ ...item, status: 'paid', amount: 0, penaltyAmount: 0, originalAmount: item.amount }); 
               } else {
                   const isOverdue = new Date() > new Date(item.dueDate);
@@ -286,22 +299,34 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
 
           for (const item of splittableItems) {
-              const currentDebt = item.amount + item.penaltyAmount;
+              const totalDebt = item.amount + item.penaltyAmount;
+              const principal = item.amount;
+
               if (remainingMoney <= 0) {
                   const isOverdue = new Date() > new Date(item.dueDate);
                   processedBatch.push({ ...item, status: isOverdue ? 'overdue' : 'pending', batchPaymentId: undefined, paymentDate: null, declaredAmount: undefined, details: undefined });
                   continue;
               }
 
-              if (remainingMoney >= currentDebt) {
-                  remainingMoney -= currentDebt;
+              // Try to pay full debt first
+              if (remainingMoney >= totalDebt - EPSILON) {
+                  remainingMoney -= totalDebt;
                   processedBatch.push({ ...item, status: 'paid', amount: 0, penaltyAmount: 0, originalAmount: item.amount });
-              } else {
+              } 
+              // If not, try to pay at least Principal to mark as Paid (Waive Penalty)
+              else if (remainingMoney >= principal - EPSILON) {
+                  // Consumes all remaining money (Principal + partial penalty)
+                  remainingMoney = 0; 
+                  processedBatch.push({ ...item, status: 'paid', amount: 0, penaltyAmount: 0, originalAmount: item.amount });
+              }
+              // Partial Payment
+              else {
                   const paymentForThis = remainingMoney;
                   let newAmount = item.amount;
                   let newPenalty = item.penaltyAmount;
                   let moneyToDeduct = paymentForThis;
 
+                  // Pay penalty first? Or principal? Standard is Penalty first usually, but let's stick to debt reduction.
                   if (moneyToDeduct >= newPenalty) {
                       moneyToDeduct -= newPenalty;
                       newPenalty = 0;
@@ -315,7 +340,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
                   processedBatch.push({
                       ...item,
-                      status: 'pending',
+                      status: 'partial',
                       amount: newAmount,
                       penaltyAmount: newPenalty,
                       originalAmount: item.originalAmount || item.amount,
@@ -419,18 +444,36 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       registerBatchPayment([recordId], file, method);
   };
 
+  const updateRecordAmount = (recordId: string, newAmount: number) => {
+      setRecords(prev => prev.map(r => {
+          if (r.id === recordId) {
+              const updatedRecord = { ...r, amount: newAmount };
+              
+              // Automatic Status Logic:
+              // If amount is zeroed out (e.g. 100% scholarship or manual fix), mark as paid.
+              if (newAmount <= 0) {
+                  updatedRecord.status = 'paid';
+                  updatedRecord.paymentDate = updatedRecord.paymentDate || new Date().toISOString();
+                  updatedRecord.amount = 0; // Sanitize negative values
+                  updatedRecord.penaltyAmount = 0; // Clear penalty too if fully discounted
+              } 
+              
+              return updatedRecord;
+          }
+          return r;
+      }));
+      addToast('Monto de deuda actualizado.', 'success');
+  };
+
   const approvePayment = (recordId: string, adjustedAmount?: number) => {
       const record = records.find(r => r.id === recordId);
       if (!record) return;
 
-      // Ensure we have a payment date to record revenue in the correct month
       const effectiveDate = record.paymentDate || new Date().toISOString();
 
       setRecords(prev => prev.map(r => {
           if (r.id === recordId) {
               // Lógica Específica: Ajuste de Mensualidad
-              // Si el maestro define un monto ajustado (ej. descuento), este se convierte en el "Monto Pagado"
-              // y también en el "Monto Original" para fines de reporte de ingresos, eliminando la diferencia (descuento).
               if (r.category === 'Mensualidad' && adjustedAmount !== undefined) {
                   return {
                       ...r,
@@ -599,6 +642,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         uploadProof,
         approvePayment, 
         rejectPayment, 
+        updateRecordAmount,
         generateMonthlyBilling, 
         checkOverdueStatus,
         getStudentPendingDebts,
