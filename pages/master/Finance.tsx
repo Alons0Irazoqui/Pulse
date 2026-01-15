@@ -7,7 +7,6 @@ import { TuitionRecord, TuitionStatus } from '../../types';
 import { exportToCSV } from '../../utils/csvExport';
 import { generateReceipt } from '../../utils/pdfGenerator';
 import { formatDateDisplay } from '../../utils/dateUtils';
-import { motion, AnimatePresence } from 'framer-motion';
 import EmptyState from '../../components/ui/EmptyState';
 import CreateChargeModal from '../../components/finance/CreateChargeModal';
 
@@ -17,40 +16,40 @@ const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: nu
     switch (status) {
         case 'paid':
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
-                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                    PAGADO
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-100 uppercase tracking-wide">
+                    <span className="material-symbols-outlined text-[14px] filled">check_circle</span>
+                    Pagado
                 </span>
             );
         case 'in_review':
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
-                    <span className="material-symbols-outlined text-[14px]">hourglass_top</span>
-                    REVISAR
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 uppercase tracking-wide animate-pulse">
+                    <span className="material-symbols-outlined text-[14px] filled">hourglass_top</span>
+                    Revisar
                 </span>
             );
         case 'overdue':
             return (
-                <div className="flex flex-col items-start">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
-                        <span className="material-symbols-outlined text-[14px]">warning</span>
-                        VENCIDO
+                <div className="flex flex-col items-start gap-1">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-100 uppercase tracking-wide">
+                        <span className="material-symbols-outlined text-[14px] filled">warning</span>
+                        Vencido
                     </span>
-                    {penalty > 0 && <span className="text-[10px] text-red-500 font-medium mt-0.5">+${penalty} Recargo</span>}
+                    {penalty > 0 && <span className="text-[10px] text-red-500 font-bold ml-1">+${penalty} Recargo</span>}
                 </div>
             );
         case 'partial':
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200">
-                    <span className="material-symbols-outlined text-[14px]">pie_chart</span>
-                    RESTANTE
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-100 uppercase tracking-wide">
+                    <span className="material-symbols-outlined text-[14px] filled">pie_chart</span>
+                    Restante
                 </span>
             );
         default: // pending
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200 uppercase tracking-wide">
                     <span className="material-symbols-outlined text-[14px]">pending</span>
-                    PENDIENTE
+                    Pendiente
                 </span>
             );
     }
@@ -302,17 +301,17 @@ const Finance: React.FC = () => {
         <div className="bg-white border-b border-gray-200 px-6 py-6 md:px-10 sticky top-0 z-20 shadow-sm">
             <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight text-text-main">Control Financiero</h1>
-                    <p className="text-text-secondary mt-1">Valida pagos, gestiona cobros y revisa el historial.</p>
+                    <h1 className="text-3xl font-black tracking-tight text-gray-900">Control Financiero</h1>
+                    <p className="text-gray-500 mt-1 font-medium">Valida pagos, gestiona cobros y revisa el historial.</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                    <button onClick={handleExport} className="px-4 py-2.5 bg-white border border-gray-200 text-text-secondary font-bold rounded-xl hover:bg-gray-50 transition-all text-sm flex items-center gap-2">
+                    <button onClick={handleExport} className="px-4 py-2.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all text-sm flex items-center gap-2 active:scale-95">
                         <span className="material-symbols-outlined text-lg">download</span> Exportar
                     </button>
-                    <button onClick={() => setIsChargeModalOpen(true)} className="px-5 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover transition-all text-sm flex items-center gap-2 shadow-lg shadow-primary/30 active:scale-95">
+                    <button onClick={() => setIsChargeModalOpen(true)} className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all text-sm flex items-center gap-2 shadow-lg shadow-orange-500/30 active:scale-95">
                         <span className="material-symbols-outlined text-lg">add_circle</span> Nuevo Cargo
                     </button>
-                    <button onClick={handleGenerateBilling} className="px-5 py-2.5 bg-black text-white font-bold rounded-xl hover:bg-gray-800 transition-all text-sm flex items-center gap-2 shadow-lg">
+                    <button onClick={handleGenerateBilling} className="px-5 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all text-sm flex items-center gap-2 shadow-lg active:scale-95">
                         <span className="material-symbols-outlined text-lg">payments</span> Generar Mensualidad
                     </button>
                 </div>
@@ -320,7 +319,7 @@ const Finance: React.FC = () => {
 
             {/* --- TABS --- */}
             <div className="max-w-[1600px] mx-auto mt-8 flex flex-col md:flex-row gap-4 justify-between items-center">
-                <div className="flex bg-gray-100 p-1 rounded-xl w-full md:w-auto overflow-x-auto no-scrollbar">
+                <div className="flex bg-gray-100 p-1.5 rounded-2xl w-full md:w-auto overflow-x-auto no-scrollbar shadow-inner">
                     {[
                         { id: 'review', label: 'Por Revisar', count: stats.review, icon: 'rate_review' },
                         { id: 'pending', label: 'Pendientes', count: stats.pending, icon: 'pending' },
@@ -331,13 +330,13 @@ const Finance: React.FC = () => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
                                 activeTab === tab.id 
-                                ? 'bg-white text-primary shadow-sm' 
-                                : 'text-text-secondary hover:text-text-main hover:bg-gray-200/50'
+                                ? 'bg-white text-orange-600 shadow-sm' 
+                                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'
                             }`}
                         >
-                            <span className={`material-symbols-outlined text-[18px] ${activeTab === tab.id ? 'filled' : ''}`}>{tab.icon}</span>
+                            <span className={`material-symbols-outlined text-[20px] ${activeTab === tab.id ? 'filled' : ''}`}>{tab.icon}</span>
                             {tab.label}
                             {tab.count !== null && tab.count > 0 && (
                                 <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] ${
@@ -351,16 +350,22 @@ const Finance: React.FC = () => {
                     ))}
                 </div>
 
-                <div className="relative w-full md:w-72">
-                    <span className="absolute left-3 top-2.5 text-gray-400 material-symbols-outlined text-[20px]">search</span>
-                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar alumno, monto..." className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/20" />
+                <div className="relative w-full md:w-80 group">
+                    <span className="absolute left-4 top-3 text-gray-400 group-focus-within:text-orange-500 material-symbols-outlined text-[20px] transition-colors">search</span>
+                    <input 
+                        type="text" 
+                        value={searchQuery} 
+                        onChange={e => setSearchQuery(e.target.value)} 
+                        placeholder="Buscar alumno, monto..." 
+                        className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-medium focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all" 
+                    />
                 </div>
             </div>
         </div>
 
         {/* --- LIST CONTENT --- */}
         <div className="flex-1 overflow-y-auto p-6 md:px-10">
-            <div className="max-w-[1600px] mx-auto bg-white rounded-3xl shadow-card border border-gray-100 overflow-hidden min-h-[400px]">
+            <div className="max-w-[1600px] mx-auto bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden min-h-[400px]">
                 {groupedTransactions.length === 0 ? (
                     <EmptyState 
                         title="Sin movimientos" 
@@ -369,82 +374,84 @@ const Finance: React.FC = () => {
                     />
                 ) : (
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-gray-50/50 border-b border-gray-100 sticky top-0 backdrop-blur-sm z-10">
+                        <thead className="bg-[#F9FAFB] border-b border-gray-100 sticky top-0 backdrop-blur-sm z-10">
                             <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Alumno</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Concepto</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Monto Declarado</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Acción</th>
+                                <th className="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Fecha</th>
+                                <th className="px-6 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Alumno</th>
+                                <th className="px-6 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Concepto</th>
+                                <th className="px-6 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Estado</th>
+                                <th className="px-6 py-5 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Monto</th>
+                                <th className="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Acción</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {groupedTransactions.map(group => {
                                 const { mainRecord, isBatch, totalAmount, declaredAmount } = group;
-                                // Display declared amount if available (Review mode), else debt amount
                                 const displayAmount = declaredAmount !== undefined ? declaredAmount : totalAmount;
                                 
                                 return (
-                                    <tr key={group.id} className="hover:bg-blue-50/20 transition-colors group">
-                                        <td className="px-6 py-4">
+                                    <tr key={group.id} className="hover:bg-gray-50/50 transition-colors group">
+                                        <td className="px-8 py-5">
                                             <div className="flex flex-col">
-                                                <span className="font-bold text-text-main text-sm">{formatDateDisplay(mainRecord.dueDate)}</span>
+                                                <span className="font-bold text-gray-900 text-sm">{formatDateDisplay(mainRecord.dueDate)}</span>
                                                 {mainRecord.paymentDate && (
-                                                    <span className="text-[10px] text-text-secondary mt-0.5">
+                                                    <span className="text-[10px] text-gray-400 font-medium mt-0.5">
                                                         Pagado: {formatDateDisplay(mainRecord.paymentDate)}
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-text-main text-sm">{mainRecord.studentName}</div>
+                                        <td className="px-6 py-5">
+                                            <div className="font-bold text-gray-900 text-sm">{mainRecord.studentName}</div>
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-text-secondary">
+                                        <td className="px-6 py-5 text-sm text-gray-500 font-medium">
                                             {isBatch ? (
                                                 <div className="flex flex-col">
-                                                    <span className="font-bold text-text-main text-xs uppercase tracking-wide flex items-center gap-1">
+                                                    <span className="font-bold text-gray-900 text-xs uppercase tracking-wide flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-[14px] text-purple-500">layers</span>
                                                         Pago Lote ({group.itemCount})
                                                     </span>
-                                                    <span className="text-xs mt-0.5 truncate max-w-[200px]">
+                                                    <span className="text-xs mt-0.5 truncate max-w-[200px] text-gray-400">
                                                         {group.records.map(r => r.concept).join(', ')}
                                                     </span>
                                                 </div>
                                             ) : (
                                                 <span>{mainRecord.concept}</span>
                                             )}
-                                            {mainRecord.method && <span className="ml-2 text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">{mainRecord.method}</span>}
+                                            {mainRecord.method && <span className="ml-2 text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 border border-gray-200">{mainRecord.method}</span>}
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-5">
                                             <StatusBadge status={mainRecord.status} amount={mainRecord.amount} penalty={mainRecord.penaltyAmount} />
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className={`font-black text-sm ${mainRecord.status === 'paid' ? 'text-green-600' : 'text-text-main'}`}>
+                                        <td className="px-6 py-5 text-right">
+                                            <span className={`font-black text-sm tracking-tight ${mainRecord.status === 'paid' ? 'text-green-600' : 'text-gray-900'}`}>
                                                 ${displayAmount.toFixed(2)}
                                             </span>
                                             {declaredAmount !== undefined && declaredAmount < totalAmount && (
-                                                <div className="text-[10px] text-orange-500 font-bold">Parcial (Deuda total: ${totalAmount})</div>
+                                                <div className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded-lg inline-block mt-1">
+                                                    Parcial (Total: ${totalAmount})
+                                                </div>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-right">
+                                        <td className="px-8 py-5 text-right">
                                             {mainRecord.status === 'in_review' ? (
                                                 <button 
                                                     onClick={() => setSelectedGroup(group)}
-                                                    className="bg-primary hover:bg-primary-hover text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg shadow-primary/20 transition-all active:scale-95 animate-pulse"
+                                                    className="bg-gray-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-gray-900/10 transition-all active:scale-95 flex items-center gap-2 ml-auto"
                                                 >
+                                                    <span className="material-symbols-outlined text-sm">visibility</span>
                                                     Revisar
                                                 </button>
                                             ) : mainRecord.status === 'paid' ? (
                                                 <button 
                                                     onClick={() => generateReceipt(mainRecord, academySettings, currentUser)}
-                                                    className="text-gray-400 hover:text-primary p-2 rounded-lg transition-colors"
+                                                    className="size-9 bg-gray-50 hover:bg-white text-gray-400 hover:text-orange-600 border border-gray-200 rounded-xl transition-all shadow-sm flex items-center justify-center ml-auto"
                                                     title="Descargar Recibo"
                                                 >
-                                                    <span className="material-symbols-outlined">receipt_long</span>
+                                                    <span className="material-symbols-outlined text-[18px]">receipt_long</span>
                                                 </button>
                                             ) : (
-                                                <span className="text-gray-300 text-xs">-</span>
+                                                <span className="text-gray-300 text-xs font-medium">-</span>
                                             )}
                                         </td>
                                     </tr>
@@ -456,36 +463,36 @@ const Finance: React.FC = () => {
             </div>
         </div>
 
-        {/* --- REVIEW MODAL (IMPROVED WATERFALL PREVIEW) --- */}
+        {/* --- REVIEW MODAL --- */}
         {selectedGroup && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white rounded-[2rem] w-full max-w-4xl h-[85vh] shadow-2xl flex overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white rounded-[2rem] w-full max-w-4xl h-[85vh] shadow-2xl flex overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
                     
                     {/* Left: Proof Image */}
-                    <div className="w-1/2 bg-gray-900 flex items-center justify-center relative p-4">
+                    <div className="w-1/2 bg-gray-50 flex items-center justify-center relative p-6 border-r border-gray-100">
                         {selectedGroup.mainRecord.proofUrl ? (
                             selectedGroup.mainRecord.proofType?.includes('pdf') ? (
-                                <iframe src={selectedGroup.mainRecord.proofUrl} className="w-full h-full rounded-xl" />
+                                <iframe src={selectedGroup.mainRecord.proofUrl} className="w-full h-full rounded-2xl border border-gray-200 shadow-sm" />
                             ) : (
-                                <img src={selectedGroup.mainRecord.proofUrl} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                                <img src={selectedGroup.mainRecord.proofUrl} className="max-w-full max-h-full object-contain rounded-xl shadow-lg" />
                             )
                         ) : (
-                            <div className="text-white/50 flex flex-col items-center">
+                            <div className="text-gray-300 flex flex-col items-center">
                                 <span className="material-symbols-outlined text-6xl mb-2">broken_image</span>
-                                <p>Sin comprobante visible</p>
+                                <p className="font-medium text-sm">Sin comprobante visible</p>
                             </div>
                         )}
-                        <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-bold border border-white/10">
+                        <div className="absolute top-6 left-6 bg-white/80 backdrop-blur-md text-gray-900 px-4 py-1.5 rounded-full text-xs font-bold border border-gray-200 shadow-sm">
                             Comprobante {selectedGroup.isBatch ? '(Lote)' : ''}
                         </div>
                     </div>
 
                     {/* Right: Validation & Waterfall Preview */}
-                    <div className="w-1/2 flex flex-col">
+                    <div className="w-1/2 flex flex-col bg-white">
                         <div className="p-8 border-b border-gray-100 flex justify-between items-start">
                             <div>
-                                <h2 className="text-2xl font-black text-text-main mb-1">Revisión de Pago</h2>
-                                <p className="text-text-secondary text-sm">Distribución automática de fondos.</p>
+                                <h2 className="text-2xl font-black text-gray-900 mb-1 tracking-tight">Revisión de Pago</h2>
+                                <p className="text-gray-500 text-sm font-medium">Distribución automática de fondos.</p>
                             </div>
                             <button onClick={() => setSelectedGroup(null)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
                                 <span className="material-symbols-outlined">close</span>
@@ -495,18 +502,18 @@ const Finance: React.FC = () => {
                         <div className="flex-1 overflow-y-auto p-8 space-y-8">
                             
                             {/* Total Amount Display */}
-                            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
                                 <div className="flex items-center justify-between mb-2">
-                                    <p className="text-xs font-bold text-text-secondary uppercase">Monto Declarado (Recibido)</p>
-                                    <span className="bg-white border border-gray-200 px-3 py-1 rounded-lg text-xs font-bold text-text-main shadow-sm">
+                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Monto Declarado</p>
+                                    <span className="bg-white border border-gray-200 px-3 py-1 rounded-lg text-xs font-bold text-gray-700 shadow-sm">
                                         {selectedGroup.mainRecord.method}
                                     </span>
                                 </div>
-                                <p className="text-4xl font-black text-text-main tracking-tight">
+                                <p className="text-4xl font-black text-gray-900 tracking-tight">
                                     ${(selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount).toFixed(2)}
                                 </p>
                                 {selectedGroup.declaredAmount !== undefined && selectedGroup.declaredAmount < selectedGroup.totalAmount && (
-                                    <p className="text-xs text-orange-600 font-bold mt-2 flex items-center gap-1">
+                                    <p className="text-xs text-orange-600 font-bold mt-2 flex items-center gap-1 bg-orange-50 w-fit px-2 py-1 rounded-lg border border-orange-100">
                                         <span className="material-symbols-outlined text-[14px]">warning</span>
                                         Pago parcial. Deuda total era ${selectedGroup.totalAmount}
                                     </p>
@@ -515,32 +522,32 @@ const Finance: React.FC = () => {
 
                             {/* PREVIEW: Waterfall Distribution */}
                             <div>
-                                <h4 className="text-xs font-bold text-text-secondary uppercase mb-3 ml-1">Aplicación de Fondos</h4>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 ml-1 tracking-wider">Aplicación de Fondos</h4>
                                 <div className="space-y-3">
                                     {previewDistribution.map((item: any) => (
-                                        <div key={item.id} className="flex flex-col p-3 bg-white border border-gray-100 rounded-xl relative overflow-hidden">
+                                        <div key={item.id} className="flex flex-col p-4 bg-white border border-gray-100 rounded-2xl relative overflow-hidden shadow-sm">
                                             {/* Status Indicator Bar */}
-                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                                            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
                                                 item._status === 'paid' ? 'bg-green-500' : item._status === 'partial' ? 'bg-orange-500' : 'bg-red-300'
                                             }`}></div>
                                             
                                             <div className="flex justify-between items-start pl-3">
                                                 <div>
-                                                    <span className="text-sm font-bold text-text-main block">{item.concept}</span>
-                                                    <span className="text-xs text-text-secondary">Deuda Total: ${(item.amount + item.penaltyAmount).toFixed(2)}</span>
+                                                    <span className="text-sm font-bold text-gray-900 block">{item.concept}</span>
+                                                    <span className="text-xs text-gray-500 font-medium">Deuda Total: ${(item.amount + item.penaltyAmount).toFixed(2)}</span>
                                                 </div>
                                                 <div className="text-right">
                                                     <span className={`font-mono font-bold text-sm ${item._status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>
                                                         ${item._paid.toFixed(2)}
                                                     </span>
-                                                    <div className="text-[10px] font-bold uppercase mt-0.5">
+                                                    <div className="text-[10px] font-bold uppercase mt-0.5 tracking-wide text-gray-400">
                                                         {item._status === 'paid' ? 'Cubierto' : item._status === 'partial' ? 'Abono' : 'Pendiente'}
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {item._remaining > 0 && (
-                                                <div className="mt-2 pl-3 pt-2 border-t border-gray-50 flex items-center gap-2 text-xs text-orange-600 font-medium">
+                                                <div className="mt-3 pl-3 pt-2 border-t border-gray-50 flex items-center gap-2 text-xs text-orange-600 font-bold">
                                                     <span className="material-symbols-outlined text-[14px]">pie_chart</span>
                                                     Restarán ${item._remaining.toFixed(2)} por cobrar
                                                 </div>
@@ -554,20 +561,20 @@ const Finance: React.FC = () => {
                             {(() => {
                                 const { isLate, diffDays } = getTimeValidation(selectedGroup.mainRecord);
                                 return (
-                                    <div className={`rounded-2xl p-4 border-l-4 text-xs ${isLate ? 'bg-red-50 border-red-500 text-red-700' : 'bg-green-50 border-green-500 text-green-700'}`}>
-                                        <div className="flex items-center gap-2 font-bold mb-1">
+                                    <div className={`rounded-2xl p-4 border text-xs ${isLate ? 'bg-red-50 border-red-100 text-red-700' : 'bg-green-50 border-green-100 text-green-700'}`}>
+                                        <div className="flex items-center gap-2 font-bold mb-1 uppercase tracking-wide">
                                             <span className="material-symbols-outlined text-base">{isLate ? 'history_toggle_off' : 'verified_user'}</span>
                                             {isLate ? 'Pago Tardío' : 'A Tiempo'}
                                         </div>
-                                        <p>{isLate ? `Subido ${diffDays} días después del vencimiento.` : `Subido antes de la fecha límite.`}</p>
+                                        <p className="font-medium opacity-80">{isLate ? `Subido ${diffDays} días después del vencimiento.` : `Subido antes de la fecha límite.`}</p>
                                     </div>
                                 );
                             })()}
                         </div>
 
                         <div className="p-8 border-t border-gray-100 bg-gray-50 flex gap-4">
-                            <button onClick={handleReject} className="flex-1 py-4 rounded-xl border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-all">Rechazar</button>
-                            <button onClick={handleApprove} className="flex-[2] py-4 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-lg shadow-green-600/30 transition-all active:scale-95 flex items-center justify-center gap-2">
+                            <button onClick={handleReject} className="flex-1 py-4 rounded-xl border border-gray-200 bg-white text-gray-600 font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all shadow-sm">Rechazar</button>
+                            <button onClick={handleApprove} className="flex-[2] py-4 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/20 transition-all active:scale-95 flex items-center justify-center gap-2">
                                 <span className="material-symbols-outlined">check_circle</span>
                                 Confirmar Distribución
                             </button>

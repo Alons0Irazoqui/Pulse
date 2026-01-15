@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -8,7 +7,7 @@ import { studentRegistrationSchema, StudentRegistrationForm } from '../../schema
 import { useToast } from '../../context/ToastContext';
 import { PulseService } from '../../services/pulseService';
 
-// --- SUB-COMPONENTS (DEFINED OUTSIDE TO PREVENT RE-RENDER FOCUS LOSS) ---
+// --- SUB-COMPONENTS ---
 
 interface InputFieldProps {
   label: string;
@@ -32,10 +31,10 @@ const InputField: React.FC<InputFieldProps> = ({
   cols = 1 
 }) => (
   <div className={cols === 2 ? 'col-span-1' : 'col-span-1 md:col-span-2'}>
-    <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5 ml-1">{label}</label>
-    <div className="relative">
+    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">{label}</label>
+    <div className="relative group">
       {icon && (
-          <span className="absolute left-4 top-3.5 text-gray-400 material-symbols-outlined text-[20px]">
+          <span className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-orange-500 material-symbols-outlined text-[20px] transition-colors">
               {icon}
           </span>
       )}
@@ -43,10 +42,10 @@ const InputField: React.FC<InputFieldProps> = ({
         {...register(name)}
         type={type}
         placeholder={placeholder}
-        className={`w-full rounded-xl border bg-gray-50/50 py-3 text-sm font-medium text-text-main transition-all placeholder:text-gray-400 focus:bg-white focus:ring-4 ${
+        className={`w-full rounded-xl border bg-gray-50 text-sm font-medium text-gray-900 py-3 transition-all placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-4 ${
           errors[name]
             ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
-            : 'border-gray-200 focus:border-primary focus:ring-primary/10'
+            : 'border-gray-200 focus:border-orange-500 focus:ring-orange-500/10'
         } ${icon ? 'pl-11 pr-4' : 'px-4'}`}
       />
     </div>
@@ -86,10 +85,6 @@ const StudentRegistration: React.FC = () => {
     }
   });
 
-  // Watch for password confirmation visual feedback is preserved logic, 
-  // but we don't render it directly to avoid unnecessary re-renders of the whole tree just for a variable check.
-  // const password = watch('password'); 
-
   const nextStep = async () => {
     let fieldsToValidate: (keyof StudentRegistrationForm)[] = [];
 
@@ -101,7 +96,6 @@ const StudentRegistration: React.FC = () => {
 
     const isStepValid = await trigger(fieldsToValidate);
     
-    // Additional Step 1 Validation: Check email strictly before moving to Step 2
     if (currentStep === 1 && isStepValid) {
         const email = watch('email');
         if (PulseService.checkEmailExists(email)) {
@@ -123,13 +117,10 @@ const StudentRegistration: React.FC = () => {
   const onSubmit: SubmitHandler<StudentRegistrationForm> = async (data) => {
     setIsSubmitting(true);
     
-    // Security Check: Final verification before submission
     if (PulseService.checkEmailExists(data.email)) {
         setIsSubmitting(false);
         setError('email', { type: 'manual', message: 'Este correo electrónico ya está registrado en la plataforma.' });
         addToast('Error de seguridad: Correo duplicado.', 'error');
-        // If we were on step 3, user might be confused why nothing happens, so we might want to navigate back or just show toast.
-        // Usually UI should have caught it at Step 1, but this is a fail-safe.
         return;
     }
 
@@ -140,8 +131,6 @@ const StudentRegistration: React.FC = () => {
             email: data.email,
             phone: data.cellPhone,
             password: data.password,
-            // Extended data handled by context internally if adapted, 
-            // for now we pass the core fields required by the signature.
         });
 
         if (success) {
@@ -159,24 +148,24 @@ const StudentRegistration: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-4 md:p-6 font-sans">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 md:p-6 font-sans">
       
       {/* Background Decor */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -right-[10%] w-[500px] h-[500px] bg-blue-100/50 rounded-full blur-[100px]"></div>
-          <div className="absolute top-[20%] -left-[10%] w-[400px] h-[400px] bg-purple-100/50 rounded-full blur-[80px]"></div>
+          <div className="absolute top-[10%] right-[10%] w-[400px] h-[400px] bg-orange-100/50 rounded-full blur-[80px]"></div>
+          <div className="absolute bottom-[20%] left-[10%] w-[300px] h-[300px] bg-gray-200/50 rounded-full blur-[60px]"></div>
       </div>
 
-      <div className="w-full max-w-2xl bg-white rounded-[2rem] shadow-soft-lg border border-white/50 relative z-10 flex flex-col overflow-hidden">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl shadow-gray-200/50 border border-gray-100 relative z-10 flex flex-col overflow-hidden">
         
         {/* Header & Stepper */}
         <div className="bg-white border-b border-gray-100 p-8 pb-6">
             <div className="flex justify-between items-start mb-8">
                 <div>
-                    <h1 className="text-2xl font-black text-text-main tracking-tight">Alta de Alumno</h1>
-                    <p className="text-text-secondary text-sm mt-1">Completa tu perfil para unirte al dojo.</p>
+                    <h1 className="text-2xl font-black text-gray-900 tracking-tight">Alta de Alumno</h1>
+                    <p className="text-gray-500 text-sm mt-1">Completa tu perfil para unirte al dojo.</p>
                 </div>
-                <div className="size-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
+                <div className="size-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center">
                     <span className="material-symbols-outlined">school</span>
                 </div>
             </div>
@@ -185,7 +174,7 @@ const StudentRegistration: React.FC = () => {
             <div className="flex items-center relative">
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-100 rounded-full -z-10"></div>
                 <div 
-                    className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full -z-10 transition-all duration-500 ease-out"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-orange-500 rounded-full -z-10 transition-all duration-500 ease-out"
                     style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
                 ></div>
                 
@@ -197,15 +186,15 @@ const StudentRegistration: React.FC = () => {
                         return (
                             <div key={step.id} className="flex flex-col items-center gap-2">
                                 <div className={`size-10 rounded-full flex items-center justify-center border-4 transition-all duration-300 ${
-                                    isActive ? 'bg-primary border-blue-100 text-white shadow-lg shadow-primary/30 scale-110' : 
-                                    isCompleted ? 'bg-primary border-primary text-white' : 
+                                    isActive ? 'bg-orange-500 border-orange-100 text-white shadow-lg shadow-orange-500/30 scale-110' : 
+                                    isCompleted ? 'bg-orange-500 border-orange-500 text-white' : 
                                     'bg-white border-gray-200 text-gray-300'
                                 }`}>
                                     <span className="material-symbols-outlined text-sm font-bold">
                                         {isCompleted ? 'check' : step.icon}
                                     </span>
                                 </div>
-                                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isActive ? 'text-primary' : 'text-gray-400'}`}>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isActive ? 'text-orange-600' : 'text-gray-400'}`}>
                                     {step.title}
                                 </span>
                             </div>
@@ -221,11 +210,11 @@ const StudentRegistration: React.FC = () => {
             {/* --- STEP 1: ACCOUNT --- */}
             {currentStep === 1 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                    <div className="md:col-span-2 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex gap-3 items-start mb-2">
-                        <span className="material-symbols-outlined text-primary mt-0.5">info</span>
+                    <div className="md:col-span-2 p-4 bg-orange-50 rounded-xl border border-orange-100 flex gap-3 items-start mb-2">
+                        <span className="material-symbols-outlined text-orange-500 mt-0.5">info</span>
                         <div>
-                            <h4 className="text-sm font-bold text-blue-900">Código de Academia</h4>
-                            <p className="text-xs text-blue-700 mt-1 leading-relaxed">Solicita este código a tu maestro. Es necesario para vincular tu perfil a la escuela correcta.</p>
+                            <h4 className="text-sm font-bold text-orange-800">Código de Academia</h4>
+                            <p className="text-xs text-orange-700 mt-1 leading-relaxed">Solicita este código a tu maestro. Es necesario para vincular tu perfil a la escuela correcta.</p>
                         </div>
                     </div>
 
@@ -243,8 +232,8 @@ const StudentRegistration: React.FC = () => {
             {currentStep === 2 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
                     <div className="md:col-span-2 flex justify-center mb-4">
-                        <div className="size-24 bg-gray-100 rounded-full flex items-center justify-center border-2 border-dashed border-gray-300">
-                            <span className="material-symbols-outlined text-4xl text-gray-400">add_a_photo</span>
+                        <div className="size-24 bg-gray-50 rounded-full flex items-center justify-center border-2 border-dashed border-gray-300 text-gray-400">
+                            <span className="material-symbols-outlined text-4xl">add_a_photo</span>
                         </div>
                     </div>
 
@@ -262,19 +251,19 @@ const StudentRegistration: React.FC = () => {
                     
                     {/* Sección Tutor */}
                     <div>
-                        <h3 className="text-sm font-black text-text-main uppercase tracking-wider mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">supervisor_account</span>
+                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-orange-500">supervisor_account</span>
                             Datos del Responsable
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <InputField register={register} errors={errors} label="Nombre del Tutor" name="guardianName" placeholder="Nombre completo" />
                             <div className="col-span-1">
-                                <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5 ml-1">Parentesco</label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-3.5 text-gray-400 material-symbols-outlined text-[20px]">diversity_3</span>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Parentesco</label>
+                                <div className="relative group">
+                                    <span className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-orange-500 material-symbols-outlined text-[20px]">diversity_3</span>
                                     <select
                                         {...register('guardianRelationship')}
-                                        className="w-full rounded-xl border border-gray-200 bg-gray-50/50 py-3 pl-11 pr-4 text-sm font-medium text-text-main focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all appearance-none"
+                                        className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-11 pr-4 py-3 text-sm font-medium text-gray-900 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all appearance-none outline-none"
                                     >
                                         <option value="Padre">Padre</option>
                                         <option value="Madre">Madre</option>
@@ -290,8 +279,8 @@ const StudentRegistration: React.FC = () => {
 
                     {/* Sección Teléfonos */}
                     <div>
-                        <h3 className="text-sm font-black text-text-main uppercase tracking-wider mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-green-600">call</span>
+                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-gray-500">call</span>
                             Teléfonos de Contacto
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -303,8 +292,8 @@ const StudentRegistration: React.FC = () => {
 
                     {/* Sección Dirección */}
                     <div>
-                        <h3 className="text-sm font-black text-text-main uppercase tracking-wider mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-red-500">home_pin</span>
+                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-gray-500">home_pin</span>
                             Dirección de Emergencia
                         </h3>
                         <div className="grid grid-cols-6 gap-4">
@@ -325,13 +314,13 @@ const StudentRegistration: React.FC = () => {
                     <button
                         type="button"
                         onClick={prevStep}
-                        className="px-6 py-3.5 rounded-xl border border-gray-200 text-text-secondary font-bold hover:bg-gray-50 active:scale-95 transition-all flex items-center gap-2"
+                        className="px-6 py-3.5 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 active:scale-95 transition-all flex items-center gap-2"
                     >
                         <span className="material-symbols-outlined text-lg">arrow_back</span>
                         Atrás
                     </button>
                 ) : (
-                    <Link to="/login" className="px-6 py-3.5 rounded-xl border border-transparent text-text-secondary font-bold hover:bg-gray-50 transition-all text-sm">
+                    <Link to="/login" className="px-6 py-3.5 rounded-xl border border-transparent text-gray-500 font-bold hover:bg-gray-50 transition-all text-sm">
                         Cancelar
                     </Link>
                 )}
@@ -340,7 +329,7 @@ const StudentRegistration: React.FC = () => {
                     type="button"
                     onClick={currentStep === 3 ? handleSubmit(onSubmit) : nextStep}
                     disabled={isSubmitting}
-                    className="flex-1 bg-primary hover:bg-primary-hover text-white font-bold py-3.5 rounded-xl shadow-lg shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-orange-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
                 >
                     {isSubmitting ? (
                         <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -358,7 +347,7 @@ const StudentRegistration: React.FC = () => {
         </form>
       </div>
       
-      <p className="fixed bottom-6 text-xs text-gray-400 font-medium">© 2024 Pulse Academy Systems</p>
+      <p className="fixed bottom-6 text-xs text-gray-400 font-medium">© 2024 Academy Pro Systems.</p>
     </div>
   );
 };

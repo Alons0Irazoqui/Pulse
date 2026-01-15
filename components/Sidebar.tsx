@@ -1,4 +1,3 @@
-
 import React, { memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -47,86 +46,92 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
   return (
     <>
-      {/* Mobile Backdrop - Overlay */}
+      {/* Mobile Backdrop */}
       <div 
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-gray-900/20 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
-      {/* Sidebar Container - Drawer */}
+      {/* Sidebar Container - Clean White Surface */}
       <aside 
         className={`
           fixed md:static inset-y-0 left-0 z-50
-          flex flex-col w-72 h-full glassmorphism border-r border-gray-200 bg-white/95 md:bg-white/50 backdrop-blur-xl
-          transform transition-transform duration-300 ease-out shadow-2xl md:shadow-none
+          flex flex-col w-72 h-full bg-white border-r border-gray-200
+          transform transition-transform duration-300 ease-out shadow-xl md:shadow-none
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
         <div className="flex flex-col h-full p-6 justify-between overflow-y-auto">
           <div className="flex flex-col gap-8">
-            {/* Header */}
-            <div className="flex justify-between items-center px-2 pt-2">
-              <div className="flex gap-4 items-center">
-                <Avatar 
-                    src={currentUser?.avatarUrl} 
-                    name={displayName} 
-                    className="size-12 rounded-full shadow-sm ring-2 ring-white" 
-                />
-                <div className="flex flex-col">
-                  <h1 className="text-text-main text-lg font-bold leading-tight truncate max-w-[140px]">
-                      {displayName}
-                  </h1>
-                  <p className="text-text-secondary text-xs font-medium truncate max-w-[140px]">
-                      {displaySubtext}
-                  </p>
+            {/* Branding Header */}
+            <div className="flex items-center gap-3 px-2">
+                <div className="size-8 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg flex items-center justify-center shadow-md shadow-orange-200">
+                    <span className="material-symbols-outlined text-xl">school</span>
                 </div>
-              </div>
-              
-              {/* Close Button (Mobile Only) */}
-              <button 
-                onClick={onClose} 
-                className="md:hidden size-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-text-secondary rounded-full transition-colors active:scale-90"
-              >
-                <span className="material-symbols-outlined text-xl">close</span>
-              </button>
+                <h1 className="text-xl font-bold tracking-tight text-gray-900">
+                    Academy Pro
+                </h1>
+                <button 
+                  onClick={onClose} 
+                  className="md:hidden ml-auto size-8 flex items-center justify-center bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-full transition-colors"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
             </div>
 
-            {/* Navigation */}
-            <nav className="flex flex-col gap-2">
+            {/* Navigation Links */}
+            <nav className="flex flex-col gap-1">
               {links.map((link) => {
                 const isActive = location.pathname.startsWith(link.path);
                 return (
                     <Link
-                    key={link.path}
-                    to={link.path}
-                    onClick={onClose}
-                    className={`flex items-center gap-4 px-4 py-3 rounded-2xl transition-all group relative overflow-hidden ${
-                        isActive
-                            ? 'bg-primary/10 text-primary shadow-sm'
-                            : 'hover:bg-gray-50 text-text-secondary hover:text-text-main'
-                        }`}
+                        key={link.path}
+                        to={link.path}
+                        onClick={onClose}
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm font-medium ${
+                            isActive
+                                ? 'bg-orange-50 text-orange-600'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            }`}
                     >
-                        <span className={`material-symbols-outlined ${isActive ? 'filled' : ''} ${isActive ? 'text-primary' : 'text-text-secondary group-hover:text-primary transition-colors'}`}>
+                        <span className={`material-symbols-outlined text-[20px] ${isActive ? 'filled' : ''}`}>
                             {link.icon}
                         </span>
-                        <span className={`font-medium text-sm ${isActive ? 'text-primary font-bold' : 'transition-colors'}`}>
+                        <span>
                             {link.name}
                         </span>
-                        {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full"></div>}
                     </Link>
                 );
               })}
             </nav>
           </div>
 
-          {/* Footer Action */}
-          <button 
-              onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 text-text-secondary hover:text-red-500 cursor-pointer transition-colors group mt-8 w-full text-left"
-          >
-            <span className="material-symbols-outlined group-hover:text-red-500 transition-colors">logout</span>
-            <span className="font-medium text-sm transition-colors">Cerrar Sesión</span>
-          </button>
+          {/* User Footer */}
+          <div className="pt-6 border-t border-gray-100">
+              <div className="flex items-center gap-3 px-2 mb-4">
+                <Avatar 
+                    src={currentUser?.avatarUrl} 
+                    name={displayName} 
+                    className="size-10 rounded-full bg-gray-100 border border-gray-200 text-gray-600" 
+                />
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-sm font-bold text-gray-900 truncate">
+                      {displayName}
+                  </span>
+                  <span className="text-xs text-gray-500 truncate">
+                      {displaySubtext}
+                  </span>
+                </div>
+              </div>
+
+              <button 
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 px-4 py-2 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors w-full text-left text-sm font-medium"
+              >
+                <span className="material-symbols-outlined text-[20px]">logout</span>
+                <span>Cerrar Sesión</span>
+              </button>
+          </div>
         </div>
       </aside>
     </>
