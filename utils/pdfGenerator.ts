@@ -33,13 +33,14 @@ export const generateReceipt = (payment: TuitionRecord, academy: AcademySettings
         calculatedTotal = payment.details.reduce((sum, item) => sum + item.amount, 0);
     } else {
         // Scenario B: Legacy Record or Single Payment without details
-        // Priority for amount display: 
-        // 1. Declared Amount (What was paid in a partial/batch context)
-        // 2. Original Amount (Historical cost before it was paid/zeroed)
-        // 3. Amount (Current debt - usually 0 if paid, or full value if pending)
-        const displayAmount = payment.declaredAmount !== undefined 
+        
+        // QA UPDATE: Logic Hierarchy for Receipt Amount (Legal Consistency)
+        // 1. declaredAmount: HIGHEST PRIORITY. Represents the exact amount validated/adjusted by the Master (Single Source of Truth).
+        // 2. originalAmount: Fallback for historical paid records.
+        // 3. amount: Fallback to current debt value if pending.
+        const displayAmount = payment.declaredAmount !== undefined
             ? payment.declaredAmount 
-            : (payment.originalAmount !== undefined ? payment.originalAmount : payment.amount);
+            : (payment.originalAmount !== undefined && payment.originalAmount > 0 ? payment.originalAmount : payment.amount);
 
         lineItemsHtml = `
             <tr>
@@ -123,7 +124,7 @@ export const generateReceipt = (payment: TuitionRecord, academy: AcademySettings
         <div class="container">
             <div class="header">
                 <div class="brand">
-                    <h1>${academy.name}</h1>
+                    <h1>${academy.name || 'Academy Pro'}</h1>
                     <p>${academy.code}</p>
                 </div>
                 <div class="meta">
@@ -167,7 +168,7 @@ export const generateReceipt = (payment: TuitionRecord, academy: AcademySettings
             </div>
 
             <div class="footer">
-                <p>Gracias por tu pago. Este recibo fue generado digitalmente por Pulse Academy.</p>
+                <p>Gracias por tu pago. Este recibo fue generado digitalmente por Academy Pro.</p>
                 <p style="margin-top: 5px;">${user?.name ? 'Emitido por: ' + user.name : ''}</p>
             </div>
         </div>

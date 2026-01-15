@@ -55,10 +55,15 @@ const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: nu
     }
 };
 
+/**
+ * DEBT AMOUNT EDITOR - REDESIGNED
+ * Single input, High-end look, Explicit Action Button.
+ */
 const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (id: string, val: number) => void }) => {
     const [val, setVal] = useState(item.amount.toString());
+    const { addToast } = useToast();
     
-    // Sync internal state if the prop changes from outside (e.g. another update)
+    // Sync internal state if the prop changes from outside
     useEffect(() => {
         setVal(item.amount.toString());
     }, [item.amount]);
@@ -67,36 +72,36 @@ const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (
         const num = parseFloat(val);
         if (!isNaN(num) && num >= 0) {
             onUpdate(item.id, num);
+            addToast("Monto actualizado correctamente", 'success');
         }
     };
 
+    // Check if local value differs from source of truth
     const hasChanged = parseFloat(val) !== item.amount;
 
     return (
-        <div className="flex items-center gap-2 mt-2" onClick={e => e.stopPropagation()}>
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Deuda:</span>
-            <div className="relative flex items-center group/input">
-                <span className="absolute left-2 text-gray-400 text-xs font-bold pointer-events-none">$</span>
-                <input 
-                    type="number"
-                    className={`w-24 pl-5 pr-2 py-1 text-xs font-bold rounded-lg border outline-none transition-all ${
-                        hasChanged 
-                        ? 'bg-white border-orange-300 text-orange-600 ring-2 ring-orange-100' 
-                        : 'bg-gray-50 border-gray-200 text-gray-700 focus:bg-white focus:border-orange-400'
-                    }`}
-                    value={val}
-                    onChange={(e) => setVal(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                />
+        <div className="flex flex-col items-end gap-2" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+                <div className="relative group">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold pointer-events-none text-sm">$</span>
+                    <input 
+                        type="number"
+                        className="w-32 pl-7 pr-3 py-2 bg-[#F9FAFB] border border-gray-200 rounded-xl text-lg font-bold text-gray-900 outline-none focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all text-right"
+                        value={val}
+                        onChange={(e) => setVal(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && hasChanged && handleSave()}
+                        placeholder="0.00"
+                    />
+                </div>
             </div>
             
             {hasChanged && (
                 <button 
                     onClick={handleSave}
-                    className="size-7 flex items-center justify-center bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all animate-in zoom-in shadow-sm border border-green-200"
-                    title="Guardar nuevo monto"
+                    className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-95 animate-in fade-in slide-in-from-right-2 duration-300"
                 >
-                    <span className="material-symbols-outlined text-sm font-bold">save</span>
+                    <span className="material-symbols-outlined text-[16px] font-bold">check</span>
+                    <span className="text-xs font-bold">Actualizar</span>
                 </button>
             )}
 
@@ -129,7 +134,7 @@ const Finance: React.FC = () => {
       currentUser,
       approveBatchPayment,
       rejectBatchPayment,
-      updateRecordAmount // New capability
+      updateRecordAmount
   } = useStore();
   
   const { addToast } = useToast();
@@ -141,20 +146,6 @@ const Finance: React.FC = () => {
   
   const [selectedGroup, setSelectedGroup] = useState<GroupedTransaction | null>(null);
   const [isChargeModalOpen, setIsChargeModalOpen] = useState(false);
-
-  // New State for Amount Adjustment
-  const [adjustmentValue, setAdjustmentValue] = useState<string>('');
-
-  // -- EFFECT: Init Adjustment Value --
-  useEffect(() => {
-      if (selectedGroup) {
-          // Default to declared if exists, otherwise total.
-          const initialVal = selectedGroup.declaredAmount !== undefined 
-              ? selectedGroup.declaredAmount 
-              : selectedGroup.totalAmount;
-          setAdjustmentValue(initialVal.toString());
-      }
-  }, [selectedGroup]);
 
   // -- DATA PROCESSING --
 
@@ -272,13 +263,10 @@ const Finance: React.FC = () => {
       const splittable = items.filter(r => r.canBePaidInParts)
                               .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
 
-      // Use adjustmentValue if editing, otherwise fallbacks
-      let available = 0;
-      if (activeGroup.mainRecord.category === 'Mensualidad' && adjustmentValue) {
-          available = parseFloat(adjustmentValue);
-      } else {
-          available = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalAmount;
-      }
+      // Use current live totalAmount (which updates as user edits individual items)
+      // Or declaredAmount if in review.
+      // Logic: If status is review, we try to satisfy the debt with the declared money.
+      let available = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalAmount;
       
       const preview = [];
 
@@ -312,7 +300,7 @@ const Finance: React.FC = () => {
       }
       
       return preview;
-  }, [activeGroup, adjustmentValue]);
+  }, [activeGroup]);
 
 
   // -- ACTIONS --
@@ -320,26 +308,26 @@ const Finance: React.FC = () => {
   const handleApprove = () => {
       if (!activeGroup) return;
       
-      // Determine final amount to approve
-      const isMensualidad = activeGroup.mainRecord.category === 'Mensualidad';
-      let amountToApprove = 0;
-
-      if (isMensualidad && adjustmentValue) {
-          amountToApprove = parseFloat(adjustmentValue);
-      } else {
-          amountToApprove = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalAmount;
-      }
+      // Determine final amount to approve.
+      // We rely on the logic that updateRecordAmount has already synced everything.
+      // We just need to pass the total "paid" amount to the approve function.
+      
+      // If user adjusted items individually, the `amount` fields in records changed.
+      // The `declaredAmount` should effectively match the sum of what's being covered if we are strict,
+      // but for 'Mensualidad' or partials, we usually look at `declaredAmount`.
+      
+      const amountToApprove = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalAmount;
 
       if (activeGroup.isBatch) {
           approveBatchPayment(activeGroup.id, amountToApprove);
       } else {
-          // If single record, use special approvePayment logic which handles adjustment if category matches
-          if (!isMensualidad && amountToApprove < activeGroup.totalAmount) {
+          // If single record, use special approvePayment logic
+          if (activeGroup.mainRecord.category !== 'Mensualidad' && amountToApprove < activeGroup.totalAmount) {
                // Treat as 1-item batch to trigger waterfall partial logic for NON-mensualidad items
                approveBatchPayment(activeGroup.records[0].batchPaymentId || `temp-${activeGroup.records[0].id}`, amountToApprove);
           } else {
                // For Mensualidad or Full Payment
-               approvePayment(activeGroup.id, isMensualidad ? amountToApprove : undefined);
+               approvePayment(activeGroup.id, amountToApprove);
           }
       }
       setSelectedGroup(null);
@@ -512,7 +500,7 @@ const Finance: React.FC = () => {
                                                 <div className="flex flex-col">
                                                     <span className="font-bold text-gray-900 text-xs uppercase tracking-wide flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-[14px] text-purple-500">layers</span>
-                                                        Pago Lote ({group.itemCount})
+                                                        Pago Lote ({group.itemCount} items)
                                                     </span>
                                                     <span className="text-xs mt-0.5 truncate max-w-[200px] text-gray-400">
                                                         {group.records.map(r => r.concept).join(', ')}
@@ -527,13 +515,25 @@ const Finance: React.FC = () => {
                                             <StatusBadge status={mainRecord.status} amount={mainRecord.amount} penalty={mainRecord.penaltyAmount} />
                                         </td>
                                         <td className="px-6 py-5 text-right">
-                                            <span className={`font-black text-sm tracking-tight ${mainRecord.status === 'paid' ? 'text-green-600' : 'text-gray-900'}`}>
-                                                ${displayAmount.toFixed(2)}
-                                            </span>
-                                            {declaredAmount !== undefined && declaredAmount < totalAmount && (
-                                                <div className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded-lg inline-block mt-1">
-                                                    Parcial (Total: ${totalAmount})
+                                            {mainRecord.status === 'in_review' && !isBatch ? (
+                                                <div className="flex justify-end">
+                                                    {/* SINGLE INPUT EDITOR */}
+                                                    <DebtAmountEditor 
+                                                        item={mainRecord} 
+                                                        onUpdate={(id, val) => updateRecordAmount(id, val)} 
+                                                    />
                                                 </div>
+                                            ) : (
+                                                <>
+                                                    <span className={`font-black text-sm tracking-tight ${mainRecord.status === 'paid' ? 'text-green-600' : 'text-gray-900'}`}>
+                                                        ${displayAmount.toFixed(2)}
+                                                    </span>
+                                                    {declaredAmount !== undefined && declaredAmount < totalAmount && (
+                                                        <div className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded-lg inline-block mt-1">
+                                                            Parcial (Total: ${totalAmount})
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </td>
                                         <td className="px-8 py-5 text-right">
@@ -623,28 +623,7 @@ const Finance: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Adjustment Input for Mensualidades */}
-                            {activeGroup.mainRecord.category === 'Mensualidad' && (
-                                <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm relative overflow-hidden group focus-within:ring-2 focus-within:ring-orange-100 focus-within:border-orange-300 transition-all">
-                                    <div className="absolute top-0 right-0 p-3 opacity-10">
-                                        <span className="material-symbols-outlined text-4xl text-orange-500">edit_note</span>
-                                    </div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Otro monto (Ajuste)</label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-3.5 text-gray-400 font-bold text-lg pointer-events-none">$</span>
-                                        <input
-                                            type="number"
-                                            value={adjustmentValue}
-                                            onChange={(e) => setAdjustmentValue(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50/50 font-bold text-gray-900 text-lg focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all placeholder:text-gray-300"
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 mt-2 font-medium">
-                                        Si modificas este valor, el registro se actualizará y marcará como pagado por este monto exacto.
-                                    </p>
-                                </div>
-                            )}
+                            {/* REMOVED DUPLICATE INPUT - CLEAN INTERFACE */}
 
                             {/* PREVIEW: Waterfall Distribution */}
                             <div>
@@ -660,14 +639,13 @@ const Finance: React.FC = () => {
                                             <div className="flex justify-between items-start pl-3">
                                                 <div>
                                                     <span className="text-sm font-bold text-gray-900 block">{item.concept}</span>
-                                                    {/* EDITABLE DEBT COMPONENT */}
-                                                    <DebtAmountEditor 
-                                                        item={item} 
-                                                        onUpdate={(id, val) => {
-                                                            updateRecordAmount(id, val);
-                                                            addToast('Monto de deuda actualizado', 'success');
-                                                        }} 
-                                                    />
+                                                    {/* SINGLE TRUTH EDITABLE DEBT */}
+                                                    <div className="mt-2">
+                                                        <DebtAmountEditor 
+                                                            item={item} 
+                                                            onUpdate={(id, val) => updateRecordAmount(id, val)}
+                                                        />
+                                                    </div>
                                                 </div>
                                                 <div className="text-right">
                                                     <span className={`font-mono font-bold text-sm ${item._status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>

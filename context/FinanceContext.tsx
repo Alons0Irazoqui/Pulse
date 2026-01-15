@@ -447,8 +447,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const updateRecordAmount = (recordId: string, newAmount: number) => {
       setRecords(prev => prev.map(r => {
           if (r.id === recordId) {
-              const updatedRecord = { ...r, amount: newAmount };
+              const updatedRecord = { 
+                  ...r, 
+                  amount: newAmount,
+                  // PRODUCTION FIX: Sync originalAmount to establish the new legal basis for the charge (Audit trail)
+                  originalAmount: newAmount 
+              };
               
+              // PRODUCTION FIX: Sync declaredAmount if transaction is in review to ensure receipt consistency
+              // This is critical for scholarships or manual price adjustments during review.
+              if (r.status === 'in_review') {
+                  updatedRecord.declaredAmount = newAmount;
+              }
+
               // Automatic Status Logic:
               // If amount is zeroed out (e.g. 100% scholarship or manual fix), mark as paid.
               if (newAmount <= 0) {
