@@ -8,19 +8,42 @@ export const generateReceipt = (payment: TuitionRecord, academy: AcademySettings
         return;
     }
 
-    // CRITICAL FIX: Manually parse date string YYYY-MM-DD to avoid UTC shift
-    // Handle both paymentDate (ISO timestamp) and dueDate (YYYY-MM-DD)
+    // Handle date parsing safely
     const dateToUse = payment.paymentDate || payment.dueDate;
     const localDate = new Date(dateToUse);
     const displayDate = localDate.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
 
     // --- LOGIC FOR DYNAMIC DETAILS & TOTALS ---
+    
+    // 1. Determine Authoritative Total (Single Source of Truth)
+    // Priority: declaredAmount (Manual/Review) > originalAmount (Paid/Historical) > amount (Pending Debt)
+    const authoritativeAmount = payment.declaredAmount !== undefined
+        ? payment.declaredAmount 
+        : (payment.originalAmount !== undefined && payment.originalAmount > 0 ? payment.originalAmount : payment.amount);
+
+    // 2. Prepare Line Items
+    // We create a copy of details to potentially patch stale data
+    let effectiveDetails = payment.details ? [...payment.details] : [];
+    
+    // FIX: If details exist (stale from creation) but don't match the updated authoritative amount,
+    // and it is a single item (e.g. Monthly Tuition), force update the detail to match the real total.
+    if (effectiveDetails.length === 1) {
+        const detailSum = effectiveDetails[0].amount;
+        // Allow for small float differences, but catch user updates (e.g. 800 vs 500)
+        if (Math.abs(detailSum - authoritativeAmount) > 0.01) {
+            effectiveDetails[0] = {
+                ...effectiveDetails[0],
+                amount: authoritativeAmount
+            };
+        }
+    }
+
     let lineItemsHtml = '';
     let calculatedTotal = 0;
 
-    if (payment.details && payment.details.length > 0) {
-        // Scenario A: Payment has explicit breakdown (New Architecture)
-        lineItemsHtml = payment.details.map(item => `
+    if (effectiveDetails.length > 0) {
+        // Scenario A: Payment has explicit (and now corrected) breakdown
+        lineItemsHtml = effectiveDetails.map(item => `
             <tr>
                 <td>
                     <span style="font-weight: 600;">${item.description}</span>
@@ -30,28 +53,19 @@ export const generateReceipt = (payment: TuitionRecord, academy: AcademySettings
             </tr>
         `).join('');
         
-        calculatedTotal = payment.details.reduce((sum, item) => sum + item.amount, 0);
+        calculatedTotal = effectiveDetails.reduce((sum, item) => sum + item.amount, 0);
     } else {
         // Scenario B: Legacy Record or Single Payment without details
-        
-        // QA UPDATE: Logic Hierarchy for Receipt Amount (Legal Consistency)
-        // 1. declaredAmount: HIGHEST PRIORITY. Represents the exact amount validated/adjusted by the Master (Single Source of Truth).
-        // 2. originalAmount: Fallback for historical paid records.
-        // 3. amount: Fallback to current debt value if pending.
-        const displayAmount = payment.declaredAmount !== undefined
-            ? payment.declaredAmount 
-            : (payment.originalAmount !== undefined && payment.originalAmount > 0 ? payment.originalAmount : payment.amount);
-
         lineItemsHtml = `
             <tr>
                 <td>
                     <span style="font-weight: 600;">${payment.concept || payment.description || 'Pago de servicios'}</span>
                 </td>
                 <td>${payment.category || 'General'}</td>
-                <td>$${displayAmount.toFixed(2)}</td>
+                <td>$${authoritativeAmount.toFixed(2)}</td>
             </tr>
         `;
-        calculatedTotal = displayAmount;
+        calculatedTotal = authoritativeAmount;
     }
 
     const html = `

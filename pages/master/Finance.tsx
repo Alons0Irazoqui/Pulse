@@ -235,12 +235,17 @@ const Finance: React.FC = () => {
 
       const mainRecord = freshRecords.find(r => r.id === selectedGroup.mainRecord.id) || freshRecords[0];
       const totalAmount = freshRecords.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0);
+      
+      // REACTIVITY FIX: Re-read declaredAmount from the fresh record. 
+      // If user edited it via context, it's updated in `freshRecords` but `selectedGroup` is stale.
+      const declaredAmount = freshRecords.find(i => i.declaredAmount !== undefined)?.declaredAmount;
 
       return {
           ...selectedGroup,
           records: freshRecords,
           mainRecord,
-          totalAmount
+          totalAmount,
+          declaredAmount // Override with fresh value
       };
   }, [selectedGroup, records]);
 
