@@ -55,7 +55,13 @@ const StatusBadge: React.FC<{ status: TuitionRecord['status'] }> = ({ status }) 
 interface PaymentModalProps { 
     isOpen: boolean; 
     onClose: () => void; 
-    onConfirm: (recordIds: string[], file: File | null, method: 'Transferencia' | 'Efectivo', totalAmount: number) => void;
+    onConfirm: (
+        recordIds: string[], 
+        file: File | null, 
+        method: 'Transferencia' | 'Efectivo', 
+        totalAmount: number,
+        details: { description: string; amount: number }[]
+    ) => void;
     preSelectedRecord: TuitionRecord | null;
     pendingDebts: TuitionRecord[];
 }
@@ -184,7 +190,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
         }
 
         const ids = selectedDebts.map(d => d.id);
-        onConfirm(ids, file, method, finalAmount);
+        
+        // TRANSACTIONAL INTEGRITY: Build the details array here based on selected items.
+        // This ensures the backend/context knows exactly what "Concepts" this payment covers.
+        const details = selectedDebts.map(d => ({
+            description: d.concept,
+            amount: d.amount + d.penaltyAmount
+        }));
+
+        onConfirm(ids, file, method, finalAmount, details);
     };
 
     if (!isOpen) return null;
@@ -457,13 +471,19 @@ const StudentPayments: React.FC = () => {
       setIsModalOpen(true);
   };
 
-  const handleConfirmPayment = (recordIds: string[], file: File | null, method: 'Transferencia' | 'Efectivo', totalAmount: number) => {
+  const handleConfirmPayment = (
+      recordIds: string[], 
+      file: File | null, 
+      method: 'Transferencia' | 'Efectivo', 
+      totalAmount: number,
+      details: { description: string; amount: number }[]
+  ) => {
       if (!file && method === 'Transferencia') return;
 
       const fileToSend = file || new File([""], "pago_efectivo.txt", { type: "text/plain" });
       
-      // Pass totalAmount to register function so Master Dashboard sees the REAL received amount
-      registerBatchPayment(recordIds, fileToSend, method, totalAmount);
+      // Pass totalAmount and explicit details to register function
+      registerBatchPayment(recordIds, fileToSend, method, totalAmount, details);
       
       setIsModalOpen(false);
       setSelectedRecord(null);

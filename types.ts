@@ -237,6 +237,14 @@ export interface TuitionRecord {
     canBePaidInParts: boolean; // Priority flag: False = Must be paid fully (e.g. Tuition)
     relatedEventId?: string; // Links to an Event ID (Tournament/Exam)
     declaredAmount?: number; // What the student claims to have paid in total for this batch
+
+    // --- ARCHITECTURAL UPDATE: TRANSACTION DETAILS ---
+    // Allows storing a breakdown of what was covered in this specific record/payment.
+    // Critical for receipts when a single payment covers multiple concepts or partials.
+    details?: { 
+        description: string; 
+        amount: number; 
+    }[];
 }
 
 export interface ManualChargeData {

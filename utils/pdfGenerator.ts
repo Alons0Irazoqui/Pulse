@@ -14,6 +14,45 @@ export const generateReceipt = (payment: TuitionRecord, academy: AcademySettings
     const localDate = new Date(dateToUse);
     const displayDate = localDate.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
 
+    // --- LOGIC FOR DYNAMIC DETAILS & TOTALS ---
+    let lineItemsHtml = '';
+    let calculatedTotal = 0;
+
+    if (payment.details && payment.details.length > 0) {
+        // Scenario A: Payment has explicit breakdown (New Architecture)
+        lineItemsHtml = payment.details.map(item => `
+            <tr>
+                <td>
+                    <span style="font-weight: 600;">${item.description}</span>
+                </td>
+                <td>${payment.category || 'Varios'}</td>
+                <td>$${item.amount.toFixed(2)}</td>
+            </tr>
+        `).join('');
+        
+        calculatedTotal = payment.details.reduce((sum, item) => sum + item.amount, 0);
+    } else {
+        // Scenario B: Legacy Record or Single Payment without details
+        // Priority for amount display: 
+        // 1. Declared Amount (What was paid in a partial/batch context)
+        // 2. Original Amount (Historical cost before it was paid/zeroed)
+        // 3. Amount (Current debt - usually 0 if paid, or full value if pending)
+        const displayAmount = payment.declaredAmount !== undefined 
+            ? payment.declaredAmount 
+            : (payment.originalAmount !== undefined ? payment.originalAmount : payment.amount);
+
+        lineItemsHtml = `
+            <tr>
+                <td>
+                    <span style="font-weight: 600;">${payment.concept || payment.description || 'Pago de servicios'}</span>
+                </td>
+                <td>${payment.category || 'General'}</td>
+                <td>$${displayAmount.toFixed(2)}</td>
+            </tr>
+        `;
+        calculatedTotal = displayAmount;
+    }
+
     const html = `
     <!DOCTYPE html>
     <html>
@@ -116,20 +155,14 @@ export const generateReceipt = (payment: TuitionRecord, academy: AcademySettings
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td>
-                            <span style="font-weight: 600;">${payment.concept || payment.description}</span>
-                        </td>
-                        <td>${payment.category || 'General'}</td>
-                        <td>$${payment.amount.toFixed(2)}</td>
-                    </tr>
+                    ${lineItemsHtml}
                 </tbody>
             </table>
 
             <div class="total-section">
                 <div class="total-box">
                     <div class="total-label">Total Pagado</div>
-                    <div class="total-amount">$${payment.amount.toFixed(2)}</div>
+                    <div class="total-amount">$${calculatedTotal.toFixed(2)}</div>
                 </div>
             </div>
 

@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { TuitionRecord, ManualChargeData } from '../types';
 import { PulseService } from '../services/pulseService';
 import { mockTuitionRecords } from '../mockData';
@@ -18,6 +18,12 @@ const generateId = (prefix: string = 'id') => {
 
 interface FinanceContextType {
   records: TuitionRecord[];
+  isFinanceLoading: boolean; // Architectural Change: Explicit loading state
+  // Calculated Metrics
+  totalRevenue: number;
+  monthlyRevenueData: { name: string; total: number }[]; // Year to Date (Jan-Dec)
+  rollingRevenueData: { name: string; total: number; fullDate: string }[]; // Last 6 Months
+  
   stats: {
       totalRevenue: number;
       activeStudents: number;
@@ -30,7 +36,13 @@ interface FinanceContextType {
   createManualCharge: (data: ManualChargeData) => void;
   
   // New Batch Payment API
-  registerBatchPayment: (recordIds: string[], file: File, method: 'Transferencia' | 'Efectivo', totalAmount?: number) => void;
+  registerBatchPayment: (
+      recordIds: string[], 
+      file: File, 
+      method: 'Transferencia' | 'Efectivo', 
+      totalAmount?: number,
+      details?: { description: string; amount: number }[] // Desglose opcional
+  ) => void;
   approveBatchPayment: (batchId: string, totalPaidAmount: number) => void;
   rejectBatchPayment: (batchId: string) => void;
 
@@ -57,29 +69,134 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // --- STATE ---
   const [records, setRecords] = useState<TuitionRecord[]>([]);
+  const [isFinanceLoading, setIsFinanceLoading] = useState(true);
 
-  // --- INIT & LOAD ---
+  // --- INIT & LOAD (ASYNC SIMULATION) ---
   useEffect(() => {
-      if (academyId) {
-          const stored = localStorage.getItem('pulse_tuition_records');
-          if (stored) {
-              setRecords(JSON.parse(stored));
+      let isMounted = true;
+
+      const loadFinancialData = async () => {
+          setIsFinanceLoading(true);
+          
+          // ARCHITECTURAL CHANGE: Simulate network latency (e.g., Supabase fetch)
+          // This prevents the dashboard from calculating incomplete data on mount.
+          await new Promise(resolve => setTimeout(resolve, 800));
+
+          if (!isMounted) return;
+
+          if (academyId) {
+              const stored = localStorage.getItem('pulse_tuition_records');
+              if (stored) {
+                  setRecords(JSON.parse(stored));
+              } else {
+                  setRecords(mockTuitionRecords.filter(r => r.academyId === academyId || !r.academyId));
+              }
           } else {
-              setRecords(mockTuitionRecords.filter(r => r.academyId === academyId || !r.academyId));
+              setRecords([]);
           }
-      }
+          
+          setIsFinanceLoading(false);
+      };
+
+      loadFinancialData();
+
+      return () => { isMounted = false; };
   }, [academyId]);
 
   // Persist Records
   useEffect(() => {
-      if (records.length > 0) {
+      if (!isFinanceLoading && records.length > 0) {
           localStorage.setItem('pulse_tuition_records', JSON.stringify(records));
       }
-  }, [records]);
+  }, [records, isFinanceLoading]);
+
+  // --- CALCULATED METRICS (MEMOIZED) ---
+
+  // 1. Total Revenue: Sum of all PAID records
+  const totalRevenue = useMemo(() => {
+      if (isFinanceLoading) return 0;
+      return records.reduce((acc, r) => {
+          if (r.status === 'paid') {
+              // Use originalAmount if available (for partial payments history correctness), else amount
+              const val = r.originalAmount !== undefined ? r.originalAmount : r.amount;
+              return acc + val + (r.penaltyAmount || 0);
+          }
+          return acc;
+      }, 0);
+  }, [records, isFinanceLoading]);
+
+  // 2. Monthly Revenue Data (Year-to-Date): Grouped by Month (Jan-Dec) for "Anual" Charts
+  const monthlyRevenueData = useMemo(() => {
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      // Initialize with 0s to ensure continuity in charts
+      const revenueByMonth = new Array(12).fill(0);
+      
+      if (isFinanceLoading) return months.map((name) => ({ name, total: 0 }));
+
+      const currentYear = new Date().getFullYear();
+
+      records.forEach(r => {
+          if (r.status === 'paid') {
+              // Prefer paymentDate, fallback to dueDate if manually marked without date
+              const dateStr = r.paymentDate || r.dueDate;
+              if (dateStr) {
+                  const dateObj = new Date(dateStr);
+                  // Only count for current year in this specific view
+                  if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() === currentYear) {
+                      const monthIndex = dateObj.getMonth(); // 0-11
+                      const val = r.originalAmount !== undefined ? r.originalAmount : r.amount;
+                      revenueByMonth[monthIndex] += val + (r.penaltyAmount || 0);
+                  }
+              }
+          }
+      });
+
+      return months.map((name, index) => ({
+          name,
+          total: revenueByMonth[index]
+      }));
+  }, [records, isFinanceLoading]);
+
+  // 3. Rolling Revenue Data (Last 6 Months): Robust calculation for "Mensual/Trend" View
+  const rollingRevenueData = useMemo(() => {
+      const result = [];
+      const today = new Date();
+      // Generate last 6 months buckets
+      for (let i = 5; i >= 0; i--) {
+          const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+          const monthIndex = d.getMonth();
+          const year = d.getFullYear();
+          const monthName = d.toLocaleDateString('es-MX', { month: 'short' });
+          const properName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+          // Calculate revenue for this specific month/year bucket
+          let total = 0;
+          
+          if (!isFinanceLoading) {
+              total = records.reduce((acc, r) => {
+                  if (r.status === 'paid') {
+                      const pDate = new Date(r.paymentDate || r.dueDate);
+                      if (pDate.getMonth() === monthIndex && pDate.getFullYear() === year) {
+                          const val = r.originalAmount !== undefined ? r.originalAmount : r.amount;
+                          return acc + val + (r.penaltyAmount || 0);
+                      }
+                  }
+                  return acc;
+              }, 0);
+          }
+
+          result.push({
+              name: properName,
+              total: total,
+              fullDate: d.toISOString()
+          });
+      }
+      return result;
+  }, [records, isFinanceLoading]);
 
   // --- REACTIVE BALANCE ENGINE ---
   useEffect(() => {
-      if (students.length === 0) return;
+      if (isFinanceLoading || students.length === 0) return;
 
       let hasChanges = false;
       const nextStudents = students.map(student => {
@@ -111,17 +228,33 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (hasChanges) {
           batchUpdateStudents(nextStudents);
       }
-  }, [records, students.length]); 
+  }, [records, students.length, isFinanceLoading]); 
 
   // --- BATCH PAYMENT LOGIC (CORE REFACTOR) ---
 
-  const registerBatchPayment = (recordIds: string[], file: File, method: 'Transferencia' | 'Efectivo', totalAmount?: number) => {
+  const registerBatchPayment = (
+      recordIds: string[], 
+      file: File, 
+      method: 'Transferencia' | 'Efectivo', 
+      totalAmount?: number,
+      details?: { description: string; amount: number }[]
+  ) => {
       const batchId = generateId('batch');
       const frozenDate = new Date().toISOString();
       const fakeUrl = URL.createObjectURL(file); // Simulation
 
+      // Logic: Ensure we have details. If not provided but it is a generic batch/deposit, generate them.
+      let transactionDetails = details;
+      if ((!transactionDetails || transactionDetails.length === 0) && totalAmount && recordIds.length === 0) {
+          transactionDetails = [{ description: 'Abono a cuenta / Depósito general', amount: totalAmount }];
+      }
+
       setRecords(prev => prev.map(r => {
           if (recordIds.includes(r.id)) {
+              // If details aren't provided explicitly for this batch call, default to the record's own info.
+              // This maintains backward compatibility for single-item payments or legacy calls.
+              const currentRecordDetails = transactionDetails || [{ description: r.concept, amount: r.amount + r.penaltyAmount }];
+
               return {
                   ...r,
                   batchPaymentId: batchId,
@@ -130,7 +263,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   proofUrl: fakeUrl,
                   proofType: file.type,
                   method: method,
-                  declaredAmount: totalAmount // Store what user said they paid
+                  declaredAmount: totalAmount, // Store what user said they paid
+                  details: currentRecordDetails // Store the full breakdown of what this payment covers
               };
           }
           return r;
@@ -141,65 +275,49 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   /**
    * WATERFALL ALGORITHM for Payment Approval
-   * Distributes totalPaidAmount based on priority:
-   * 1. Non-splittable items (Tuition) -> Must be paid fully.
-   * 2. Splittable items (Equipment/Tournaments) -> Paid with remaining funds.
    */
   const approveBatchPayment = (batchId: string, totalPaidAmount: number) => {
       setRecords(prev => {
-          // 1. Isolate the batch
           const batchRecords = prev.filter(r => r.batchPaymentId === batchId);
           const otherRecords = prev.filter(r => r.batchPaymentId !== batchId);
 
           if (batchRecords.length === 0) return prev;
 
-          // 2. Separate by Priority
           const mandatoryItems = batchRecords.filter(r => !r.canBePaidInParts);
           const splittableItems = batchRecords.filter(r => r.canBePaidInParts)
-                                              .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()); // Newest first
+                                              .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
 
           let remainingMoney = totalPaidAmount;
           const processedBatch: TuitionRecord[] = [];
 
-          // 3. Process Mandatory Items (Waterfall Step 1)
           for (const item of mandatoryItems) {
               const totalCost = item.amount + item.penaltyAmount;
-              
               if (remainingMoney >= totalCost) {
                   remainingMoney -= totalCost;
                   processedBatch.push({ ...item, status: 'paid', amount: 0, penaltyAmount: 0, originalAmount: item.amount }); 
               } else {
-                  // Failed to cover mandatory item. Revert to overdue/pending.
                   const isOverdue = new Date() > new Date(item.dueDate);
-                  processedBatch.push({ ...item, status: isOverdue ? 'overdue' : 'pending', batchPaymentId: undefined, paymentDate: null, declaredAmount: undefined });
+                  processedBatch.push({ ...item, status: isOverdue ? 'overdue' : 'pending', batchPaymentId: undefined, paymentDate: null, declaredAmount: undefined, details: undefined });
               }
           }
 
-          // 4. Process Splittable Items (Waterfall Step 2)
           for (const item of splittableItems) {
               const currentDebt = item.amount + item.penaltyAmount;
-
               if (remainingMoney <= 0) {
-                  // Ran out of money. Revert this item to unpaid state.
                   const isOverdue = new Date() > new Date(item.dueDate);
-                  processedBatch.push({ ...item, status: isOverdue ? 'overdue' : 'pending', batchPaymentId: undefined, paymentDate: null, declaredAmount: undefined });
+                  processedBatch.push({ ...item, status: isOverdue ? 'overdue' : 'pending', batchPaymentId: undefined, paymentDate: null, declaredAmount: undefined, details: undefined });
                   continue;
               }
 
               if (remainingMoney >= currentDebt) {
-                  // Full Payment
                   remainingMoney -= currentDebt;
                   processedBatch.push({ ...item, status: 'paid', amount: 0, penaltyAmount: 0, originalAmount: item.amount });
               } else {
-                  // Partial Payment Logic
                   const paymentForThis = remainingMoney;
-                  
-                  // Calculate new remaining balance
                   let newAmount = item.amount;
                   let newPenalty = item.penaltyAmount;
                   let moneyToDeduct = paymentForThis;
 
-                  // Pay penalty first
                   if (moneyToDeduct >= newPenalty) {
                       moneyToDeduct -= newPenalty;
                       newPenalty = 0;
@@ -208,25 +326,20 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                       moneyToDeduct = 0;
                   }
                   
-                  // Pay principal
                   newAmount -= moneyToDeduct;
-                  
-                  remainingMoney = 0; // All money used
+                  remainingMoney = 0; 
 
-                  // CRITICAL: We keep the record alive as 'pending' (or partial state that behaves like pending) with REDUCED amount.
-                  // We remove batch info so it doesn't show as "in_review" and allows new payment attempts.
                   processedBatch.push({
                       ...item,
-                      status: 'pending', // Reverts to pending but with less amount
-                      amount: newAmount, // Updated remaining debt
+                      status: 'pending',
+                      amount: newAmount,
                       penaltyAmount: newPenalty,
-                      originalAmount: item.originalAmount || item.amount, // Track original total for history
-                      
-                      // RESET PAYMENT INFO so it can be paid again
+                      originalAmount: item.originalAmount || item.amount,
                       batchPaymentId: undefined,
                       paymentDate: null,
                       proofUrl: null,
-                      declaredAmount: undefined
+                      declaredAmount: undefined,
+                      details: undefined
                   });
               }
           }
@@ -247,7 +360,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   proofUrl: null,
                   paymentDate: null,
                   batchPaymentId: undefined,
-                  declaredAmount: undefined
+                  declaredAmount: undefined,
+                  details: undefined
               };
           }
           return r;
@@ -258,7 +372,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // --- SINGLE ITEM ACTIONS (Wrappers or Standalone) ---
 
   const createRecord = (data: Partial<TuitionRecord>) => {
-      // Legacy wrapper - assumes canBePaidInParts based on simple logic if not provided
       if (!data.studentId || !data.amount) return;
       const student = students.find(s => s.id === data.studentId);
       
@@ -275,7 +388,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           paymentDate: null,
           status: 'pending',
           proofUrl: null,
-          canBePaidInParts: false, // Default strict
+          canBePaidInParts: false,
           ...data
       } as TuitionRecord;
 
@@ -300,20 +413,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           academyId: currentUser!.academyId,
           studentId: data.studentId,
           studentName: student.name,
-          
           type: 'charge',
           status: 'pending',
-          
           concept: data.title,
           description: data.description,
           category: data.category,
           amount: data.amount,
           penaltyAmount: 0,
-          
           dueDate: data.dueDate,
           paymentDate: null,
           proofUrl: null,
-          
           canBePaidInParts: data.canBePaidInParts,
           relatedEventId: data.relatedEventId
       };
@@ -323,15 +432,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const uploadProof = (recordId: string, file: File, method: 'Transferencia' | 'Efectivo' = 'Transferencia') => {
-      // Wraps single upload into batch logic for consistency
       registerBatchPayment([recordId], file, method);
   };
 
   const approvePayment = (recordId: string) => {
-      // Single approval implies full payment of that specific item
       const record = records.find(r => r.id === recordId);
       if (!record) return;
-      // We create a fake batch ID if it doesn't have one, or use existing
       setRecords(prev => prev.map(r => r.id === recordId ? { ...r, status: 'paid', amount: 0, penaltyAmount: 0 } : r));
       addToast('Pago aprobado', 'success');
   };
@@ -370,8 +476,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
           if ((r.status === 'pending' || r.status === 'partial') && today > dueDateObj) {
               updatesCount++;
-              // Only apply penalty if not already applied or if logic dictates recurring penalty
-              // Here we apply once if penalty is 0
               if (r.penaltyAmount === 0) {
                   return { ...r, status: 'overdue', penaltyAmount: lateFeeAmount };
               }
@@ -413,7 +517,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   status: 'pending',
                   proofUrl: null,
                   category: 'Mensualidad',
-                  canBePaidInParts: false, // Tuition is strict
+                  canBePaidInParts: false,
                   type: 'charge'
               });
           }
@@ -428,52 +532,50 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const getStudentPendingDebts = (studentId: string) => {
-      // Returns items that can be paid (including partials)
       return records.filter(r => 
           r.studentId === studentId && 
           (r.status === 'pending' || r.status === 'overdue' || r.status === 'charged' || r.status === 'in_review' || r.status === 'partial')
       );
   };
   
-  // --- DELETE HELPER (For Cleanup) ---
   const purgeStudentDebts = (studentId: string) => {
       setRecords(prev => prev.filter(r => {
           if (r.studentId === studentId) {
-              // Only keep PAID records for history. Remove everything else.
               return r.status === 'paid';
           }
           return true;
       }));
   };
 
-  const calculateMonthlyRevenue = () => {
-      const revenueByMonth: Record<string, number> = {};
-      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      
-      records.forEach(r => {
-          if (r.status === 'paid' && r.paymentDate) {
-              const dateObj = new Date(r.paymentDate);
-              const key = months[dateObj.getMonth()];
-              if (key) {
-                  revenueByMonth[key] = (revenueByMonth[key] || 0) + (r.amount + r.penaltyAmount);
-              }
-          }
-      });
-      return Object.entries(revenueByMonth).map(([name, value]) => ({ name, value }));
-  };
-
-  const stats = {
-      totalRevenue: records.filter(r => r.status === 'paid').reduce((sum, r) => sum + (r.originalAmount || r.amount) + r.penaltyAmount, 0),
-      activeStudents: students.filter(s => s.status !== 'inactive').length,
-      retentionRate: 98.5,
-      pendingCollection: records.filter(r => r.status !== 'paid').reduce((sum, r) => sum + r.amount, 0),
-      overdueAmount: records.filter(r => r.status === 'overdue').reduce((sum, r) => sum + r.amount + r.penaltyAmount, 0),
-      monthlyRevenue: calculateMonthlyRevenue()
-  };
+  const stats = useMemo(() => {
+      // Return 0 stats if loading to avoid flickering
+      if (isFinanceLoading) {
+          return {
+              totalRevenue: 0,
+              activeStudents: 0,
+              retentionRate: 0,
+              pendingCollection: 0,
+              overdueAmount: 0,
+              monthlyRevenue: []
+          };
+      }
+      return {
+          totalRevenue,
+          activeStudents: students.filter(s => s.status !== 'inactive').length,
+          retentionRate: 98.5,
+          pendingCollection: records.filter(r => r.status !== 'paid').reduce((sum, r) => sum + r.amount, 0),
+          overdueAmount: records.filter(r => r.status === 'overdue').reduce((sum, r) => sum + r.amount + r.penaltyAmount, 0),
+          monthlyRevenue: monthlyRevenueData.map(m => ({ name: m.name, value: m.total }))
+      };
+  }, [records, students, totalRevenue, monthlyRevenueData, isFinanceLoading]);
 
   return (
     <FinanceContext.Provider value={{ 
         records, 
+        isFinanceLoading, // Exported for Dashboard usage
+        totalRevenue,
+        monthlyRevenueData,
+        rollingRevenueData,
         stats,
         createRecord,
         createManualCharge,

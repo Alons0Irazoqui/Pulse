@@ -107,7 +107,8 @@ export const PulseService = {
         };
 
         // AUTOMATIC DEBT GENERATION LOGIC
-        const initialAmount = academy.paymentSettings?.monthlyTuition || 0;
+        // Ensure strictly NUMBER
+        const initialAmount = Number(academy.paymentSettings?.monthlyTuition) || 0;
         
         const newStudent: Student = {
             id: userId,
@@ -139,7 +140,7 @@ export const PulseService = {
             attendance: 0,
             totalAttendance: 0,
             joinDate: new Date().toLocaleDateString(),
-            balance: initialAmount, // Set initial balance reference (will be recalculated by Store)
+            balance: initialAmount, // Set initial balance reference
             classesId: [],
             attendanceHistory: [],
             avatarUrl: ''
@@ -305,16 +306,36 @@ export const PulseService = {
 
     saveAcademySettings: (settings: AcademySettings) => {
         const academies = PulseService.getAcademiesDB();
-        const index = academies.findIndex(a => a.id === settings.id);
-        if (index >= 0) academies[index] = settings;
-        else academies.push(settings);
+        
+        // DATA NORMALIZATION: Ensure monetary values are numbers
+        const sanitizedSettings = {
+            ...settings,
+            paymentSettings: {
+                ...settings.paymentSettings,
+                monthlyTuition: Number(settings.paymentSettings.monthlyTuition) || 0,
+                lateFeeAmount: Number(settings.paymentSettings.lateFeeAmount) || 0,
+                billingDay: Number(settings.paymentSettings.billingDay),
+                lateFeeDay: Number(settings.paymentSettings.lateFeeDay)
+            }
+        };
+
+        const index = academies.findIndex(a => a.id === sanitizedSettings.id);
+        if (index >= 0) academies[index] = sanitizedSettings;
+        else academies.push(sanitizedSettings);
         localStorage.setItem(STORAGE_KEYS.ACADEMIES, JSON.stringify(academies));
     },
 
     getStudents: (academyId?: string): Student[] => {
         const data = localStorage.getItem(STORAGE_KEYS.STUDENTS);
         let allStudents: Student[] = data ? JSON.parse(data) : mockStudents;
-        allStudents = allStudents.map(s => ({...s, academyId: s.academyId || 'acad-1'}));
+        
+        // Normalize Balance
+        allStudents = allStudents.map(s => ({
+            ...s, 
+            academyId: s.academyId || 'acad-1',
+            balance: Number(s.balance) || 0
+        }));
+        
         if (academyId) return allStudents.filter(s => s.academyId === academyId);
         return allStudents;
     },
@@ -476,8 +497,22 @@ export const PulseService = {
 
     getPayments: (academyId?: string): TuitionRecord[] => {
         const data = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
-        let payments: TuitionRecord[] = data ? JSON.parse(data) : [];
-        payments = payments.map(p => ({...p, academyId: p.academyId || 'acad-1'}));
+        let rawPayments: any[] = data ? JSON.parse(data) : [];
+        
+        // CRITICAL DATA SANITIZATION
+        // Ensure numbers are Numbers and dates are handled safely
+        const payments: TuitionRecord[] = rawPayments.map(p => ({
+            ...p,
+            academyId: p.academyId || 'acad-1',
+            // Force number coercion to prevent string concatenation bugs
+            amount: Number(p.amount) || 0,
+            penaltyAmount: Number(p.penaltyAmount) || 0,
+            originalAmount: p.originalAmount !== undefined ? Number(p.originalAmount) : undefined,
+            declaredAmount: p.declaredAmount !== undefined ? Number(p.declaredAmount) : undefined,
+            // Ensure PaymentDate is explicitly null if empty string/undefined, to match Typescript check logic
+            paymentDate: p.paymentDate || null
+        }));
+
         if (academyId) return payments.filter(p => p.academyId === academyId);
         return payments;
     },
