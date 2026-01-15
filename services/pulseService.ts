@@ -78,7 +78,34 @@ export const PulseService = {
         return { user: newUser, academy: newAcademy };
     },
 
-    registerStudent: (data: { name: string; email: string; phone: string; password: string; academyCode: string }) => {
+    registerStudent: (data: { 
+        // Auth & Link
+        academyCode: string; 
+        email: string; 
+        password: string; 
+        
+        // Student Info
+        name: string; 
+        cellPhone: string;
+        age: number;
+        birthDate: string;
+        avatarUrl?: string; // Optional Avatar
+
+        // Guardian Info
+        guardianName: string;
+        guardianEmail: string;
+        guardianRelationship: 'Padre' | 'Madre' | 'Tutor Legal' | 'Familiar' | 'Otro';
+        guardianMainPhone: string;
+        guardianSecondaryPhone?: string;
+        guardianTertiaryPhone?: string;
+
+        // Address
+        street: string;
+        exteriorNumber: string;
+        interiorNumber?: string;
+        colony: string;
+        zipCode: string;
+    }) => {
         // Double check internally
         if (PulseService.checkEmailExists(data.email)) {
             throw new Error("El correo electrónico ya está registrado en la plataforma.");
@@ -95,6 +122,8 @@ export const PulseService = {
         }
 
         const userId = uuid();
+        
+        // Create User (Auth)
         const newUser: UserProfile = {
             id: userId,
             email: data.email,
@@ -102,7 +131,7 @@ export const PulseService = {
             name: data.name,
             role: 'student',
             academyId: academy.id,
-            avatarUrl: '', // Empty to trigger initial avatar
+            avatarUrl: data.avatarUrl || '',
             studentId: userId 
         };
 
@@ -110,25 +139,31 @@ export const PulseService = {
         // Ensure strictly NUMBER
         const initialAmount = Number(academy.paymentSettings?.monthlyTuition) || 0;
         
+        // Create Student Profile (Data)
         const newStudent: Student = {
             id: userId,
             userId: userId,
             academyId: academy.id,
             name: data.name,
             email: data.email,
-            cellPhone: data.phone,
-            age: 0, 
-            birthDate: new Date().toISOString().split('T')[0],
+            cellPhone: data.cellPhone,
+            age: data.age, 
+            birthDate: data.birthDate,
             guardian: {
-                fullName: 'N/A',
-                email: 'N/A',
-                phones: { main: 'N/A' },
-                relationship: 'Otro',
+                fullName: data.guardianName,
+                email: data.guardianEmail,
+                relationship: data.guardianRelationship,
+                phones: { 
+                    main: data.guardianMainPhone,
+                    secondary: data.guardianSecondaryPhone,
+                    tertiary: data.guardianTertiaryPhone
+                },
                 address: {
-                    street: 'N/A',
-                    exteriorNumber: 'N/A',
-                    colony: 'N/A',
-                    zipCode: '00000'
+                    street: data.street,
+                    exteriorNumber: data.exteriorNumber,
+                    interiorNumber: data.interiorNumber,
+                    colony: data.colony,
+                    zipCode: data.zipCode
                 }
             },
             rank: 'White Belt',
@@ -143,7 +178,7 @@ export const PulseService = {
             balance: initialAmount, // Set initial balance reference
             classesId: [],
             attendanceHistory: [],
-            avatarUrl: ''
+            avatarUrl: data.avatarUrl || ''
         };
 
         // Create the initial CHARGE record

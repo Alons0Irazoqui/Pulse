@@ -1,8 +1,8 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Student, ClassCategory, Event, LibraryResource, AcademySettings, Message, AttendanceRecord, SessionModification, ClassException, PromotionHistoryItem, CalendarEvent, Rank } from '../types';
 import { PulseService } from '../services/pulseService';
-import { mockMessages, mockCalendarEvents } from '../mockData';
+import { mockMessages } from '../mockData';
 import { getLocalDate, formatDateDisplay } from '../utils/dateUtils';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
@@ -80,33 +80,37 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { addToast } = useToast();
   const academyId = currentUser?.academyId;
 
+  // --- ARCHITECTURE FIX: Race Condition Prevention ---
+  // When we poll data from LS, we update React State. Normally, this triggers the `useEffect` 
+  // that saves State -> LS. This creates a loop and risks overwriting new data if the poll was slightly stale.
+  // We use `isPollingRef` to signal that a state update came from the DB, so we should NOT write it back immediately.
+  const isPollingRef = useRef(false);
+
   const [isLoading, setIsLoading] = useState(true);
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassCategory[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [scheduleEvents, setScheduleEvents] = useState<CalendarEvent[]>([]); // This is now derived + explicit events
+  const [scheduleEvents, setScheduleEvents] = useState<CalendarEvent[]>([]); 
   const [libraryResources, setLibraryResources] = useState<LibraryResource[]>([]);
   const [academySettings, setAcademySettings] = useState<AcademySettings>(PulseService.getAcademySettings(academyId));
   const [messages, setMessages] = useState<Message[]>([]);
 
   // --- CALENDAR ENGINE ---
-  // Calculates events dynamically based on recurring classes and their modifications.
   const calculateCalendarEvents = useCallback((currentClasses: ClassCategory[], currentEvents: Event[]) => {
       const generatedEvents: CalendarEvent[] = [];
       
-      // 1. Process One-time Events (Marketplace)
+      // 1. Process One-time Events
       currentEvents.forEach(evt => {
           generatedEvents.push({
               ...evt,
               start: new Date(`${evt.date}T${evt.time}`),
-              end: new Date(new Date(`${evt.date}T${evt.time}`).getTime() + 60*60*1000), // Default 1h if not spec
+              end: new Date(new Date(`${evt.date}T${evt.time}`).getTime() + 60*60*1000), 
               color: evt.type === 'exam' ? '#db2777' : evt.type === 'tournament' ? '#f97316' : '#3b82f6',
               isRecurring: false
           });
       });
 
-      // 2. Generate Recurring Class Instances
-      // Generate for a 12-month window (-2 month to +10 months) to cover reasonable viewing
+      // 2. Generate Recurring Class Instances (12-month window)
       const today = new Date();
       const startWindow = new Date(today.getFullYear(), today.getMonth() - 2, 1);
       const endWindow = new Date(today.getFullYear(), today.getMonth() + 10, 0);
@@ -118,10 +122,8 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           
           while (loopDate <= endWindow) {
               const dayName = dayNames[loopDate.getDay()];
-              // CRITICAL FIX: Use local format yyyy-MM-dd to match modification keys exactly
               const dateStr = format(loopDate, 'yyyy-MM-dd');
               
-              // Check if class occurs on this day OR if it was moved TO this day
               const modification = cls.modifications.find(m => m.date === dateStr);
               const movedHere = cls.modifications.find(m => m.newDate === dateStr && m.type === 'move');
               
@@ -132,9 +134,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   shouldRender = true;
                   currentMod = movedHere;
               } else if (cls.days.includes(dayName)) {
-                  // It's a regular day
                   if (modification?.type === 'move') {
-                      // Moved AWAY from here -> Don't render
                       shouldRender = false; 
                   } else {
                       shouldRender = true;
@@ -160,7 +160,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   generatedEvents.push({
                       id: `${cls.id}-${dateStr}`,
                       academyId: cls.academyId,
-                      classId: cls.id, // CRITICAL FOR FILTERING
+                      classId: cls.id,
                       title: cls.name,
                       start,
                       end,
@@ -173,7 +173,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
                       description: status === 'cancelled' ? 'Clase Cancelada' : `Instructor: ${instructor}`
                   });
               }
-
               loopDate.setDate(loopDate.getDate() + 1);
           }
       });
@@ -181,53 +180,129 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return generatedEvents;
   }, []);
 
-  // Refresh calendar when classes or events change
+  // Update calendar when dependencies change (Derived State)
   useEffect(() => {
-      if (!isLoading) {
-          const newEvents = calculateCalendarEvents(classes, events);
-          setScheduleEvents(newEvents);
-      }
-  }, [classes, events, isLoading, calculateCalendarEvents]);
+      // Logic runs immediately on state change, no persistence needed here
+      const newEvents = calculateCalendarEvents(classes, events);
+      setScheduleEvents(newEvents);
+  }, [classes, events, calculateCalendarEvents]);
 
 
-  const loadData = () => {
-      setIsLoading(true);
+  // --- DATA LOADING & POLLING ---
+  
+  const loadData = useCallback(async (silent = false) => {
       if (currentUser?.academyId) {
-          setTimeout(() => {
-              setAcademySettings(PulseService.getAcademySettings(currentUser.academyId));
-              setStudents(PulseService.getStudents(currentUser.academyId));
-              const loadedClasses = PulseService.getClasses(currentUser.academyId);
-              setClasses(loadedClasses);
-              const loadedEvents = PulseService.getEvents(currentUser.academyId);
-              setEvents(loadedEvents);
-              
-              // Initial Calc
-              const calculated = calculateCalendarEvents(loadedClasses, loadedEvents);
-              setScheduleEvents(calculated);
+          if (!silent) setIsLoading(true);
+          
+          // FLAG: Start polling phase. Prevent persistence effects from running.
+          isPollingRef.current = true;
+
+          try {
+              // 1. Fetch Students
+              const dbStudents = PulseService.getStudents(currentUser.academyId);
+              setStudents(prev => {
+                  // Only update if signature changed to avoid re-renders
+                  if (JSON.stringify(prev) !== JSON.stringify(dbStudents)) return dbStudents;
+                  return prev;
+              });
+
+              // 2. Fetch Classes
+              const dbClasses = PulseService.getClasses(currentUser.academyId);
+              setClasses(prev => {
+                  if (JSON.stringify(prev) !== JSON.stringify(dbClasses)) return dbClasses;
+                  return prev;
+              });
+
+              // 3. Fetch Events
+              const dbEvents = PulseService.getEvents(currentUser.academyId);
+              setEvents(prev => {
+                  if (JSON.stringify(prev) !== JSON.stringify(dbEvents)) return dbEvents;
+                  return prev;
+              });
+
+              // 4. Fetch Settings & Other
+              const dbSettings = PulseService.getAcademySettings(currentUser.academyId);
+              setAcademySettings(prev => {
+                  if (JSON.stringify(prev) !== JSON.stringify(dbSettings)) return dbSettings;
+                  return prev;
+              });
 
               setLibraryResources(PulseService.getLibrary(currentUser.academyId));
               const storedMsgs = localStorage.getItem('pulse_messages');
-              setMessages(storedMsgs ? JSON.parse(storedMsgs) : mockMessages.map(m => ({...m, academyId: currentUser.academyId, recipientId: 'all', recipientName: 'Todos'}))); 
-              setIsLoading(false);
-          }, 800);
+              if (storedMsgs) {
+                  setMessages(JSON.parse(storedMsgs));
+              } else {
+                  if (messages.length === 0) {
+                      setMessages(mockMessages.map(m => ({...m, academyId: currentUser.academyId, recipientId: 'all', recipientName: 'Todos'}))); 
+                  }
+              }
+
+          } finally {
+              if (!silent) setIsLoading(false);
+              
+              // CRITICAL: Allow a small buffer for React to settle state updates before re-enabling persistence.
+              // This ensures the `useEffect` hooks for saving don't fire during the poll update.
+              setTimeout(() => {
+                  isPollingRef.current = false;
+              }, 500);
+          }
       } else {
           setIsLoading(false);
       }
-  };
-
-  useEffect(() => {
-      loadData();
   }, [currentUser]);
 
-  // Persistence
-  useEffect(() => { if(currentUser && !isLoading) PulseService.saveStudents(students); }, [students, currentUser, isLoading]);
-  useEffect(() => { if(currentUser && !isLoading) PulseService.saveClasses(classes); }, [classes, currentUser, isLoading]);
-  useEffect(() => { if(currentUser && !isLoading) PulseService.saveEvents(events); }, [events, currentUser, isLoading]);
-  useEffect(() => { if(currentUser && !isLoading) PulseService.saveLibrary(libraryResources); }, [libraryResources, currentUser, isLoading]);
-  useEffect(() => { if(currentUser && !isLoading) PulseService.saveAcademySettings(academySettings); }, [academySettings, currentUser, isLoading]);
-  useEffect(() => { if(currentUser && !isLoading) localStorage.setItem('pulse_messages', JSON.stringify(messages)); }, [messages, currentUser, isLoading]);
+  // Initial Load
+  useEffect(() => {
+      loadData(false);
+  }, [loadData]);
 
-  // --- ACTIONS ---
+  // Polling Interval (Every 5 seconds)
+  useEffect(() => {
+      if (!currentUser) return;
+      
+      const intervalId = setInterval(() => {
+          // Silent refresh to keep Master Dashboard in sync with new Registrations
+          loadData(true);
+      }, 5000);
+
+      return () => clearInterval(intervalId);
+  }, [loadData, currentUser]);
+
+
+  // --- PERSISTENCE (With Safety Checks) ---
+  
+  // Helper to check if we should save
+  const shouldSave = () => {
+      // Only save if user is logged in, not loading, AND not currently polling updates from DB
+      return currentUser && !isLoading && !isPollingRef.current;
+  };
+
+  useEffect(() => { 
+      if(shouldSave() && students.length > 0) PulseService.saveStudents(students); 
+  }, [students, currentUser, isLoading]);
+
+  useEffect(() => { 
+      if(shouldSave()) PulseService.saveClasses(classes); 
+  }, [classes, currentUser, isLoading]);
+
+  useEffect(() => { 
+      if(shouldSave()) PulseService.saveEvents(events); 
+  }, [events, currentUser, isLoading]);
+
+  useEffect(() => { 
+      if(shouldSave()) PulseService.saveLibrary(libraryResources); 
+  }, [libraryResources, currentUser, isLoading]);
+
+  useEffect(() => { 
+      if(shouldSave()) PulseService.saveAcademySettings(academySettings); 
+  }, [academySettings, currentUser, isLoading]);
+
+  useEffect(() => { 
+      if(shouldSave()) localStorage.setItem('pulse_messages', JSON.stringify(messages)); 
+  }, [messages, currentUser, isLoading]);
+
+
+  // --- ACTIONS (Wrapped) ---
 
   const addStudent = (student: Student) => {
       if (currentUser?.role !== 'master') return;
@@ -257,9 +332,12 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const updateStudent = (updatedStudent: Student) => {
       if (currentUser?.role !== 'master') return;
       setStudents(prev => prev.map(s => s.id === updatedStudent.id ? { ...updatedStudent, balance: s.balance } : s));
+      
+      // Update Auth DB too if basic info changed
       const userDB = PulseService.getUsersDB();
       const updatedDB = userDB.map(u => u.id === updatedStudent.userId ? { ...u, name: updatedStudent.name, email: updatedStudent.email } : u);
       localStorage.setItem('pulse_users_db', JSON.stringify(updatedDB));
+      
       addToast('Datos del alumno actualizados', 'success');
   };
 
@@ -267,11 +345,10 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setStudents(updatedStudents);
   };
 
-  // --- DELETE STUDENT (CRUD FIXED) ---
   const deleteStudent = (id: string) => {
       if (currentUser?.role !== 'master') return;
       
-      // 1. Perform Hard Delete in DB layer
+      // 1. Perform Hard Delete in DB layer immediately
       PulseService.deleteFullStudentData(id);
 
       // 2. Update Local State (Students List)
@@ -422,20 +499,16 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addToast('Clase actualizada', 'success');
   };
 
-  // --- CRITICAL: Updates the class exceptions, triggering calendar regeneration ---
   const modifyClassSession = (classId: string, modification: SessionModification) => {
     if (currentUser?.role !== 'master') return;
     setClasses(prev => prev.map(c => {
         if (c.id === classId) {
-            // Remove existing mod for this date if exists
             const newModifications = c.modifications.filter(m => m.date !== modification.date);
-            // Add new mod
             newModifications.push(modification);
             return { ...c, modifications: newModifications };
         }
         return c;
     }));
-    // Note: useEffect[classes] will trigger recalculation of scheduleEvents automatically
     addToast('Sesión modificada', 'success');
   };
 
@@ -494,9 +567,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const updateCalendarEvent = (id: string, updates: Partial<CalendarEvent>) => {
       if (currentUser?.role !== 'master') return;
       
-      // CRITICAL FIX: If it's a recurring class instance, ensure DATE key matches formatting
       if (updates.classId && updates.start) {
-          // Use format from date-fns to avoid timezone shifts (UTC vs Local)
           const dateStr = format(updates.start, 'yyyy-MM-dd');
           
           const modification: SessionModification = {
@@ -510,27 +581,24 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           
           modifyClassSession(updates.classId, modification);
       } 
-      // Else, update legacy event
       else {
           setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
       }
   };
 
   const deleteCalendarEvent = (id: string) => {
-      // Find if it's an Event or Class Instance
       const evt = events.find(e => e.id === id);
       if (evt) {
           deleteEvent(id);
       } else {
-          // It's likely a generated class instance ID like "classId-date"
-          const [classId, dateStr] = id.split(/-(?=\d{4}-\d{2}-\d{2})/); // split on last dash before date
+          const [classId, dateStr] = id.split(/-(?=\d{4}-\d{2}-\d{2})/); 
           if (classId && dateStr) {
               modifyClassSession(classId, { date: dateStr, type: 'cancel' });
           }
       }
   };
 
-  // --- MARKETPLACE EVENTS (LEGACY) ---
+  // --- MARKETPLACE EVENTS ---
 
   const addEvent = (event: Event) => {
       if (currentUser?.role !== 'master') return;
@@ -568,7 +636,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const registerForEvent = (studentId: string, eventId: string) => {
       const event = events.find(e => e.id === eventId);
       
-      // FIXED: Allow Masters to register students for exams. Block only Students.
       if (event && event.type === 'exam') {
           if (currentUser?.role !== 'master') {
               addToast('La inscripción a exámenes es gestionada exclusivamente por el maestro.', 'error');
@@ -591,8 +658,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const getStudentEnrolledEvents = (studentId: string) => {
-      // Return events where student is registered AND date is future OR recent past (30 days)
-      const now = new Date();
       const threshold = new Date();
       threshold.setDate(threshold.getDate() - 30); 
 
@@ -654,7 +719,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           ...prev,
           ranks: [...prev.ranks, rank]
       }));
-      // addToast handled by consumer usually, but we can add generic here
   };
 
   const deleteRank = (id: string) => {
@@ -679,12 +743,12 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <AcademyContext.Provider value={{ 
         students, classes, events, scheduleEvents, libraryResources, academySettings, messages, isLoading,
-        refreshData: loadData,
+        refreshData: () => loadData(true),
         addStudent, updateStudent, deleteStudent, updateStudentStatus, batchUpdateStudents,
         markAttendance, bulkMarkPresent, promoteStudent, 
         addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
         addEvent, updateEvent, deleteEvent, registerForEvent, updateEventRegistrants,
-        addCalendarEvent, updateCalendarEvent, deleteCalendarEvent, getStudentEnrolledEvents, // NEW EXPORT
+        addCalendarEvent, updateCalendarEvent, deleteCalendarEvent, getStudentEnrolledEvents, 
         addLibraryResource, deleteLibraryResource, toggleResourceCompletion, 
         updateAcademySettings, updatePaymentDates, addRank, deleteRank,
         sendMessage, markMessageRead

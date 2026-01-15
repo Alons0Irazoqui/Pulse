@@ -13,6 +13,7 @@ export const studentRegistrationSchema = z.object({
   birthDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Fecha de nacimiento inválida" }),
   email: z.string().email("Ingresa un correo electrónico válido para el alumno"),
   cellPhone: z.string().regex(phoneRegex, "El celular debe tener al menos 10 dígitos"),
+  avatarUrl: z.string().optional(),
   
   // Guardian Data
   guardianName: z.string().min(3, "El nombre del tutor es obligatorio"),

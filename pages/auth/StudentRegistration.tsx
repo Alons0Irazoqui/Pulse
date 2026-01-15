@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm, SubmitHandler, UseFormRegister, FieldErrors } from 'react-hook-form';
@@ -69,19 +70,25 @@ const StudentRegistration: React.FC = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Avatar logic
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
     handleSubmit,
     trigger,
     setError,
+    setValue,
     formState: { errors },
     watch
   } = useForm<StudentRegistrationForm>({
     resolver: zodResolver(studentRegistrationSchema),
     mode: 'onChange',
     defaultValues: {
-        guardianRelationship: 'Padre'
+        guardianRelationship: 'Padre',
+        avatarUrl: ''
     }
   });
 
@@ -114,6 +121,19 @@ const StudentRegistration: React.FC = () => {
     setCurrentStep((prev) => prev - 1);
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        setAvatarPreview(base64);
+        setValue('avatarUrl', base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const onSubmit: SubmitHandler<StudentRegistrationForm> = async (data) => {
     setIsSubmitting(true);
     
@@ -125,13 +145,8 @@ const StudentRegistration: React.FC = () => {
     }
 
     try {
-        const success = await registerStudent({
-            academyCode: data.academyCode,
-            name: data.name,
-            email: data.email,
-            phone: data.cellPhone,
-            password: data.password,
-        });
+        // Now passing the FULL data object, including avatarUrl
+        const success = await registerStudent(data);
 
         if (success) {
             addToast('Registro completado con éxito', 'success');
@@ -232,9 +247,25 @@ const StudentRegistration: React.FC = () => {
             {currentStep === 2 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
                     <div className="md:col-span-2 flex justify-center mb-4">
-                        <div className="size-24 bg-gray-50 rounded-full flex items-center justify-center border-2 border-dashed border-gray-300 text-gray-400">
-                            <span className="material-symbols-outlined text-4xl">add_a_photo</span>
+                        <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="size-24 bg-gray-50 rounded-full flex items-center justify-center border-2 border-dashed border-gray-300 text-gray-400 cursor-pointer hover:border-orange-500 hover:text-orange-500 transition-all overflow-hidden relative group"
+                        >
+                            {avatarPreview ? (
+                                <img src={avatarPreview} alt="Avatar Preview" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="material-symbols-outlined text-4xl">add_a_photo</span>
+                            )}
+                            {/* Overlay hint */}
+                            {!avatarPreview && <div className="absolute inset-0 bg-transparent group-hover:bg-orange-50/10 transition-colors"></div>}
                         </div>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={handleImageChange}
+                        />
                     </div>
 
                     <InputField register={register} errors={errors} label="Nombre Completo" name="name" icon="badge" placeholder="Nombre y Apellidos" />
