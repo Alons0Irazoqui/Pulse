@@ -18,7 +18,7 @@ const generateId = (prefix: string = 'id') => {
 
 interface FinanceContextType {
   records: TuitionRecord[];
-  isFinanceLoading: boolean; // Architectural Change: Explicit loading state
+  isFinanceLoading: boolean; 
   // Calculated Metrics
   totalRevenue: number;
   monthlyRevenueData: { name: string; total: number }[]; // Year to Date (Jan-Dec)
@@ -35,27 +35,24 @@ interface FinanceContextType {
   createRecord: (record: Partial<TuitionRecord>) => void;
   createManualCharge: (data: ManualChargeData) => void;
   
-  // New Batch Payment API
   registerBatchPayment: (
       recordIds: string[], 
       file: File, 
       method: 'Transferencia' | 'Efectivo', 
       totalAmount?: number,
-      details?: { description: string; amount: number }[] // Desglose opcional
+      details?: { description: string; amount: number }[] 
   ) => void;
   approveBatchPayment: (batchId: string, totalPaidAmount: number) => void;
   rejectBatchPayment: (batchId: string) => void;
 
-  // Legacy/Single Item Actions (kept for compatibility or single actions)
   uploadProof: (recordId: string, file: File, method?: 'Transferencia' | 'Efectivo') => void;
-  approvePayment: (recordId: string) => void; 
+  approvePayment: (recordId: string, adjustedAmount?: number) => void; 
   rejectPayment: (recordId: string) => void;
   
   generateMonthlyBilling: () => void; 
   checkOverdueStatus: () => void;
   getStudentPendingDebts: (studentId: string) => TuitionRecord[];
   
-  // --- DELETE HELPER ---
   purgeStudentDebts: (studentId: string) => void;
 }
 
@@ -78,8 +75,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const loadFinancialData = async () => {
           setIsFinanceLoading(true);
           
-          // ARCHITECTURAL CHANGE: Simulate network latency (e.g., Supabase fetch)
-          // This prevents the dashboard from calculating incomplete data on mount.
           await new Promise(resolve => setTimeout(resolve, 800));
 
           if (!isMounted) return;
@@ -113,11 +108,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // --- CALCULATED METRICS (MEMOIZED) ---
 
   // 1. Total Revenue: Sum of all PAID records
+  // CRITICAL: This depends on `originalAmount` or `amount` of paid records.
+  // When approvePayment adjusts the amount, it updates `originalAmount`, so this sum automatically reflects the discount.
   const totalRevenue = useMemo(() => {
       if (isFinanceLoading) return 0;
       return records.reduce((acc, r) => {
           if (r.status === 'paid') {
-              // Use originalAmount if available (for partial payments history correctness), else amount
               const val = r.originalAmount !== undefined ? r.originalAmount : r.amount;
               return acc + val + (r.penaltyAmount || 0);
           }
@@ -125,10 +121,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }, 0);
   }, [records, isFinanceLoading]);
 
-  // 2. Monthly Revenue Data (Year-to-Date): Grouped by Month (Jan-Dec) for "Anual" Charts
+  // 2. Monthly Revenue Data (Year-to-Date)
   const monthlyRevenueData = useMemo(() => {
       const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      // Initialize with 0s to ensure continuity in charts
       const revenueByMonth = new Array(12).fill(0);
       
       if (isFinanceLoading) return months.map((name) => ({ name, total: 0 }));
@@ -137,13 +132,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       records.forEach(r => {
           if (r.status === 'paid') {
-              // Prefer paymentDate, fallback to dueDate if manually marked without date
+              // Priority: Payment Date (Real Cash Flow) -> Due Date (Accrual fallback)
               const dateStr = r.paymentDate || r.dueDate;
               if (dateStr) {
                   const dateObj = new Date(dateStr);
-                  // Only count for current year in this specific view
                   if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() === currentYear) {
-                      const monthIndex = dateObj.getMonth(); // 0-11
+                      const monthIndex = dateObj.getMonth(); 
                       const val = r.originalAmount !== undefined ? r.originalAmount : r.amount;
                       revenueByMonth[monthIndex] += val + (r.penaltyAmount || 0);
                   }
@@ -157,11 +151,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }));
   }, [records, isFinanceLoading]);
 
-  // 3. Rolling Revenue Data (Last 6 Months): Robust calculation for "Mensual/Trend" View
+  // 3. Rolling Revenue Data (Last 6 Months)
   const rollingRevenueData = useMemo(() => {
       const result = [];
       const today = new Date();
-      // Generate last 6 months buckets
       for (let i = 5; i >= 0; i--) {
           const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
           const monthIndex = d.getMonth();
@@ -169,7 +162,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const monthName = d.toLocaleDateString('es-MX', { month: 'short' });
           const properName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
-          // Calculate revenue for this specific month/year bucket
           let total = 0;
           
           if (!isFinanceLoading) {
@@ -202,13 +194,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const nextStudents = students.map(student => {
           const studentRecords = records.filter(r => r.studentId === student.id);
           
-          // Debt calculation: Sum of amount + penalty for all non-paid records
           const debt = studentRecords
               .filter(r => r.status !== 'paid')
               .reduce((sum, r) => sum + (r.amount + r.penaltyAmount), 0);
           
           let newStatus = student.status;
-          
           const hasOverdue = studentRecords.some(r => r.status === 'overdue');
           
           if (debt > 0) {
@@ -230,7 +220,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
   }, [records, students.length, isFinanceLoading]); 
 
-  // --- BATCH PAYMENT LOGIC (CORE REFACTOR) ---
+  // --- BATCH PAYMENT LOGIC ---
 
   const registerBatchPayment = (
       recordIds: string[], 
@@ -241,9 +231,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ) => {
       const batchId = generateId('batch');
       const frozenDate = new Date().toISOString();
-      const fakeUrl = URL.createObjectURL(file); // Simulation
+      const fakeUrl = URL.createObjectURL(file); 
 
-      // Logic: Ensure we have details. If not provided but it is a generic batch/deposit, generate them.
       let transactionDetails = details;
       if ((!transactionDetails || transactionDetails.length === 0) && totalAmount && recordIds.length === 0) {
           transactionDetails = [{ description: 'Abono a cuenta / Depósito general', amount: totalAmount }];
@@ -251,8 +240,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       setRecords(prev => prev.map(r => {
           if (recordIds.includes(r.id)) {
-              // If details aren't provided explicitly for this batch call, default to the record's own info.
-              // This maintains backward compatibility for single-item payments or legacy calls.
               const currentRecordDetails = transactionDetails || [{ description: r.concept, amount: r.amount + r.penaltyAmount }];
 
               return {
@@ -263,8 +250,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   proofUrl: fakeUrl,
                   proofType: file.type,
                   method: method,
-                  declaredAmount: totalAmount, // Store what user said they paid
-                  details: currentRecordDetails // Store the full breakdown of what this payment covers
+                  declaredAmount: totalAmount, 
+                  details: currentRecordDetails 
               };
           }
           return r;
@@ -273,9 +260,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast(`Pago registrado (${recordIds.length} conceptos). En revisión.`, 'success');
   };
 
-  /**
-   * WATERFALL ALGORITHM for Payment Approval
-   */
   const approveBatchPayment = (batchId: string, totalPaidAmount: number) => {
       setRecords(prev => {
           const batchRecords = prev.filter(r => r.batchPaymentId === batchId);
@@ -369,7 +353,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast('Pago rechazado. Se ha notificado al alumno.', 'info');
   };
 
-  // --- SINGLE ITEM ACTIONS (Wrappers or Standalone) ---
+  // --- SINGLE ITEM ACTIONS ---
 
   const createRecord = (data: Partial<TuitionRecord>) => {
       if (!data.studentId || !data.amount) return;
@@ -435,11 +419,42 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       registerBatchPayment([recordId], file, method);
   };
 
-  const approvePayment = (recordId: string) => {
+  const approvePayment = (recordId: string, adjustedAmount?: number) => {
       const record = records.find(r => r.id === recordId);
       if (!record) return;
-      setRecords(prev => prev.map(r => r.id === recordId ? { ...r, status: 'paid', amount: 0, penaltyAmount: 0 } : r));
-      addToast('Pago aprobado', 'success');
+
+      // Ensure we have a payment date to record revenue in the correct month
+      const effectiveDate = record.paymentDate || new Date().toISOString();
+
+      setRecords(prev => prev.map(r => {
+          if (r.id === recordId) {
+              // Lógica Específica: Ajuste de Mensualidad
+              // Si el maestro define un monto ajustado (ej. descuento), este se convierte en el "Monto Pagado"
+              // y también en el "Monto Original" para fines de reporte de ingresos, eliminando la diferencia (descuento).
+              if (r.category === 'Mensualidad' && adjustedAmount !== undefined) {
+                  return {
+                      ...r,
+                      status: 'paid',
+                      amount: adjustedAmount, // Muestra lo que se pagó realmente
+                      originalAmount: adjustedAmount, // Asegura que el reporte de ingresos sume solo lo cobrado
+                      penaltyAmount: 0, // Condonación de recargos implícita
+                      paymentDate: effectiveDate
+                  };
+              }
+
+              // Flujo estándar
+              return { 
+                  ...r, 
+                  status: 'paid', 
+                  amount: 0, // Deuda saldada
+                  penaltyAmount: 0,
+                  originalAmount: r.originalAmount !== undefined ? r.originalAmount : r.amount,
+                  paymentDate: effectiveDate
+              };
+          }
+          return r;
+      }));
+      addToast('Pago aprobado exitosamente', 'success');
   };
 
   const rejectPayment = (recordId: string) => {
@@ -548,7 +563,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const stats = useMemo(() => {
-      // Return 0 stats if loading to avoid flickering
       if (isFinanceLoading) {
           return {
               totalRevenue: 0,
@@ -572,7 +586,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <FinanceContext.Provider value={{ 
         records, 
-        isFinanceLoading, // Exported for Dashboard usage
+        isFinanceLoading, 
         totalRevenue,
         monthlyRevenueData,
         rollingRevenueData,

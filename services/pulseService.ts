@@ -7,7 +7,7 @@ const STORAGE_KEYS = {
     CLASSES: 'pulse_classes',
     USER: 'pulse_current_session', // Session
     USERS_DB: 'pulse_users_db', // Simulating Auth Table
-    PAYMENTS: 'pulse_payments',
+    PAYMENTS: 'pulse_tuition_records', // ALIGNED with FinanceContext
     LIBRARY: 'pulse_library',
     EVENTS: 'pulse_events',
     ACADEMIES: 'pulse_academies' // Simulating Academies Table
@@ -202,7 +202,7 @@ export const PulseService = {
                 canBePaidInParts: false
             };
             payments.push(initialCharge);
-            localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
+            PulseService.savePayments(payments); // Use the safe save method
         }
 
         users.push(newUser);
@@ -300,7 +300,7 @@ export const PulseService = {
         localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(newStudents));
         localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(newClasses));
         localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(newEvents));
-        localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(newPayments));
+        PulseService.savePayments(newPayments);
 
         return true;
     },
@@ -553,7 +553,41 @@ export const PulseService = {
     },
 
     savePayments: (payments: TuitionRecord[]) => {
-        localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
+        // --- DATA INTEGRITY FIX ---
+        // 1. Deduplication: Use a Map with ID as key to ensure we don't save duplicates.
+        //    The last item in the array (most recent update) will overwrite previous ones.
+        const uniqueMap = new Map<string, TuitionRecord>();
+        
+        payments.forEach(p => {
+            // 2. Type Safety: Ensure all monetary fields are strictly numbers before saving to disk.
+            // This prevents "500" + 50 = "50050" string concatenation bugs later.
+            const cleanRecord = {
+                ...p,
+                amount: Number(p.amount),
+                penaltyAmount: Number(p.penaltyAmount || 0),
+                originalAmount: p.originalAmount !== undefined ? Number(p.originalAmount) : undefined,
+                declaredAmount: p.declaredAmount !== undefined ? Number(p.declaredAmount) : undefined,
+            };
+            uniqueMap.set(p.id, cleanRecord);
+        });
+
+        const uniquePayments = Array.from(uniqueMap.values());
+        localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(uniquePayments));
+    },
+
+    updatePaymentRecord: (updatedRecord: TuitionRecord) => {
+        const allRecords = PulseService.getPayments();
+        const index = allRecords.findIndex(r => r.id === updatedRecord.id);
+
+        if (index !== -1) {
+            // Update existing record
+            allRecords[index] = { ...allRecords[index], ...updatedRecord };
+        } else {
+            // Add new record if it somehow doesn't exist (safety fallback)
+            allRecords.push(updatedRecord);
+        }
+        
+        PulseService.savePayments(allRecords);
     },
     
     getCurrentUser: (): UserProfile | null => {

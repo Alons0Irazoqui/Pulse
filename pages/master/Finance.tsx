@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirmation } from '../../context/ConfirmationContext';
@@ -86,6 +86,20 @@ const Finance: React.FC = () => {
   
   const [selectedGroup, setSelectedGroup] = useState<GroupedTransaction | null>(null);
   const [isChargeModalOpen, setIsChargeModalOpen] = useState(false);
+
+  // New State for Amount Adjustment
+  const [adjustmentValue, setAdjustmentValue] = useState<string>('');
+
+  // -- EFFECT: Init Adjustment Value --
+  useEffect(() => {
+      if (selectedGroup) {
+          // Default to declared if exists, otherwise total.
+          const initialVal = selectedGroup.declaredAmount !== undefined 
+              ? selectedGroup.declaredAmount 
+              : selectedGroup.totalAmount;
+          setAdjustmentValue(initialVal.toString());
+      }
+  }, [selectedGroup]);
 
   // -- DATA PROCESSING --
 
@@ -182,8 +196,13 @@ const Finance: React.FC = () => {
       const splittable = items.filter(r => r.canBePaidInParts)
                               .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
 
-      // Use Declared Amount if available (what student claimed they paid), else default to full debt
-      let available = selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount;
+      // Use adjustmentValue if editing, otherwise fallbacks
+      let available = 0;
+      if (selectedGroup.mainRecord.category === 'Mensualidad' && adjustmentValue) {
+          available = parseFloat(adjustmentValue);
+      } else {
+          available = selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount;
+      }
       
       const preview = [];
 
@@ -217,7 +236,7 @@ const Finance: React.FC = () => {
       }
       
       return preview;
-  }, [selectedGroup]);
+  }, [selectedGroup, adjustmentValue]);
 
 
   // -- ACTIONS --
@@ -225,18 +244,26 @@ const Finance: React.FC = () => {
   const handleApprove = () => {
       if (!selectedGroup) return;
       
-      // Use Declared Amount for approval logic
-      const amountToApprove = selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount;
+      // Determine final amount to approve
+      const isMensualidad = selectedGroup.mainRecord.category === 'Mensualidad';
+      let amountToApprove = 0;
+
+      if (isMensualidad && adjustmentValue) {
+          amountToApprove = parseFloat(adjustmentValue);
+      } else {
+          amountToApprove = selectedGroup.declaredAmount !== undefined ? selectedGroup.declaredAmount : selectedGroup.totalAmount;
+      }
 
       if (selectedGroup.isBatch) {
           approveBatchPayment(selectedGroup.id, amountToApprove);
       } else {
-          // If single record, check if it's partial or full based on declared amount
-          if (amountToApprove < selectedGroup.totalAmount) {
-               // Treat as 1-item batch to trigger waterfall partial logic
+          // If single record, use special approvePayment logic which handles adjustment if category matches
+          if (!isMensualidad && amountToApprove < selectedGroup.totalAmount) {
+               // Treat as 1-item batch to trigger waterfall partial logic for NON-mensualidad items
                approveBatchPayment(selectedGroup.records[0].batchPaymentId || `temp-${selectedGroup.records[0].id}`, amountToApprove);
           } else {
-               approvePayment(selectedGroup.id);
+               // For Mensualidad or Full Payment
+               approvePayment(selectedGroup.id, isMensualidad ? amountToApprove : undefined);
           }
       }
       setSelectedGroup(null);
@@ -519,6 +546,29 @@ const Finance: React.FC = () => {
                                     </p>
                                 )}
                             </div>
+
+                            {/* Adjustment Input for Mensualidades */}
+                            {selectedGroup.mainRecord.category === 'Mensualidad' && (
+                                <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm relative overflow-hidden group focus-within:ring-2 focus-within:ring-orange-100 focus-within:border-orange-300 transition-all">
+                                    <div className="absolute top-0 right-0 p-3 opacity-10">
+                                        <span className="material-symbols-outlined text-4xl text-orange-500">edit_note</span>
+                                    </div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Otro monto (Ajuste)</label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-3.5 text-gray-400 font-bold text-lg pointer-events-none">$</span>
+                                        <input
+                                            type="number"
+                                            value={adjustmentValue}
+                                            onChange={(e) => setAdjustmentValue(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50/50 font-bold text-gray-900 text-lg focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all placeholder:text-gray-300"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 mt-2 font-medium">
+                                        Si modificas este valor, el registro se actualizará y marcará como pagado por este monto exacto.
+                                    </p>
+                                </div>
+                            )}
 
                             {/* PREVIEW: Waterfall Distribution */}
                             <div>
