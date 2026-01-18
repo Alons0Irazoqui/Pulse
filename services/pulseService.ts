@@ -189,6 +189,7 @@ export const PulseService = {
                 studentId: userId,
                 studentName: data.name,
                 amount: initialAmount,
+                originalAmount: initialAmount, // Ensure original is set
                 penaltyAmount: 0,
                 dueDate: new Date().toISOString().split('T')[0],
                 status: 'charged', // STRICT STATUS
@@ -561,6 +562,7 @@ export const PulseService = {
         payments.forEach(p => {
             // 2. Type Safety: Ensure all monetary fields are strictly numbers before saving to disk.
             // This prevents "500" + 50 = "50050" string concatenation bugs later.
+            // FIX: Ensure originalAmount is preserved and not accidentally dropped or zeroed if valid
             const cleanRecord = {
                 ...p,
                 amount: Number(p.amount),

@@ -102,35 +102,45 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
 
     // -- DERIVED VALUES (THE BRAINS) --
     
-    // 1. Calculate Totals
+    // 1. Calculate Total Debt (Upper Limit)
     const totalDebtSum = useMemo(() => {
         return selectedDebts.reduce((sum, d) => sum + d.amount + d.penaltyAmount, 0);
     }, [selectedDebts]);
 
+    // 2. Calculate Mandatory Sum (Lower Limit)
+    // Sum of items that CANNOT be paid in parts OR are 'Mensualidad'
     const mandatorySum = useMemo(() => {
-        return selectedDebts
-            .filter(d => !d.canBePaidInParts)
-            .reduce((sum, d) => sum + d.amount + d.penaltyAmount, 0);
+        return selectedDebts.reduce((sum, d) => {
+            const isMensualidad = d.category === 'Mensualidad' || d.concept.toLowerCase().includes('mensualidad');
+            // If it's tuition OR explicitly marked as "no partials", it contributes to the minimum floor
+            if (!d.canBePaidInParts || isMensualidad) {
+                return sum + d.amount + d.penaltyAmount;
+            }
+            return sum;
+        }, 0);
     }, [selectedDebts]);
 
-    // 2. Logic Flags
+    // 3. Logic Flags - MIXED BATCH RULE
     const canCustomizeAmount = useMemo(() => {
-        // Can only customize if at least one item allows partial payments
-        return selectedDebts.some(d => d.canBePaidInParts);
-    }, [selectedDebts]);
+        if (selectedDebts.length === 0) return false;
+        
+        // If Total > Mandatory, it implies there's at least one item (or part of items) 
+        // that allows flexibility. This satisfies "si hay dos conceptos uno que no... y otro que si".
+        return totalDebtSum > mandatorySum;
+    }, [totalDebtSum, mandatorySum, selectedDebts]);
 
     const finalAmount = isPartialEnabled && customAmount ? parseFloat(customAmount) : totalDebtSum;
     
     // VALIDATION LOGIC UPDATE:
-    // 1. Must cover mandatory items
-    // 2. Must NOT exceed total debt (Overpayment check)
+    // 1. Must be >= mandatorySum (Cover the non-splittable items)
+    // 2. Must be <= totalDebtSum (Cannot overpay)
     const isAmountValid = useMemo(() => {
         if (!isPartialEnabled) return true;
         // Allow slight float margin errors
-        return finalAmount >= mandatorySum - 0.01 && finalAmount <= totalDebtSum + 0.01;
+        return finalAmount >= (mandatorySum - 0.01) && finalAmount <= (totalDebtSum + 0.01);
     }, [finalAmount, mandatorySum, totalDebtSum, isPartialEnabled]);
 
-    // 3. Available Options for Selector (Exclude already selected)
+    // 4. Available Options for Selector (Exclude already selected)
     const availableOptions = useMemo(() => {
         return pendingDebts.filter(d => !selectedDebts.find(s => s.id === d.id));
     }, [pendingDebts, selectedDebts]);
@@ -141,7 +151,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
         const checked = e.target.checked;
         setIsPartialEnabled(checked);
         if (checked) {
-            // UX IMPROVEMENT: Set custom amount to current total instead of 0
+            // UX IMPROVEMENT: Start with Total, user adjusts down
             setCustomAmount(totalDebtSum.toFixed(2));
         } else {
             setCustomAmount('');
@@ -155,16 +165,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
         const debt = pendingDebts.find(d => d.id === id);
         if (debt) {
             setSelectedDebts(prev => [...prev, debt]);
-            // Reset logic if needed
+            // Reset partial toggle when selection changes to avoid confusing validation state
             setIsPartialEnabled(false); 
             setCustomAmount('');
         }
-        // Reset select to default immediately (Auto-Add UX)
         e.target.value = "";
     };
 
     const handleRemoveDebt = (id: string) => {
-        // If single mode, you can't remove the only item (effectively cancels modal)
         if (isSinglePaymentMode) return; 
         setSelectedDebts(prev => prev.filter(d => d.id !== id));
         setIsPartialEnabled(false);
@@ -177,35 +185,22 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
         }
     };
 
-    const handleManualUpdate = () => {
-        if (isAmountValid) {
-            addToast('Monto actualizado correctamente', 'success');
-        } else {
-            // Re-use logic from isAmountValid for the toast message
-            if (finalAmount > totalDebtSum + 0.01) {
-                addToast('El monto no puede ser mayor a la deuda total.', 'error');
-            } else {
-                addToast(`Debes cubrir al menos $${mandatorySum.toFixed(2)} de los conceptos obligatorios.`, 'error');
-            }
-        }
-    };
-
     const handleSubmit = () => {
         if (selectedDebts.length === 0) return;
         if (method === 'Transferencia' && !file) return;
+        
         if (!isAmountValid) {
             if (finalAmount > totalDebtSum) {
                 addToast('El monto no puede ser mayor a la deuda total.', 'error');
             } else {
-                addToast(`El monto mínimo a cubrir es $${mandatorySum.toFixed(2)}`, 'error');
+                addToast(`El monto mínimo obligatorio a cubrir es $${mandatorySum.toFixed(2)}`, 'error');
             }
             return;
         }
 
         const ids = selectedDebts.map(d => d.id);
         
-        // TRANSACTIONAL INTEGRITY: Build the details array here based on selected items.
-        // This ensures the backend/context knows exactly what "Concepts" this payment covers.
+        // Use full concepts for description
         const details = selectedDebts.map(d => ({
             description: d.concept,
             amount: d.amount + d.penaltyAmount
@@ -274,15 +269,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                                         className="flex items-center justify-between p-3.5 bg-gray-50 border border-gray-100 rounded-xl group"
                                     >
                                         <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${debt.canBePaidInParts ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                                            <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${debt.category === 'Mensualidad' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
                                                 <span className="material-symbols-outlined text-sm">
-                                                    {debt.canBePaidInParts ? 'payments' : 'lock'}
+                                                    {debt.category === 'Mensualidad' ? 'payments' : 'lock'}
                                                 </span>
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold text-gray-900 truncate">{debt.concept}</p>
                                                 <p className="text-[10px] text-gray-500 font-medium">
-                                                    {debt.canBePaidInParts ? 'Permite Abonos' : 'Pago Exacto Requerido'}
+                                                    {debt.category === 'Mensualidad' ? 'Monto Fijo' : (debt.canBePaidInParts ? 'Permite Abonos' : 'Pago Exacto')}
                                                 </p>
                                             </div>
                                         </div>
@@ -330,46 +325,43 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                         </div>
 
                         <div className="relative">
-                            <span className="absolute left-4 top-4 text-gray-400 font-bold text-lg">$</span>
+                            <span className={`absolute left-4 top-4 font-bold text-lg z-10 ${!isPartialEnabled ? 'text-gray-400' : 'text-gray-900'}`}>$</span>
                             <input 
                                 type="number" 
                                 value={isPartialEnabled ? customAmount : totalDebtSum.toFixed(2)}
                                 onChange={(e) => setCustomAmount(e.target.value)}
-                                disabled={!isPartialEnabled}
-                                className={`w-full rounded-2xl border py-4 pl-8 pr-4 text-2xl font-black text-gray-900 focus:ring-4 transition-all outline-none ${
+                                readOnly={!isPartialEnabled}
+                                className={`w-full rounded-2xl border py-4 pl-8 pr-4 text-2xl font-black transition-all outline-none ${
                                     !isPartialEnabled 
-                                    ? 'bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed' 
+                                    ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed select-none' 
                                     : isAmountValid 
-                                        ? 'bg-white border-orange-500 focus:border-orange-500 focus:ring-orange-500/10' 
-                                        : 'bg-red-50 border-red-300 focus:border-red-500 focus:ring-red-100 text-red-600'
+                                        ? 'bg-white border-orange-500 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 text-gray-900' 
+                                        : 'bg-red-50 border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100 text-red-600'
                                 }`}
                                 placeholder="0.00"
                             />
                             {!isPartialEnabled && (
-                                <span className="absolute right-4 top-5 text-xs font-bold text-orange-500 flex items-center gap-1 bg-orange-50 px-2 py-1 rounded-md">
-                                    <span className="material-symbols-outlined text-[14px]">lock</span> Total Exacto
+                                <span className="absolute right-4 top-5 text-xs font-bold text-gray-500 flex items-center gap-1 bg-gray-300/50 px-2 py-1 rounded-md">
+                                    <span className="material-symbols-outlined text-[14px]">lock</span> Fijo
                                 </span>
                             )}
                         </div>
-
-                        {/* NEW BUTTON: Update Amount */}
-                        {isPartialEnabled && (
-                            <button 
-                                onClick={handleManualUpdate}
-                                className="w-full mt-2 py-2 text-sm font-bold border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
-                            >
-                                <span className="material-symbols-outlined text-lg">sync</span>
-                                Actualizar Monto
-                            </button>
-                        )}
 
                         {!isAmountValid && isPartialEnabled && (
                             <div className="flex items-center gap-3 text-xs text-red-600 font-medium bg-red-50 p-3 rounded-xl border border-red-100 animate-in slide-in-from-top-1">
                                 <span className="material-symbols-outlined text-sm filled">error</span>
                                 {finalAmount > totalDebtSum 
-                                    ? `El monto no puede ser mayor al total de $${totalDebtSum.toFixed(2)}`
-                                    : `Debes cubrir al menos $${mandatorySum.toFixed(2)} de los conceptos obligatorios.`
+                                    ? `El monto no puede superar el total de $${totalDebtSum.toFixed(2)}`
+                                    : `Monto inválido. Debes cubrir al menos $${mandatorySum.toFixed(2)} de los conceptos obligatorios.`
                                 }
+                            </div>
+                        )}
+                        
+                        {/* Info Helper */}
+                        {isPartialEnabled && isAmountValid && mandatorySum > 0 && (
+                            <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium px-1">
+                                <span className="material-symbols-outlined text-sm">info</span>
+                                Mínimo requerido: ${mandatorySum.toFixed(2)}
                             </div>
                         )}
                     </div>

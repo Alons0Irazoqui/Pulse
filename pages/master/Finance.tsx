@@ -42,7 +42,7 @@ const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: nu
             return (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-100 uppercase tracking-wide">
                     <span className="material-symbols-outlined text-[14px] filled">pie_chart</span>
-                    Restante
+                    Parcial
                 </span>
             );
         default: // pending
@@ -56,14 +56,12 @@ const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: nu
 };
 
 /**
- * DEBT AMOUNT EDITOR - REDESIGNED
- * Single input, High-end look, Explicit Action Button.
+ * DEBT AMOUNT EDITOR
  */
 const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (id: string, val: number) => void }) => {
     const [val, setVal] = useState(item.amount.toString());
     const { addToast } = useToast();
     
-    // Sync internal state if the prop changes from outside
     useEffect(() => {
         setVal(item.amount.toString());
     }, [item.amount]);
@@ -76,7 +74,6 @@ const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (
         }
     };
 
-    // Check if local value differs from source of truth
     const hasChanged = parseFloat(val) !== item.amount;
 
     return (
@@ -104,12 +101,6 @@ const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (
                     <span className="text-xs font-bold">Actualizar</span>
                 </button>
             )}
-
-            {item.penaltyAmount > 0 && (
-                <span className="text-[10px] text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[10px]">add</span> ${item.penaltyAmount} recargo
-                </span>
-            )}
         </div>
     );
 };
@@ -118,9 +109,10 @@ interface GroupedTransaction {
     id: string; // BatchID or RecordID
     isBatch: boolean;
     records: TuitionRecord[];
-    mainRecord: TuitionRecord; // Representative record for sorting/display
-    totalAmount: number;
-    declaredAmount?: number; // What the student says they paid
+    mainRecord: TuitionRecord; 
+    totalOriginalAmount: number; // The FULL COST (e.g. 1000)
+    totalRemainingDebt: number;  // What is left to pay (e.g. 20)
+    declaredAmount?: number;     // Amount paid in this specific transaction
     itemCount: number;
 }
 
@@ -140,7 +132,6 @@ const Finance: React.FC = () => {
   const { addToast } = useToast();
   const { confirm } = useConfirmation();
   
-  // -- STATES --
   const [activeTab, setActiveTab] = useState<'review' | 'pending' | 'overdue' | 'paid' | 'all'>('review');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -175,7 +166,7 @@ const Finance: React.FC = () => {
       const result: GroupedTransaction[] = [];
       const processedIds = new Set<string>();
 
-      // First pass: Group batch items
+      // Group batch items
       rawFilteredRecords.forEach(r => {
           if (r.batchPaymentId && activeTab === 'review') { 
               if (!groups[r.batchPaymentId]) groups[r.batchPaymentId] = [];
@@ -183,17 +174,13 @@ const Finance: React.FC = () => {
           }
       });
 
-      // Second pass: Build display objects
+      // Build objects
       rawFilteredRecords.forEach(r => {
           if (processedIds.has(r.id)) return;
 
           if (r.batchPaymentId && groups[r.batchPaymentId] && activeTab === 'review') {
-              // It's a batch
               const batchItems = groups[r.batchPaymentId];
               batchItems.forEach(i => processedIds.add(i.id));
-              
-              // Only sum amounts for display in list, logical distribution happens later
-              // Look for declaredAmount in the first record of the batch (it should be consistent)
               const declared = batchItems.find(i => i.declaredAmount !== undefined)?.declaredAmount;
               
               result.push({
@@ -201,7 +188,9 @@ const Finance: React.FC = () => {
                   isBatch: true,
                   records: batchItems,
                   mainRecord: r,
-                  totalAmount: batchItems.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0),
+                  // Logic Fix: Sum the Original Amounts to show Total Value
+                  totalOriginalAmount: batchItems.reduce((acc, item) => acc + (item.originalAmount ?? item.amount) + item.penaltyAmount, 0),
+                  totalRemainingDebt: batchItems.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0),
                   declaredAmount: declared,
                   itemCount: batchItems.length
               });
@@ -212,7 +201,9 @@ const Finance: React.FC = () => {
                   isBatch: false,
                   records: [r],
                   mainRecord: r,
-                  totalAmount: r.amount + r.penaltyAmount,
+                  // Logic Fix: Use originalAmount for display if available
+                  totalOriginalAmount: (r.originalAmount ?? r.amount) + r.penaltyAmount,
+                  totalRemainingDebt: r.amount + r.penaltyAmount,
                   declaredAmount: r.declaredAmount,
                   itemCount: 1
               });
@@ -223,29 +214,22 @@ const Finance: React.FC = () => {
 
   }, [rawFilteredRecords, activeTab]);
 
-  // -- REACTIVE ACTIVE GROUP (CRITICAL FIX) --
-  // Rebuilds the selected group data from fresh `records` to support live editing in modal
+  // -- REACTIVE ACTIVE GROUP --
   const activeGroup = useMemo(() => {
       if (!selectedGroup) return null;
       
-      // Find updated records that match the IDs in the selected group
       const freshRecords = records.filter(r => selectedGroup.records.some(old => old.id === r.id));
-      
-      if (freshRecords.length === 0) return null; // Should not happen unless deleted externally
+      if (freshRecords.length === 0) return null;
 
       const mainRecord = freshRecords.find(r => r.id === selectedGroup.mainRecord.id) || freshRecords[0];
-      const totalAmount = freshRecords.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0);
       
-      // REACTIVITY FIX: Re-read declaredAmount from the fresh record. 
-      // If user edited it via context, it's updated in `freshRecords` but `selectedGroup` is stale.
-      const declaredAmount = freshRecords.find(i => i.declaredAmount !== undefined)?.declaredAmount;
-
       return {
           ...selectedGroup,
           records: freshRecords,
           mainRecord,
-          totalAmount,
-          declaredAmount // Override with fresh value
+          totalOriginalAmount: freshRecords.reduce((acc, item) => acc + (item.originalAmount ?? item.amount) + item.penaltyAmount, 0),
+          totalRemainingDebt: freshRecords.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0),
+          declaredAmount: freshRecords.find(i => i.declaredAmount !== undefined)?.declaredAmount
       };
   }, [selectedGroup, records]);
 
@@ -258,52 +242,46 @@ const Finance: React.FC = () => {
       };
   }, [records]);
 
-  // -- CALCULATE PREVIEW (The Visual Waterfall) --
+  // -- PREVIEW CALCULATION (Exact Match to Approve Logic) --
   const previewDistribution = useMemo(() => {
       if (!activeGroup) return [];
       
-      const items = [...activeGroup.records];
-      // Separate mandatory and splittable
-      const mandatory = items.filter(r => !r.canBePaidInParts);
-      const splittable = items.filter(r => r.canBePaidInParts)
-                              .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
-
-      // Use current live totalAmount (which updates as user edits individual items)
-      // Or declaredAmount if in review.
-      // Logic: If status is review, we try to satisfy the debt with the declared money.
-      let available = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalAmount;
+      const items = [...activeGroup.records].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
       
+      const mandatory = items.filter(r => !r.canBePaidInParts);
+      const splittable = items.filter(r => r.canBePaidInParts);
+
+      let available = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalRemainingDebt;
       const preview = [];
 
-      // 1. Mandatory
+      // 1. Mandatory First
       for (const item of mandatory) {
           const debt = item.amount + item.penaltyAmount;
-          if (available >= debt) {
+          if (available >= debt - 0.01) {
               preview.push({ ...item, _status: 'paid', _paid: debt, _remaining: 0 });
               available -= debt;
           } else {
               preview.push({ ...item, _status: 'unpaid', _paid: 0, _remaining: debt });
+              // Money effectively 0 for subsequent items
+              available = 0; 
           }
       }
 
-      // 2. Splittable
+      // 2. Splittable Next (Waterfall)
       for (const item of splittable) {
           const debt = item.amount + item.penaltyAmount;
-          if (available <= 0) {
+          if (available <= 0.01) {
               preview.push({ ...item, _status: 'unpaid', _paid: 0, _remaining: debt });
               continue;
           }
-
-          if (available >= debt) {
+          if (available >= debt - 0.01) {
               preview.push({ ...item, _status: 'paid', _paid: debt, _remaining: 0 });
               available -= debt;
           } else {
-              // Partial
               preview.push({ ...item, _status: 'partial', _paid: available, _remaining: debt - available });
               available = 0;
           }
       }
-      
       return preview;
   }, [activeGroup]);
 
@@ -312,26 +290,14 @@ const Finance: React.FC = () => {
 
   const handleApprove = () => {
       if (!activeGroup) return;
-      
-      // Determine final amount to approve.
-      // We rely on the logic that updateRecordAmount has already synced everything.
-      // We just need to pass the total "paid" amount to the approve function.
-      
-      // If user adjusted items individually, the `amount` fields in records changed.
-      // The `declaredAmount` should effectively match the sum of what's being covered if we are strict,
-      // but for 'Mensualidad' or partials, we usually look at `declaredAmount`.
-      
-      const amountToApprove = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalAmount;
+      const amountToApprove = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalRemainingDebt;
 
       if (activeGroup.isBatch) {
           approveBatchPayment(activeGroup.id, amountToApprove);
       } else {
-          // If single record, use special approvePayment logic
-          if (activeGroup.mainRecord.category !== 'Mensualidad' && amountToApprove < activeGroup.totalAmount) {
-               // Treat as 1-item batch to trigger waterfall partial logic for NON-mensualidad items
+          if (activeGroup.mainRecord.category !== 'Mensualidad' && amountToApprove < activeGroup.totalRemainingDebt) {
                approveBatchPayment(activeGroup.records[0].batchPaymentId || `temp-${activeGroup.records[0].id}`, amountToApprove);
           } else {
-               // For Mensualidad or Full Payment
                approvePayment(activeGroup.id, amountToApprove);
           }
       }
@@ -371,7 +337,7 @@ const Finance: React.FC = () => {
           Fecha: g.mainRecord.dueDate,
           Alumno: g.mainRecord.studentName,
           Concepto: g.isBatch ? `Lote (${g.itemCount} items)` : g.mainRecord.concept,
-          Monto: g.totalAmount,
+          Monto: g.totalOriginalAmount,
           Estado: g.mainRecord.status,
           Metodo: g.mainRecord.method || '-'
       }));
@@ -379,20 +345,8 @@ const Finance: React.FC = () => {
       addToast('Reporte descargado', 'success');
   };
 
-  const getTimeValidation = (record: TuitionRecord) => {
-      if (!record.paymentDate) return { isLate: false, diffDays: 0 };
-      const due = new Date(record.dueDate);
-      const paid = new Date(record.paymentDate);
-      due.setHours(23, 59, 59, 999); 
-      const isLate = paid > due;
-      const diffTime = Math.abs(paid.getTime() - due.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-      return { isLate, diffDays };
-  };
-
   return (
     <div className="flex flex-col h-full bg-[#F5F5F7]">
-        
         {/* --- HEADER --- */}
         <div className="bg-white border-b border-gray-200 px-6 py-6 md:px-10 sticky top-0 z-20 shadow-sm">
             <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
@@ -482,9 +436,19 @@ const Finance: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {groupedTransactions.map(group => {
-                                const { mainRecord, isBatch, totalAmount, declaredAmount } = group;
-                                const displayAmount = declaredAmount !== undefined ? declaredAmount : totalAmount;
+                                const { mainRecord, isBatch, totalOriginalAmount, totalRemainingDebt, declaredAmount } = group;
                                 
+                                // Logic for display values
+                                const isPaid = mainRecord.status === 'paid';
+                                const isPartial = mainRecord.status === 'partial' || (declaredAmount !== undefined && declaredAmount < totalOriginalAmount);
+                                const paidSoFar = totalOriginalAmount - totalRemainingDebt;
+                                
+                                // Logic for Master Edit Permission (Mensualidad Only)
+                                const isMensualidad = mainRecord.category === 'Mensualidad' || mainRecord.concept.toLowerCase().includes('mensualidad');
+
+                                // Tooltip text for detailed breakdown
+                                const breakdownTooltip = `Total: $${totalOriginalAmount} \nPagado: $${paidSoFar} \nRestante: $${totalRemainingDebt}`;
+
                                 return (
                                     <tr key={group.id} className="hover:bg-gray-50/50 transition-colors group">
                                         <td className="px-8 py-5">
@@ -519,28 +483,42 @@ const Finance: React.FC = () => {
                                         <td className="px-6 py-5">
                                             <StatusBadge status={mainRecord.status} amount={mainRecord.amount} penalty={mainRecord.penaltyAmount} />
                                         </td>
-                                        <td className="px-6 py-5 text-right">
-                                            {mainRecord.status === 'in_review' && !isBatch ? (
+                                        
+                                        {/* CRITICAL UPDATE: MONTO COLUMN */}
+                                        <td className="px-6 py-5 text-right" title={breakdownTooltip}>
+                                            {/* Show Editor ONLY if in review, not batch, AND is Mensualidad category */}
+                                            {mainRecord.status === 'in_review' && !isBatch && isMensualidad ? (
                                                 <div className="flex justify-end">
-                                                    {/* SINGLE INPUT EDITOR */}
                                                     <DebtAmountEditor 
                                                         item={mainRecord} 
                                                         onUpdate={(id, val) => updateRecordAmount(id, val)} 
                                                     />
                                                 </div>
                                             ) : (
-                                                <>
-                                                    <span className={`font-black text-sm tracking-tight ${mainRecord.status === 'paid' ? 'text-green-600' : 'text-gray-900'}`}>
-                                                        ${displayAmount.toFixed(2)}
+                                                <div className="flex flex-col items-end">
+                                                    {/* ALWAYS SHOW FULL TOTAL AMOUNT */}
+                                                    <span className={`font-black text-sm tracking-tight ${isPaid ? 'text-green-600' : 'text-gray-900'}`}>
+                                                        ${totalOriginalAmount.toFixed(2)}
                                                     </span>
-                                                    {declaredAmount !== undefined && declaredAmount < totalAmount && (
-                                                        <div className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded-lg inline-block mt-1">
-                                                            Parcial (Total: ${totalAmount})
+                                                    
+                                                    {/* SHOW PROGRESS IF PARTIAL */}
+                                                    {isPartial && !isPaid && (
+                                                        <div className="mt-1 flex flex-col items-end gap-0.5">
+                                                            <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden">
+                                                                <div 
+                                                                    className="h-full bg-orange-500 rounded-full" 
+                                                                    style={{ width: `${(paidSoFar / totalOriginalAmount) * 100}%` }}
+                                                                ></div>
+                                                            </div>
+                                                            <span className="text-[10px] text-orange-600 font-bold">
+                                                                Abonado: ${paidSoFar.toFixed(2)}
+                                                            </span>
                                                         </div>
                                                     )}
-                                                </>
+                                                </div>
                                             )}
                                         </td>
+                                        
                                         <td className="px-8 py-5 text-right">
                                             {mainRecord.status === 'in_review' ? (
                                                 <button 
@@ -618,63 +596,80 @@ const Finance: React.FC = () => {
                                     </span>
                                 </div>
                                 <p className="text-4xl font-black text-gray-900 tracking-tight">
-                                    ${(activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalAmount).toFixed(2)}
+                                    ${(activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalRemainingDebt).toFixed(2)}
                                 </p>
-                                {activeGroup.declaredAmount !== undefined && activeGroup.declaredAmount < activeGroup.totalAmount && (
+                                {activeGroup.declaredAmount !== undefined && activeGroup.declaredAmount < activeGroup.totalRemainingDebt && (
                                     <p className="text-xs text-orange-600 font-bold mt-2 flex items-center gap-1 bg-orange-50 w-fit px-2 py-1 rounded-lg border border-orange-100">
                                         <span className="material-symbols-outlined text-[14px]">warning</span>
-                                        Pago parcial. Deuda total era ${activeGroup.totalAmount}
+                                        Pago parcial. Deuda total era ${activeGroup.totalRemainingDebt}
                                     </p>
                                 )}
                             </div>
-
-                            {/* REMOVED DUPLICATE INPUT - CLEAN INTERFACE */}
 
                             {/* PREVIEW: Waterfall Distribution */}
                             <div>
                                 <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 ml-1 tracking-wider">Aplicación de Fondos</h4>
                                 <div className="space-y-3">
-                                    {previewDistribution.map((item: any) => (
-                                        <div key={item.id} className="flex flex-col p-4 bg-white border border-gray-100 rounded-2xl relative overflow-hidden shadow-sm transition-all hover:border-gray-200">
-                                            {/* Status Indicator Bar */}
-                                            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                                                item._status === 'paid' ? 'bg-green-500' : item._status === 'partial' ? 'bg-orange-500' : 'bg-red-300'
-                                            }`}></div>
-                                            
-                                            <div className="flex justify-between items-start pl-3">
-                                                <div>
-                                                    <span className="text-sm font-bold text-gray-900 block">{item.concept}</span>
-                                                    {/* SINGLE TRUTH EDITABLE DEBT */}
-                                                    <div className="mt-2">
-                                                        <DebtAmountEditor 
-                                                            item={item} 
-                                                            onUpdate={(id, val) => updateRecordAmount(id, val)}
-                                                        />
+                                    {previewDistribution.map((item: any) => {
+                                        // Logic for displaying Editor inside Modal: Only if Mensualidad
+                                        const isMensualidadModal = item.category === 'Mensualidad' || item.concept.toLowerCase().includes('mensualidad');
+                                        
+                                        return (
+                                            <div key={item.id} className="flex flex-col p-4 bg-white border border-gray-100 rounded-2xl relative overflow-hidden shadow-sm transition-all hover:border-gray-200">
+                                                {/* Status Indicator Bar */}
+                                                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                                                    item._status === 'paid' ? 'bg-green-500' : item._status === 'partial' ? 'bg-orange-500' : 'bg-red-300'
+                                                }`}></div>
+                                                
+                                                <div className="flex justify-between items-start pl-3">
+                                                    <div>
+                                                        <span className="text-sm font-bold text-gray-900 block">{item.concept}</span>
+                                                        {/* SINGLE TRUTH EDITABLE DEBT */}
+                                                        <div className="mt-2">
+                                                            {isMensualidadModal ? (
+                                                                <DebtAmountEditor 
+                                                                    item={item} 
+                                                                    onUpdate={(id, val) => updateRecordAmount(id, val)}
+                                                                />
+                                                            ) : (
+                                                                <span className="text-xs text-gray-500 font-mono">Deuda Original: ${item.amount}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className={`font-mono font-bold text-sm ${item._status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>
+                                                            ${item._paid.toFixed(2)}
+                                                        </span>
+                                                        <div className="text-[10px] font-bold uppercase mt-0.5 tracking-wide text-gray-400">
+                                                            {item._status === 'paid' ? 'Cubierto' : item._status === 'partial' ? 'Abono' : 'Pendiente'}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <span className={`font-mono font-bold text-sm ${item._status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>
-                                                        ${item._paid.toFixed(2)}
-                                                    </span>
-                                                    <div className="text-[10px] font-bold uppercase mt-0.5 tracking-wide text-gray-400">
-                                                        {item._status === 'paid' ? 'Cubierto' : item._status === 'partial' ? 'Abono' : 'Pendiente'}
-                                                    </div>
-                                                </div>
-                                            </div>
 
-                                            {item._remaining > 0 && (
-                                                <div className="mt-3 pl-3 pt-2 border-t border-gray-50 flex items-center gap-2 text-xs text-orange-600 font-bold">
-                                                    <span className="material-symbols-outlined text-[14px]">pie_chart</span>
-                                                    Restarán ${item._remaining.toFixed(2)} por cobrar
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
+                                                {item._remaining > 0 && (
+                                                    <div className="mt-3 pl-3 pt-2 border-t border-gray-50 flex items-center gap-2 text-xs text-orange-600 font-bold">
+                                                        <span className="material-symbols-outlined text-[14px]">pie_chart</span>
+                                                        Restarán ${item._remaining.toFixed(2)} por cobrar
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
                             {/* Time Validation */}
                             {(() => {
+                                const getTimeValidation = (record: TuitionRecord) => {
+                                    if (!record.paymentDate) return { isLate: false, diffDays: 0 };
+                                    const due = new Date(record.dueDate);
+                                    const paid = new Date(record.paymentDate);
+                                    due.setHours(23, 59, 59, 999); 
+                                    const isLate = paid > due;
+                                    const diffTime = Math.abs(paid.getTime() - due.getTime());
+                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                                    return { isLate, diffDays };
+                                };
                                 const { isLate, diffDays } = getTimeValidation(activeGroup.mainRecord);
                                 return (
                                     <div className={`rounded-2xl p-4 border text-xs ${isLate ? 'bg-red-50 border-red-100 text-red-700' : 'bg-green-50 border-green-100 text-green-700'}`}>
