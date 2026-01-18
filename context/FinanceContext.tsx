@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { TuitionRecord, ManualChargeData } from '../types';
+import { TuitionRecord, ManualChargeData, PaymentHistoryItem } from '../types';
 import { PulseService } from '../services/pulseService';
 import { mockTuitionRecords } from '../mockData';
 import { getLocalDate } from '../utils/dateUtils';
@@ -111,7 +111,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // --- CALCULATED METRICS (MEMOIZED) ---
 
   // 1. Total Revenue: Sum of all PAID records
-  // FIX: Use amountPaid logic (Original - Remaining) for Partials, and Original for Paid.
   const totalRevenue = useMemo(() => {
       if (isFinanceLoading) return 0;
       return records.reduce((acc, r) => {
@@ -307,37 +306,64 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           let remainingMoney = totalPaidAmount;
           const processedBatch: TuitionRecord[] = [];
 
+          const applyPayment = (item: TuitionRecord, amountToPay: number, isFull: boolean): TuitionRecord => {
+              const paymentDate = new Date().toISOString();
+              
+              // Create history item
+              const newHistoryItem: PaymentHistoryItem = {
+                  date: paymentDate,
+                  amount: amountToPay,
+                  method: item.method || 'System'
+              };
+
+              const previousHistory = item.paymentHistory || [];
+              const updatedHistory = [...previousHistory, newHistoryItem];
+
+              if (isFull) {
+                  return {
+                      ...item,
+                      status: 'paid',
+                      amount: 0,
+                      penaltyAmount: 0,
+                      originalAmount: item.originalAmount !== undefined ? item.originalAmount : item.amount,
+                      paymentDate: paymentDate,
+                      paymentHistory: updatedHistory
+                  };
+              } else {
+                  return {
+                      ...item,
+                      status: 'partial',
+                      amount: item.amount - amountToPay, // Simplified penalty logic handled in block below
+                      penaltyAmount: 0, // Simplified: assumption is penalty is paid first.
+                      originalAmount: item.originalAmount !== undefined ? item.originalAmount : item.amount,
+                      batchPaymentId: undefined, // Detach so it can be paid again
+                      paymentDate: paymentDate, 
+                      proofUrl: null,
+                      paymentHistory: updatedHistory
+                  };
+              }
+          };
+
           // 3. Pay Mandatory First
           for (const item of mandatoryItems) {
               const currentDebt = item.amount;
               const penalty = item.penaltyAmount;
               const totalItemDebt = currentDebt + penalty;
-              const originalTotal = item.originalAmount !== undefined ? item.originalAmount : currentDebt;
 
               if (remainingMoney >= totalItemDebt - EPSILON) {
                   // Full Payment
-                  processedBatch.push({
-                      ...item,
-                      status: 'paid',
-                      amount: 0,
-                      penaltyAmount: 0,
-                      originalAmount: originalTotal,
-                      paymentDate: new Date().toISOString()
-                  });
+                  processedBatch.push(applyPayment(item, totalItemDebt, true));
                   remainingMoney -= totalItemDebt;
               } else {
-                  // Not enough for mandatory?
-                  // Logic: Frontend validation ensures total >= mandatory sum.
-                  // But as a fallback, if money runs out here, it remains unpaid.
+                  // Insufficient funds for mandatory -> Remains Unpaid (or overdue)
                   const isOverdue = new Date() > new Date(item.dueDate);
                   processedBatch.push({
                       ...item,
                       status: isOverdue ? 'overdue' : 'pending',
-                      batchPaymentId: undefined, // Detach from batch
+                      batchPaymentId: undefined, // Detach
                       paymentDate: null,
                       proofUrl: null
                   });
-                  // Money effectively 0 or insufficient
                   remainingMoney = 0; 
               }
           }
@@ -347,7 +373,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
               const currentDebt = item.amount;
               const penalty = item.penaltyAmount;
               const totalItemDebt = currentDebt + penalty;
-              const originalTotal = item.originalAmount !== undefined ? item.originalAmount : currentDebt;
 
               if (remainingMoney <= EPSILON) {
                   // No money left
@@ -364,20 +389,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
               if (remainingMoney >= totalItemDebt - EPSILON) {
                   // Full Payment
-                  processedBatch.push({
-                      ...item,
-                      status: 'paid',
-                      amount: 0,
-                      penaltyAmount: 0,
-                      originalAmount: originalTotal,
-                      paymentDate: new Date().toISOString()
-                  });
+                  processedBatch.push(applyPayment(item, totalItemDebt, true));
                   remainingMoney -= totalItemDebt;
               } else {
                   // Partial Payment (Abono)
                   // Apply all remaining money to this item
                   const paymentToApply = remainingMoney;
                   
+                  // Logic to update the item state specifically for partial
                   let newPenalty = penalty;
                   let newAmount = currentDebt;
                   let amountToDeduct = paymentToApply;
@@ -390,19 +409,26 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                       newPenalty -= amountToDeduct;
                       amountToDeduct = 0;
                   }
-
-                  // Reduce Principal
                   newAmount -= amountToDeduct;
 
+                  // Manually construct because applyPayment helper was slightly simplified
+                  const paymentDate = new Date().toISOString();
+                  const newHistoryItem: PaymentHistoryItem = {
+                      date: paymentDate,
+                      amount: paymentToApply,
+                      method: item.method || 'System'
+                  };
+                  
                   processedBatch.push({
                       ...item,
                       status: 'partial',
                       amount: newAmount,
                       penaltyAmount: newPenalty,
-                      originalAmount: originalTotal,
-                      batchPaymentId: undefined, // Detach so it can be paid again
-                      paymentDate: null, 
-                      proofUrl: null
+                      originalAmount: item.originalAmount !== undefined ? item.originalAmount : item.amount,
+                      batchPaymentId: undefined, 
+                      paymentDate: paymentDate, 
+                      proofUrl: null,
+                      paymentHistory: [...(item.paymentHistory || []), newHistoryItem]
                   });
                   
                   remainingMoney = 0; // Consumed
@@ -455,6 +481,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           status: 'pending',
           proofUrl: null,
           canBePaidInParts: false,
+          paymentHistory: [],
           ...data
       } as TuitionRecord;
 
@@ -491,7 +518,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           paymentDate: null,
           proofUrl: null,
           canBePaidInParts: data.canBePaidInParts,
-          relatedEventId: data.relatedEventId
+          relatedEventId: data.relatedEventId,
+          paymentHistory: []
       };
 
       setRecords(prev => [newRecord, ...prev]);
@@ -539,10 +567,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setRecords(prev => prev.map(r => {
           if (r.id === recordId) {
               const original = r.originalAmount !== undefined ? r.originalAmount : r.amount;
+              const currentHistory = r.paymentHistory || [];
               
               // Handle Partial Payment Approval Logic within Single Approve
               if (adjustedAmount !== undefined && adjustedAmount < r.amount) {
                    const remaining = r.amount - adjustedAmount;
+                   
+                   // Record History
+                   const newHistory: PaymentHistoryItem = {
+                       date: effectiveDate,
+                       amount: adjustedAmount,
+                       method: r.method || 'System'
+                   };
+
                    return {
                        ...r,
                        status: 'partial',
@@ -551,18 +588,27 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                        paymentDate: null, // Reset for next payment
                        penaltyAmount: r.penaltyAmount, // Keep penalty if not paid
                        details: undefined,
-                       batchPaymentId: undefined
+                       batchPaymentId: undefined,
+                       paymentHistory: [...currentHistory, newHistory]
                    };
               }
 
               // Full Payment
+              // Record final payment history
+              const finalHistory: PaymentHistoryItem = {
+                  date: effectiveDate,
+                  amount: r.amount + r.penaltyAmount, // Paying off remainder
+                  method: r.method || 'System'
+              };
+
               return { 
                   ...r, 
                   status: 'paid', 
                   amount: 0, // Debt Cleared
                   penaltyAmount: 0,
                   originalAmount: original, // History Preserved
-                  paymentDate: effectiveDate
+                  paymentDate: effectiveDate,
+                  paymentHistory: [...currentHistory, finalHistory]
               };
           }
           return r;
@@ -647,7 +693,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   proofUrl: null,
                   category: 'Mensualidad',
                   canBePaidInParts: true, // Allow partials for tuition usually
-                  type: 'charge'
+                  type: 'charge',
+                  paymentHistory: []
               });
           }
       });

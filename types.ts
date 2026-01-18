@@ -205,6 +205,12 @@ export interface Event extends CalendarEvent {
 export type TuitionStatus = 'pending' | 'overdue' | 'in_review' | 'paid' | 'charged' | 'partial';
 export type ChargeCategory = 'Mensualidad' | 'Torneo' | 'Examen/Promoción' | 'Equipo/Uniforme' | 'Otro' | 'Late Fee';
 
+export interface PaymentHistoryItem {
+    date: string; // ISO String
+    amount: number;
+    method?: string; // 'Efectivo', 'Transferencia', etc.
+}
+
 export interface TuitionRecord {
     id: string;
     academyId: string;
@@ -240,11 +246,13 @@ export interface TuitionRecord {
 
     // --- ARCHITECTURAL UPDATE: TRANSACTION DETAILS ---
     // Allows storing a breakdown of what was covered in this specific record/payment.
-    // Critical for receipts when a single payment covers multiple concepts or partials.
     details?: { 
         description: string; 
         amount: number; 
     }[];
+
+    // --- NEW: Payment History for Partial/Full Tracking ---
+    paymentHistory?: PaymentHistoryItem[];
 }
 
 export interface ManualChargeData {

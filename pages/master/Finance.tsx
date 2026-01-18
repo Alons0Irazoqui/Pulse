@@ -292,6 +292,33 @@ const Finance: React.FC = () => {
       if (!activeGroup) return;
       const amountToApprove = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalRemainingDebt;
 
+      // ---------------------------------------------------------
+      // AUTO-GENERATE RECEIPTS FOR APPROVED ITEMS
+      // Iterate based on the waterfall preview (since that's what will be applied)
+      // ---------------------------------------------------------
+      previewDistribution.forEach(item => {
+          if (item._paid > 0) {
+              // Calculate rough history for display (Total Original - Current Debt Before Pay)
+              const previouslyPaid = (item.originalAmount || item.amount) - item.amount;
+              const history = previouslyPaid > 0 ? [{
+                  date: item.paymentDate || new Date().toISOString(), // Fallback date
+                  amount: previouslyPaid,
+                  method: 'Pago Previo'
+              }] : [];
+
+              generateReceipt(
+                  item, 
+                  academySettings, 
+                  currentUser, 
+                  {
+                      paymentStatus: item._status === 'paid' ? 'completed' : 'partial',
+                      currentPaymentAmount: item._paid,
+                      paymentHistory: history
+                  }
+              );
+          }
+      });
+
       if (activeGroup.isBatch) {
           approveBatchPayment(activeGroup.id, amountToApprove);
       } else {
