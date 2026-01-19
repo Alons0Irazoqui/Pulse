@@ -557,11 +557,20 @@ const Finance: React.FC = () => {
                                                 </button>
                                             ) : (mainRecord.status === 'paid' || mainRecord.status === 'partial') ? (
                                                 <button 
-                                                    onClick={() => generateReceipt(mainRecord, academySettings, currentUser)}
+                                                    onClick={() => {
+                                                        // BATCH DOWNLOAD HANDLING
+                                                        if (group.isBatch) {
+                                                            group.records.forEach(r => generateReceipt(r, academySettings, currentUser));
+                                                        } else {
+                                                            generateReceipt(mainRecord, academySettings, currentUser);
+                                                        }
+                                                    }}
                                                     className="size-9 bg-gray-50 hover:bg-white text-gray-400 hover:text-orange-600 border border-gray-200 rounded-xl transition-all shadow-sm flex items-center justify-center ml-auto"
-                                                    title="Descargar Recibo"
+                                                    title={group.isBatch ? "Descargar Recibos del Lote" : "Descargar Recibo"}
                                                 >
-                                                    <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                                                    <span className="material-symbols-outlined text-[18px]">
+                                                        {group.isBatch ? 'folder_open' : 'receipt_long'}
+                                                    </span>
                                                 </button>
                                             ) : (
                                                 <span className="text-gray-300 text-xs font-medium">-</span>

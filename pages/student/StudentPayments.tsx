@@ -615,13 +615,25 @@ const StudentPayments: React.FC = () => {
                                                           ${amountDisplay.toFixed(2)}
                                                       </span>
                                                   </div>
-                                                  <button 
-                                                      onClick={() => handleOpenPaymentModal(record)}
-                                                      className="bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-gray-900/10 flex items-center gap-2 transition-all active:scale-95 whitespace-nowrap text-sm"
-                                                  >
-                                                      <span className="material-symbols-outlined text-[18px]">credit_card</span>
-                                                      <span className="hidden sm:inline">Pagar</span>
-                                                  </button>
+                                                  
+                                                  <div className="flex items-center gap-2">
+                                                      {record.status === 'partial' && (
+                                                          <button 
+                                                              onClick={(e) => { e.stopPropagation(); handleDownloadReceipt(record); }}
+                                                              className="size-11 rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-orange-600 hover:border-orange-200 hover:bg-orange-50 transition-all flex items-center justify-center shadow-sm"
+                                                              title="Descargar Recibo de Abonos"
+                                                          >
+                                                              <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+                                                          </button>
+                                                      )}
+                                                      <button 
+                                                          onClick={() => handleOpenPaymentModal(record)}
+                                                          className="bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-gray-900/10 flex items-center gap-2 transition-all active:scale-95 whitespace-nowrap text-sm"
+                                                      >
+                                                          <span className="material-symbols-outlined text-[18px]">credit_card</span>
+                                                          <span className="hidden sm:inline">Pagar</span>
+                                                      </button>
+                                                  </div>
                                               </div>
                                           </div>
                                       </MotionDiv>
