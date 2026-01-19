@@ -471,7 +471,7 @@ const StudentPayments: React.FC = () => {
   // Grouping for UI Lists
   const activeRecords = myRecords.filter(r => ['pending', 'overdue', 'charged', 'partial'].includes(r.status));
   const inReviewRecords = myRecords.filter(r => r.status === 'in_review');
-  const historyRecords = myRecords.filter(r => r.status === 'paid');
+  const historyRecords = myRecords.filter(r => r.status === 'paid' || r.status === 'partial');
 
   // Calculate Total Debt
   const totalDebt = activeRecords.reduce((acc, r) => {
@@ -669,7 +669,9 @@ const StudentPayments: React.FC = () => {
                                   <div>
                                       <div className="flex items-center gap-3 mb-1">
                                           <span className="text-sm font-bold text-gray-900">{record.concept}</span>
-                                          <span className="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full uppercase">Pagado</span>
+                                          <span className={`text-[10px] font-bold ${record.status === 'partial' ? 'text-orange-700 bg-orange-50' : 'text-green-700 bg-green-50'} px-2 py-0.5 rounded-full uppercase`}>
+                                              {record.status === 'partial' ? 'Parcial' : 'Pagado'}
+                                          </span>
                                       </div>
                                       <p className="text-xs text-gray-500">
                                           {formatDateDisplay(record.paymentDate || '')} • {record.method}
