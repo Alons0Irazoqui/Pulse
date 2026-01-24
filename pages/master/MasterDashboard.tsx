@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Defs, LinearGradient } from 'recharts';
 import { useStore } from '../../context/StoreContext';
+import { useFinance } from '../../context/FinanceContext';
 import { useNavigate } from 'react-router-dom';
 import Avatar from '../../components/ui/Avatar';
 import { 
@@ -16,17 +17,14 @@ import { es } from 'date-fns/locale';
 type TimeRange = 'month' | 'year';
 
 const MasterDashboard: React.FC = () => {
-  // ARCHITECTURAL CHANGE: Consume specific loading states.
-  // We rename isLoading from Store (which might default to Academy's) to isAcademyLoading
-  // and explicitly grab isFinanceLoading to ensure we wait for BOTH data sources.
+  // 1. Data Sources
+  const { students, isLoading: isAcademyLoading } = useStore();
   const { 
-      students, 
+      stats, 
       monthlyRevenueData, 
       rollingRevenueData, 
-      stats: financeStats, 
-      isLoading: isAcademyLoading,
       isFinanceLoading 
-  } = useStore();
+  } = useFinance();
   
   const navigate = useNavigate();
   
@@ -37,7 +35,7 @@ const MasterDashboard: React.FC = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>('month');
   const [currentDate, setCurrentDate] = useState(new Date()); 
   
-  // --- LOGICA DE DATOS (PURE CONSUMER) ---
+  // --- LOGICA DE DATOS ---
 
   // 1. Critical Debtors (Top 5)
   const criticalDebtors = useMemo(() => {
@@ -47,7 +45,7 @@ const MasterDashboard: React.FC = () => {
           .slice(0, 5);
   }, [students]);
 
-  // 2. Cálculo de Tendencias Financieras
+  // 2. Financial Trend (Calculated from rolling data)
   const financialTrend = useMemo(() => {
       if (rollingRevenueData.length < 2) return 0;
       
@@ -57,50 +55,29 @@ const MasterDashboard: React.FC = () => {
       const currentVal = currentMonth?.total || 0;
       const prevVal = prevMonth?.total || 0;
       
-      // Evitar división por cero
+      // Prevent division by zero
       if (prevVal === 0) return currentVal > 0 ? 100 : 0;
       return ((currentVal - prevVal) / prevVal) * 100;
   }, [rollingRevenueData]);
 
-  // 3. Nuevos Estudiantes (Cálculo ligero local)
-  const enrollmentMetrics = useMemo(() => {
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-      
-      let newStudentsCount = 0;
-      let prevStudentsCount = 0;
-
-      students.forEach(s => {
-          const joinDate = new Date(s.joinDate); // Asumiendo formato ISO o compatible
-          if (joinDate.getFullYear() === currentYear) {
-              if (joinDate.getMonth() === currentMonth) newStudentsCount++;
-              else if (joinDate.getMonth() === currentMonth - 1) prevStudentsCount++;
-          }
-      });
-
-      const trend = prevStudentsCount === 0 ? (newStudentsCount > 0 ? 100 : 0) : ((newStudentsCount - prevStudentsCount) / prevStudentsCount) * 100;
-      
-      return { count: newStudentsCount, trend };
-  }, [students]);
-
-  // 4. Datos para la Gráfica (Switch Logic)
+  // 3. Chart Data Formatting
   const chartData = useMemo(() => {
       const sourceData = timeRange === 'year' ? monthlyRevenueData : rollingRevenueData;
       return sourceData.map(item => ({
           name: item.name,
-          value: item.total
+          value: item.total // Matches dataKey="value" in AreaChart
       }));
   }, [monthlyRevenueData, rollingRevenueData, timeRange]);
 
-  // 5. KPI dinámico según el filtro de tiempo
+  // 4. Dynamic Revenue Display
   const displayRevenue = useMemo(() => {
       if (timeRange === 'year') {
-          return financeStats.totalRevenue; // YTD Total
+          return stats.totalRevenue; // Total Paid (YTD)
       } else {
-          // Último mes registrado en rolling data
+          // Last month in rolling data
           return rollingRevenueData[rollingRevenueData.length - 1]?.total || 0;
       }
-  }, [timeRange, financeStats.totalRevenue, rollingRevenueData]);
+  }, [timeRange, stats.totalRevenue, rollingRevenueData]);
 
 
   // --- ACTIONS ---
@@ -116,7 +93,7 @@ const MasterDashboard: React.FC = () => {
   // KPI Definition
   const kpis = [
       {
-          label: timeRange === 'year' ? 'Ingresos Anuales (YTD)' : 'Ingresos del Mes',
+          label: timeRange === 'year' ? 'Ingresos Totales (YTD)' : 'Ingresos del Mes',
           value: `$${displayRevenue.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
           trend: financialTrend,
           icon: 'payments',
@@ -124,34 +101,33 @@ const MasterDashboard: React.FC = () => {
           bg: 'bg-green-50'
       },
       {
-          label: 'Alumnos Activos',
-          value: financeStats.activeStudents,
+          label: 'Cuentas por Cobrar',
+          value: `$${stats.pendingCollection.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
           trend: 0,
-          icon: 'groups',
+          icon: 'pending_actions',
           color: 'text-blue-600',
           bg: 'bg-blue-50'
       },
       {
-          label: 'Nuevos (Mes)',
-          value: enrollmentMetrics.count,
-          trend: enrollmentMetrics.trend,
-          icon: 'person_add',
-          color: 'text-purple-600',
-          bg: 'bg-purple-50'
-      },
-      {
-          label: 'Deuda Pendiente',
-          // Sumamos vencido + pendiente para una visión total de riesgo
-          value: `$${(financeStats.pendingCollection + financeStats.overdueAmount).toLocaleString('es-MX', { minimumFractionDigits: 0 })}`,
+          label: 'Deuda Vencida',
+          value: `$${stats.overdueAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
           trend: 0,
           icon: 'warning',
-          color: 'text-orange-600',
-          bg: 'bg-orange-50',
+          color: 'text-red-600',
+          bg: 'bg-red-50',
           isInverse: true
+      },
+      {
+          label: 'Alumnos Activos',
+          value: stats.activeStudents,
+          trend: 0,
+          icon: 'groups',
+          color: 'text-purple-600',
+          bg: 'bg-purple-50'
       }
   ];
 
-  // Skeleton Loader - Triggered if ANY data source is loading
+  // Skeleton Loader
   if (isGlobalLoading) {
       return (
         <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full animate-pulse">
@@ -175,7 +151,7 @@ const MasterDashboard: React.FC = () => {
             <div>
                 <h1 className="text-3xl font-black tracking-tight text-text-main flex items-center gap-3">
                     Dashboard
-                    <span className="text-lg font-medium text-text-secondary bg-gray-100 px-3 py-1 rounded-xl">
+                    <span className="text-lg font-medium text-text-secondary bg-gray-100 px-3 py-1 rounded-xl capitalize">
                         {format(currentDate, 'MMMM yyyy', { locale: es })}
                     </span>
                 </h1>
@@ -269,7 +245,7 @@ const MasterDashboard: React.FC = () => {
                     </div>
                     {/* Dynamic total badge in chart header */}
                     <div className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold">
-                        YTD: ${financeStats.totalRevenue.toLocaleString()}
+                        Total: ${stats.totalRevenue.toLocaleString()}
                     </div>
                 </div>
                 
@@ -325,10 +301,10 @@ const MasterDashboard: React.FC = () => {
                 <div className="flex justify-between items-center mb-6">
                     <div>
                         <h3 className="text-xl font-bold text-text-main flex items-center gap-2">
-                            Alertas de Deuda
+                            Top Deudores
                             {criticalDebtors.length > 0 && <span className="flex size-2 rounded-full bg-red-500 animate-pulse"></span>}
                         </h3>
-                        <p className="text-sm text-text-secondary">Mayor riesgo financiero global.</p>
+                        <p className="text-sm text-text-secondary">Riesgo financiero crítico.</p>
                     </div>
                 </div>
 

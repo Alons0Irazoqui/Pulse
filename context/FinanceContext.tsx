@@ -1,5 +1,6 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { TuitionRecord, ManualChargeData, ChargeCategory } from '../types';
+import { TuitionRecord, ManualChargeData, ChargeCategory, Student } from '../types';
 import { PulseService } from '../services/pulseService';
 import { useAuth } from './AuthContext';
 import { useAcademy } from './AcademyContext'; // Need academy settings for billing
@@ -60,7 +61,7 @@ const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { currentUser } = useAuth();
-    const { academySettings, students } = useAcademy(); // We might need students list for billing
+    const { academySettings, students, batchUpdateStudents } = useAcademy(); // Extract batchUpdateStudents
     const { addToast } = useToast();
 
     const [records, setRecords] = useState<TuitionRecord[]>([]);
@@ -92,6 +93,76 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     useEffect(() => {
         loadFinanceData();
     }, [loadFinanceData]);
+
+    // --- SYNC ENGINE: OVERDUE CHECK & STUDENT STATUS UPDATE ---
+    useEffect(() => {
+        if (isFinanceLoading || students.length === 0) return;
+
+        // 1. Check Overdue Status (Run once on records update)
+        // Detects 'pending' records that are past due date and flips them to 'overdue'
+        const today = getLocalDate();
+        let recordsUpdated = false;
+        
+        const processedRecords = records.map(r => {
+            if (r.status === 'pending' && r.dueDate < today) {
+                recordsUpdated = true;
+                // Apply Late Fee if configured
+                const penalty = academySettings.paymentSettings?.lateFeeAmount || 0;
+                return { ...r, status: 'overdue', penaltyAmount: penalty } as TuitionRecord;
+            }
+            return r;
+        });
+
+        if (recordsUpdated) {
+            // Update records first, this will re-trigger the effect to handle student status in next pass
+            setRecords(processedRecords);
+            return; 
+        }
+
+        // 2. Calculate Student Balances & Update Status
+        const studentsToUpdate: Student[] = [];
+        
+        students.forEach(student => {
+            const studentRecords = records.filter(r => r.studentId === student.id);
+            
+            // Calculate REAL Debt (Pending + Overdue + Partial + Charged)
+            const debt = studentRecords.reduce((acc, r) => {
+                if (['pending', 'overdue', 'partial', 'charged'].includes(r.status)) {
+                    return acc + r.amount + r.penaltyAmount;
+                }
+                return acc;
+            }, 0);
+
+            let newStatus = student.status;
+
+            // LOGIC CHANGE: If ANY debt exists (> 0), mark as 'debtor'.
+            // Previously might have checked only for 'overdue' records.
+            if (debt > 0.01) {
+                // Force 'debtor' if active or exam_ready. 
+                // We assume inactive students stay inactive unless manually reactivated.
+                if (newStatus === 'active' || newStatus === 'exam_ready') {
+                    newStatus = 'debtor';
+                }
+            } else {
+                // If paid off, revert 'debtor' to 'active'
+                if (newStatus === 'debtor') {
+                    newStatus = 'active';
+                }
+            }
+
+            // Detect if update is needed (Floating point comparison for balance)
+            const currentBalance = student.balance || 0;
+            if (Math.abs(currentBalance - debt) > 0.01 || student.status !== newStatus) {
+                studentsToUpdate.push({ ...student, balance: debt, status: newStatus });
+            }
+        });
+
+        if (studentsToUpdate.length > 0) {
+            batchUpdateStudents(studentsToUpdate);
+        }
+
+    }, [records, students, isFinanceLoading, academySettings, batchUpdateStudents]);
+
 
     // --- CALCULATE STATS (Derived) ---
     useEffect(() => {

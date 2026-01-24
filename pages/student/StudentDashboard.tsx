@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
-import { Event, CalendarEvent } from '../../types';
+import { Event, CalendarEvent, Student } from '../../types';
 import { useAcademy } from '../../context/AcademyContext';
 import { getLocalDate } from '../../utils/dateUtils';
 import Avatar from '../../components/ui/Avatar';
@@ -14,52 +14,58 @@ const StudentDashboard: React.FC = () => {
   const { addToast } = useToast();
   const navigate = useNavigate();
   
-  const student = students.find(s => s.id === currentUser?.studentId);
+  // LIVE DATA: Force lookup from the fresh students list to get real-time balance/status updates
+  // from FinanceContext > AcademyContext > Here.
+  // Fallback to currentUser (as any) to prevent crash on initial load, though currentUser lacks 'balance'.
+  const liveStudent = useMemo(() => {
+      return students.find(s => s.id === currentUser?.studentId) || (currentUser as unknown as Student);
+  }, [students, currentUser]);
   
   // -- STATE --
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   // -- 1. RANK PROGRESS LOGIC --
-  const currentRankConfig = academySettings.ranks.find(r => r.id === student?.rankId) || academySettings.ranks[0];
+  const currentRankConfig = academySettings.ranks.find(r => r.id === liveStudent?.rankId) || academySettings.ranks[0];
   const nextRankConfig = academySettings.ranks.find(r => r.order === currentRankConfig.order + 1);
   const required = currentRankConfig.requiredAttendance;
-  const current = student?.attendance || 0;
+  const current = liveStudent?.attendance || 0;
   // Calculate percentage but cap at 100
   const progressPercent = required > 0 ? Math.min((current / required) * 100, 100) : 100;
   
   // -- 2. FINANCIAL LOGIC --
-  const hasDebt = (student?.balance || 0) > 0;
+  // Use liveStudent.balance to reflect recent calculations immediately
+  const hasDebt = (liveStudent?.balance || 0) > 0;
 
   // -- 3. ENROLLED CLASSES LOGIC --
   const myEnrolledClasses = useMemo(() => {
-      return classes.filter(c => student?.classesId?.includes(c.id));
-  }, [classes, student]);
+      return classes.filter(c => liveStudent?.classesId?.includes(c.id));
+  }, [classes, liveStudent]);
 
   // -- 4. NEXT CLASS LOGIC --
   const nextClass = useMemo(() => {
-      if (!student) return null;
+      if (!liveStudent) return null;
       const now = new Date();
       
       const upcomingClasses = scheduleEvents.filter(evt => {
           if (evt.type !== 'class' || !evt.classId) return false;
-          if (!student.classesId?.includes(evt.classId)) return false;
+          if (!liveStudent.classesId?.includes(evt.classId)) return false;
           if (evt.status === 'cancelled') return false;
           return evt.end > now;
       });
 
       upcomingClasses.sort((a, b) => a.start.getTime() - b.start.getTime());
       return upcomingClasses[0] || null;
-  }, [scheduleEvents, student]);
+  }, [scheduleEvents, liveStudent]);
 
   // -- 5. EVENTS LOGIC --
   const todayStr = getLocalDate();
   
   const nextAssignedExam = useMemo(() => {
-      if (!student) return null;
+      if (!liveStudent) return null;
       return events
-          .filter(e => e.type === 'exam' && e.registrants?.includes(student.id) && e.date >= todayStr)
+          .filter(e => e.type === 'exam' && e.registrants?.includes(liveStudent.id) && e.date >= todayStr)
           .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
-  }, [events, student, todayStr]);
+  }, [events, liveStudent, todayStr]);
 
   const marketplaceEvents = useMemo(() => {
       return events
@@ -67,18 +73,18 @@ const StudentDashboard: React.FC = () => {
               if (e.date < todayStr) return false;
               if (nextAssignedExam && e.id === nextAssignedExam.id) return false;
               const isPublic = e.isVisibleToStudents !== false;
-              const isRegistered = student && e.registrants?.includes(student.id);
+              const isRegistered = liveStudent && e.registrants?.includes(liveStudent.id);
               return isPublic || isRegistered;
           })
           .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
           .slice(0, 2); // Show only top 2 to save space
-  }, [events, todayStr, student, nextAssignedExam]);
+  }, [events, todayStr, liveStudent, nextAssignedExam]);
 
 
   // -- ACTIONS --
   const handleRegister = () => {
-      if(student && selectedEvent) {
-          registerForEvent(student.id, selectedEvent.id);
+      if(liveStudent && selectedEvent) {
+          registerForEvent(liveStudent.id, selectedEvent.id);
           addToast('¡Te has inscrito correctamente!', 'success');
           setSelectedEvent(null);
       }
@@ -93,6 +99,8 @@ const StudentDashboard: React.FC = () => {
       }
   };
 
+  if (!liveStudent) return <div className="p-10 text-center">Cargando perfil...</div>;
+
   return (
     <div className="max-w-[1600px] mx-auto p-6 md:p-10 flex flex-col gap-8 pb-24">
       
@@ -100,7 +108,7 @@ const StudentDashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h2 className="text-4xl font-black tracking-tight text-text-main mb-1">
-              Hola, {student?.name.split(' ')[0]}
+              Hola, {liveStudent?.name.split(' ')[0]}
           </h2>
           <p className="text-text-secondary font-medium">
               {nextRankConfig 
@@ -111,7 +119,7 @@ const StudentDashboard: React.FC = () => {
         <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl shadow-sm border border-gray-100">
             <span className="text-xs font-bold uppercase text-text-secondary tracking-wider">Tu Rango Actual:</span>
             <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase bg-gray-100 text-gray-800 border border-gray-200`}>
-                {student?.rank}
+                {liveStudent?.rank}
             </span>
         </div>
       </div>
@@ -152,7 +160,7 @@ const StudentDashboard: React.FC = () => {
                   </div>
                   <p className={`text-xs font-bold uppercase tracking-wider ${hasDebt ? 'text-red-600' : 'text-green-600'}`}>Estado de Cuenta</p>
                   <h3 className={`text-2xl font-black ${hasDebt ? 'text-red-900' : 'text-green-900'}`}>
-                      {hasDebt ? `$${student?.balance.toFixed(2)}` : 'Al Corriente'}
+                      {hasDebt ? `$${liveStudent?.balance.toFixed(2)}` : 'Al Corriente'}
                   </h3>
               </div>
               
@@ -305,7 +313,7 @@ const StudentDashboard: React.FC = () => {
               </div>
 
               {/* Current Belt Card */}
-              {student && (
+              {liveStudent && (
                   <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm relative overflow-hidden flex flex-col justify-between min-h-[180px]">
                       <div>
                           <div className="flex justify-between items-start mb-2">
@@ -314,7 +322,7 @@ const StudentDashboard: React.FC = () => {
                                       Tu Cinturón
                                   </span>
                                   <h3 className="text-xl font-black text-text-main mt-3 leading-none">
-                                      {student.rank}
+                                      {liveStudent.rank}
                                   </h3>
                               </div>
                               <div className="size-10 flex items-center justify-center rounded-full bg-gray-50 border border-gray-100">
@@ -324,20 +332,20 @@ const StudentDashboard: React.FC = () => {
                           
                           {/* Belt Visual */}
                           <div className={`mt-4 h-12 w-full rounded-lg shadow-sm border flex items-center justify-end pr-3 relative overflow-hidden ${
-                              student.rankColor === 'white' ? 'bg-slate-50 border-slate-200' :
-                              student.rankColor === 'yellow' ? 'bg-yellow-300 border-yellow-400' :
-                              student.rankColor === 'orange' ? 'bg-orange-400 border-orange-500' :
-                              student.rankColor === 'green' ? 'bg-green-600 border-green-700' :
-                              student.rankColor === 'blue' ? 'bg-blue-600 border-blue-700' :
-                              student.rankColor === 'purple' ? 'bg-purple-600 border-purple-700' :
-                              student.rankColor === 'brown' ? 'bg-[#5D4037] border-[#3E2723]' :
+                              liveStudent.rankColor === 'white' ? 'bg-slate-50 border-slate-200' :
+                              liveStudent.rankColor === 'yellow' ? 'bg-yellow-300 border-yellow-400' :
+                              liveStudent.rankColor === 'orange' ? 'bg-orange-400 border-orange-500' :
+                              liveStudent.rankColor === 'green' ? 'bg-green-600 border-green-700' :
+                              liveStudent.rankColor === 'blue' ? 'bg-blue-600 border-blue-700' :
+                              liveStudent.rankColor === 'purple' ? 'bg-purple-600 border-purple-700' :
+                              liveStudent.rankColor === 'brown' ? 'bg-[#5D4037] border-[#3E2723]' :
                               'bg-gray-900 border-black'
                           }`}>
                               {/* Texture overlay */}
                               <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/fabric-of-squares.png')]"></div>
                               
-                              <div className={`relative h-full w-16 ${student.rankColor === 'black' ? 'bg-red-600' : 'bg-black'} flex items-center justify-center gap-1 shadow-lg`}>
-                                  {Array.from({ length: student.stripes || 0 }).map((_, i) => (
+                              <div className={`relative h-full w-16 ${liveStudent.rankColor === 'black' ? 'bg-red-600' : 'bg-black'} flex items-center justify-center gap-1 shadow-lg`}>
+                                  {Array.from({ length: liveStudent.stripes || 0 }).map((_, i) => (
                                       <div key={i} className="w-1.5 h-7 bg-white/90 rounded-sm shadow-sm"></div>
                                   ))}
                               </div>
@@ -346,7 +354,7 @@ const StudentDashboard: React.FC = () => {
 
                       <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between items-center text-xs">
                           <span className="text-text-secondary font-medium">
-                              {student.stripes > 0 ? `${student.stripes} ${student.stripes === 1 ? 'Grado' : 'Grados'}` : 'Sin grados'}
+                              {liveStudent.stripes > 0 ? `${liveStudent.stripes} ${liveStudent.stripes === 1 ? 'Grado' : 'Grados'}` : 'Sin grados'}
                           </span>
                           {nextRankConfig && (
                               <span className="text-primary font-bold">
@@ -402,7 +410,7 @@ const StudentDashboard: React.FC = () => {
                       </div>
 
                       <div className="pt-4 border-t border-gray-100">
-                          {selectedEvent.type === 'exam' && !selectedEvent.registrants?.includes(student?.id || '') ? (
+                          {selectedEvent.type === 'exam' && !selectedEvent.registrants?.includes(liveStudent?.id || '') ? (
                               <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 flex items-start gap-3">
                                   <span className="material-symbols-outlined text-yellow-600">info</span>
                                   <div>
@@ -414,7 +422,7 @@ const StudentDashboard: React.FC = () => {
                               </div>
                           ) : (
                               <>
-                                  {selectedEvent.registrants?.includes(student?.id || '') ? (
+                                  {selectedEvent.registrants?.includes(liveStudent?.id || '') ? (
                                       <div className="flex items-center justify-center gap-2 text-green-600 font-bold bg-green-50 px-4 py-3 rounded-xl border border-green-100">
                                           <span className="material-symbols-outlined">check_circle</span>
                                           Ya estás inscrito
