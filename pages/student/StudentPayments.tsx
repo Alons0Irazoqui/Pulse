@@ -6,6 +6,7 @@ import { TuitionRecord } from '../../types';
 import { generateReceipt } from '../../utils/pdfGenerator';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { motion, AnimatePresence } from 'framer-motion';
+import TransactionDetailModal from '../../components/ui/TransactionDetailModal';
 
 // Fix for type errors with motion components
 const MotionDiv = motion.div as any;
@@ -454,6 +455,7 @@ const StudentPayments: React.FC = () => {
   const { addToast } = useToast();
   
   const [selectedRecord, setSelectedRecord] = useState<TuitionRecord | null>(null);
+  const [selectedDetailRecord, setSelectedDetailRecord] = useState<TuitionRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Filter only my records for display
@@ -583,7 +585,8 @@ const StudentPayments: React.FC = () => {
                                           initial={{ opacity: 0, y: 10 }}
                                           animate={{ opacity: 1, y: 0 }}
                                           exit={{ opacity: 0, scale: 0.95 }}
-                                          className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 hover:shadow-md transition-all group relative overflow-hidden"
+                                          onClick={() => setSelectedDetailRecord(record)}
+                                          className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 hover:shadow-md hover:scale-[1.01] transition-all group relative overflow-hidden cursor-pointer"
                                       >
                                           {isOverdue && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>}
                                           
@@ -627,7 +630,7 @@ const StudentPayments: React.FC = () => {
                                                           </button>
                                                       )}
                                                       <button 
-                                                          onClick={() => handleOpenPaymentModal(record)}
+                                                          onClick={(e) => { e.stopPropagation(); handleOpenPaymentModal(record); }}
                                                           className="bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-gray-900/10 flex items-center gap-2 transition-all active:scale-95 whitespace-nowrap text-sm"
                                                       >
                                                           <span className="material-symbols-outlined text-[18px]">credit_card</span>
@@ -646,7 +649,8 @@ const StudentPayments: React.FC = () => {
                               <MotionDiv 
                                   key={record.id}
                                   layout
-                                  className="bg-gray-50/50 rounded-2xl p-5 border border-gray-200 border-dashed flex flex-col sm:flex-row gap-4 justify-between items-center opacity-80"
+                                  onClick={() => setSelectedDetailRecord(record)}
+                                  className="bg-gray-50/50 rounded-2xl p-5 border border-gray-200 border-dashed flex flex-col sm:flex-row gap-4 justify-between items-center opacity-80 cursor-pointer hover:bg-gray-50 hover:opacity-100 transition-all"
                               >
                                   <div className="flex-1 w-full">
                                       <div className="flex justify-between items-start mb-2">
@@ -677,7 +681,11 @@ const StudentPayments: React.FC = () => {
                       </h3>
                       <div className="flex flex-col">
                           {historyRecords.map((record) => (
-                              <div key={record.id} className="bg-white p-4 border-b border-gray-100 last:border-0 flex justify-between items-center group hover:bg-gray-50 transition-colors first:rounded-t-xl last:rounded-b-xl">
+                              <div 
+                                  key={record.id} 
+                                  onClick={() => setSelectedDetailRecord(record)}
+                                  className="bg-white p-4 border-b border-gray-100 last:border-0 flex justify-between items-center group hover:bg-gray-50 hover:scale-[1.005] cursor-pointer transition-all first:rounded-t-xl last:rounded-b-xl"
+                              >
                                   <div>
                                       <div className="flex items-center gap-3 mb-1">
                                           <span className="text-sm font-bold text-gray-900">{record.concept}</span>
@@ -692,7 +700,7 @@ const StudentPayments: React.FC = () => {
                                   <div className="flex items-center gap-4">
                                       <span className="font-bold text-gray-900 text-sm">${(record.originalAmount || record.amount).toFixed(2)}</span>
                                       <button 
-                                          onClick={() => handleDownloadReceipt(record)}
+                                          onClick={(e) => { e.stopPropagation(); handleDownloadReceipt(record); }}
                                           className="size-8 rounded-lg text-gray-400 hover:text-orange-600 hover:bg-orange-50 flex items-center justify-center transition-colors"
                                           title="Descargar Recibo"
                                       >
@@ -776,6 +784,19 @@ const StudentPayments: React.FC = () => {
           onConfirm={handleConfirmPayment}
           preSelectedRecord={selectedRecord}
           pendingDebts={pendingDebts}
+      />
+
+      <TransactionDetailModal
+          isOpen={!!selectedDetailRecord}
+          onClose={() => setSelectedDetailRecord(null)}
+          record={selectedDetailRecord}
+          role="student"
+          paymentHistory={selectedDetailRecord?.paymentHistory || []}
+          onPay={(r) => {
+              setSelectedDetailRecord(null);
+              handleOpenPaymentModal(r);
+          }}
+          onDownloadReceipt={(r) => handleDownloadReceipt(r)}
       />
     </div>
   );

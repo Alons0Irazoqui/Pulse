@@ -9,6 +9,7 @@ import { generateReceipt } from '../../utils/pdfGenerator';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import EmptyState from '../../components/ui/EmptyState';
 import CreateChargeModal from '../../components/finance/CreateChargeModal';
+import TransactionDetailModal from '../../components/ui/TransactionDetailModal';
 
 // --- HELPER COMPONENTS ---
 
@@ -126,7 +127,8 @@ const Finance: React.FC = () => {
       currentUser,
       approveBatchPayment,
       rejectBatchPayment,
-      updateRecordAmount
+      updateRecordAmount,
+      deleteRecord
   } = useStore();
   
   const { addToast } = useToast();
@@ -136,6 +138,7 @@ const Finance: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   
   const [selectedGroup, setSelectedGroup] = useState<GroupedTransaction | null>(null);
+  const [viewDetailRecord, setViewDetailRecord] = useState<TuitionRecord | null>(null);
   const [isChargeModalOpen, setIsChargeModalOpen] = useState(false);
 
   // -- DATA PROCESSING --
@@ -349,6 +352,19 @@ const Finance: React.FC = () => {
       });
   };
 
+  const handleDeleteRecord = (record: TuitionRecord) => {
+      setViewDetailRecord(null);
+      confirm({
+          title: 'Eliminar Movimiento',
+          message: '¿Estás seguro de que deseas eliminar este movimiento? Esta acción no se puede deshacer y borrará el historial de pagos asociado.',
+          type: 'danger',
+          confirmText: 'Eliminar',
+          onConfirm: () => {
+              deleteRecord(record.id);
+          }
+      });
+  };
+
   const handleGenerateBilling = () => {
       confirm({
           title: 'Generar Mensualidades',
@@ -477,7 +493,11 @@ const Finance: React.FC = () => {
                                 const breakdownTooltip = `Total: $${totalOriginalAmount} \nPagado: $${paidSoFar} \nRestante: $${totalRemainingDebt}`;
 
                                 return (
-                                    <tr key={group.id} className="hover:bg-gray-50/50 transition-colors group">
+                                    <tr 
+                                        key={group.id} 
+                                        className="hover:bg-gray-50/50 transition-colors group cursor-pointer"
+                                        onClick={() => setViewDetailRecord(group.mainRecord)}
+                                    >
                                         <td className="px-8 py-5">
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-gray-900 text-sm">{formatDateDisplay(mainRecord.dueDate)}</span>
@@ -549,7 +569,7 @@ const Finance: React.FC = () => {
                                         <td className="px-8 py-5 text-right">
                                             {mainRecord.status === 'in_review' ? (
                                                 <button 
-                                                    onClick={() => setSelectedGroup(group)}
+                                                    onClick={(e) => { e.stopPropagation(); setSelectedGroup(group); }}
                                                     className="bg-gray-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-gray-900/10 transition-all active:scale-95 flex items-center gap-2 ml-auto"
                                                 >
                                                     <span className="material-symbols-outlined text-sm">visibility</span>
@@ -557,7 +577,8 @@ const Finance: React.FC = () => {
                                                 </button>
                                             ) : (mainRecord.status === 'paid' || mainRecord.status === 'partial') ? (
                                                 <button 
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         // BATCH DOWNLOAD HANDLING
                                                         if (group.isBatch) {
                                                             group.records.forEach(r => generateReceipt(r, academySettings, currentUser));
@@ -585,7 +606,7 @@ const Finance: React.FC = () => {
             </div>
         </div>
 
-        {/* --- REVIEW MODAL --- */}
+        {/* --- REVIEW MODAL (BATCH/ACTION) --- */}
         {activeGroup && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white rounded-[2rem] w-full max-w-4xl h-[85vh] shadow-2xl flex overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
@@ -732,6 +753,46 @@ const Finance: React.FC = () => {
         )}
 
         <CreateChargeModal isOpen={isChargeModalOpen} onClose={() => setIsChargeModalOpen(false)} />
+
+        {/* --- DETAIL MODAL (READ-ONLY / HISTORY) --- */}
+        <TransactionDetailModal
+            isOpen={!!viewDetailRecord}
+            onClose={() => setViewDetailRecord(null)}
+            record={viewDetailRecord}
+            role="master"
+            paymentHistory={viewDetailRecord?.paymentHistory || []}
+            onApprove={(r) => { approvePayment(r.id); setViewDetailRecord(null); }}
+            onReject={(r) => { rejectPayment(r.id); setViewDetailRecord(null); }}
+            onDownloadReceipt={(r) => generateReceipt(r, academySettings, currentUser)}
+            onReview={(r) => {
+                // Logic to transition from Detail Modal to Review/Waterfall Modal
+                const isBatch = !!r.batchPaymentId;
+                let groupRecords = [r];
+                
+                // If batch, we need to gather all related records to form the group correctly
+                if (isBatch) {
+                     groupRecords = records.filter(item => item.batchPaymentId === r.batchPaymentId);
+                }
+                
+                // Construct the GroupedTransaction object expected by the Review Modal
+                const group: GroupedTransaction = {
+                    id: isBatch ? r.batchPaymentId! : r.id,
+                    isBatch: isBatch,
+                    records: groupRecords,
+                    mainRecord: r,
+                    totalOriginalAmount: groupRecords.reduce((acc, item) => acc + (item.originalAmount ?? item.amount) + item.penaltyAmount, 0),
+                    totalRemainingDebt: groupRecords.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0),
+                    declaredAmount: groupRecords.find(i => i.declaredAmount !== undefined)?.declaredAmount,
+                    itemCount: groupRecords.length
+                };
+                
+                setViewDetailRecord(null); // Close detail
+                setSelectedGroup(group);   // Open review
+            }}
+            onDelete={() => {
+                if (viewDetailRecord) handleDeleteRecord(viewDetailRecord);
+            }}
+        />
     </div>
   );
 };

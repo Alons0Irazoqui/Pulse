@@ -34,6 +34,7 @@ interface FinanceContextType {
   };
   createRecord: (record: Partial<TuitionRecord>) => void;
   createManualCharge: (data: ManualChargeData) => void;
+  deleteRecord: (id: string) => void;
   
   registerBatchPayment: (
       recordIds: string[], 
@@ -526,6 +527,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast('Cargo manual registrado exitosamente', 'success');
   };
 
+  const deleteRecord = (id: string) => {
+      setRecords(prev => prev.filter(r => r.id !== id));
+      addToast('Registro eliminado correctamente', 'success');
+  };
+
   const uploadProof = (recordId: string, file: File, method: 'Transferencia' | 'Efectivo' = 'Transferencia') => {
       registerBatchPayment([recordId], file, method);
   };
@@ -754,6 +760,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         stats,
         createRecord,
         createManualCharge,
+        deleteRecord,
         registerBatchPayment,
         approveBatchPayment,
         rejectBatchPayment,
