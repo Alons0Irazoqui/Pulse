@@ -1,354 +1,336 @@
-
 import React, { useMemo, useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Defs, LinearGradient } from 'recharts';
 import { useStore } from '../../context/StoreContext';
-import { useFinance } from '../../context/FinanceContext';
+import { 
+    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+    PieChart, Pie, Cell, Legend 
+} from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import Avatar from '../../components/ui/Avatar';
-import { 
-    format, 
-    subMonths, 
-    addMonths,
-    isSameMonth, 
-    isSameYear, 
-} from 'date-fns';
-import { es } from 'date-fns/locale';
-
-type TimeRange = 'month' | 'year';
 
 const MasterDashboard: React.FC = () => {
-  // 1. Data Sources
-  const { students, isLoading: isAcademyLoading } = useStore();
-  const { 
-      stats, 
-      monthlyRevenueData, 
-      rollingRevenueData, 
-      isFinanceLoading 
-  } = useFinance();
-  
-  const navigate = useNavigate();
-  
-  // Unified Loading State
-  const isGlobalLoading = isAcademyLoading || isFinanceLoading;
-  
-  // --- STATE ---
-  const [timeRange, setTimeRange] = useState<TimeRange>('month');
-  const [currentDate, setCurrentDate] = useState(new Date()); 
-  
-  // --- LOGICA DE DATOS ---
+    // 1. Arquitectura de Datos (Local)
+    const { students, monthlyRevenueData, rollingRevenueData, stats } = useStore();
+    const navigate = useNavigate();
+    
+    // Selector de Tiempo
+    const [timeRange, setTimeRange] = useState<'month' | 'year'>('month');
 
-  // 1. Critical Debtors (Top 5)
-  const criticalDebtors = useMemo(() => {
-      return students
-          .filter(s => s.balance > 0 && s.status !== 'inactive')
-          .sort((a, b) => b.balance - a.balance)
-          .slice(0, 5);
-  }, [students]);
+    // --- LÓGICA DE NEGOCIO ---
 
-  // 2. Financial Trend (Calculated from rolling data)
-  const financialTrend = useMemo(() => {
-      if (rollingRevenueData.length < 2) return 0;
-      
-      const currentMonth = rollingRevenueData[rollingRevenueData.length - 1];
-      const prevMonth = rollingRevenueData[rollingRevenueData.length - 2];
-      
-      const currentVal = currentMonth?.total || 0;
-      const prevVal = prevMonth?.total || 0;
-      
-      // Prevent division by zero
-      if (prevVal === 0) return currentVal > 0 ? 100 : 0;
-      return ((currentVal - prevVal) / prevVal) * 100;
-  }, [rollingRevenueData]);
+    // 2. Lógica "Ingresos" (KPI Dinámico)
+    const displayRevenue = useMemo(() => {
+        if (timeRange === 'year') return stats.totalRevenue;
+        // Si es mes, tomamos el último valor disponible en los datos rodantes (asumiendo mes actual)
+        if (rollingRevenueData.length > 0) {
+            return rollingRevenueData[rollingRevenueData.length - 1].total;
+        }
+        return 0;
+    }, [timeRange, stats, rollingRevenueData]);
 
-  // 3. Chart Data Formatting
-  const chartData = useMemo(() => {
-      const sourceData = timeRange === 'year' ? monthlyRevenueData : rollingRevenueData;
-      return sourceData.map(item => ({
-          name: item.name,
-          value: item.total // Matches dataKey="value" in AreaChart
-      }));
-  }, [monthlyRevenueData, rollingRevenueData, timeRange]);
+    // 3. Lógica "Alumnos Nuevos" (KPI Dinámico)
+    const newStudentsCount = useMemo(() => {
+        const now = new Date();
+        const startOfPeriod = timeRange === 'month'
+            ? new Date(now.getFullYear(), now.getMonth(), 1)
+            : new Date(now.getFullYear(), 0, 1);
 
-  // 4. Dynamic Revenue Display
-  const displayRevenue = useMemo(() => {
-      if (timeRange === 'year') {
-          return stats.totalRevenue; // Total Paid (YTD)
-      } else {
-          // Last month in rolling data
-          return rollingRevenueData[rollingRevenueData.length - 1]?.total || 0;
-      }
-  }, [timeRange, stats.totalRevenue, rollingRevenueData]);
+        return students.filter(s => {
+            // joinDate viene como string (ej: "2023-08-15" o ISO), Date.parse lo maneja
+            const joinDate = new Date(s.joinDate); 
+            return joinDate >= startOfPeriod;
+        }).length;
+    }, [students, timeRange]);
 
+    // 4. Datos Gráfica Principal (Ingresos)
+    const revenueChartData = useMemo(() => {
+        return timeRange === 'year' ? monthlyRevenueData : rollingRevenueData;
+    }, [timeRange, monthlyRevenueData, rollingRevenueData]);
 
-  // --- ACTIONS ---
-  
-  const handlePrevPeriod = () => {
-      setCurrentDate(subMonths(currentDate, 1));
-  };
+    // 5. Datos Donut (Grados con Colores Estáticos)
+    const studentsByRank = useMemo(() => {
+        const activeStudents = students.filter(s => s.status === 'active');
+        const distribution: Record<string, number> = {};
 
-  const handleNextPeriod = () => {
-      setCurrentDate(addMonths(currentDate, 1));
-  };
+        activeStudents.forEach(s => {
+            distribution[s.rank] = (distribution[s.rank] || 0) + 1;
+        });
 
-  // KPI Definition
-  const kpis = [
-      {
-          label: timeRange === 'year' ? 'Ingresos Totales (YTD)' : 'Ingresos del Mes',
-          value: `$${displayRevenue.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
-          trend: financialTrend,
-          icon: 'payments',
-          color: 'text-green-600',
-          bg: 'bg-green-50'
-      },
-      {
-          label: 'Cuentas por Cobrar',
-          value: `$${stats.pendingCollection.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
-          trend: 0,
-          icon: 'pending_actions',
-          color: 'text-blue-600',
-          bg: 'bg-blue-50'
-      },
-      {
-          label: 'Deuda Vencida',
-          value: `$${stats.overdueAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
-          trend: 0,
-          icon: 'warning',
-          color: 'text-red-600',
-          bg: 'bg-red-50',
-          isInverse: true
-      },
-      {
-          label: 'Alumnos Activos',
-          value: stats.activeStudents,
-          trend: 0,
-          icon: 'groups',
-          color: 'text-purple-600',
-          bg: 'bg-purple-50'
-      }
-  ];
+        // Mapa de colores estáticos hexadecimales
+        const getColor = (rankName: string) => {
+            const lower = rankName.toLowerCase();
+            if (lower.includes('white') || lower.includes('blanco')) return '#E5E7EB';
+            if (lower.includes('yellow') || lower.includes('amarillo')) return '#FACC15';
+            if (lower.includes('orange') || lower.includes('naranja')) return '#FB923C';
+            if (lower.includes('green') || lower.includes('verde')) return '#4ADE80';
+            if (lower.includes('blue') || lower.includes('azul')) return '#60A5FA';
+            if (lower.includes('purple') || lower.includes('morado')) return '#A78BFA';
+            if (lower.includes('brown') || lower.includes('marrón') || lower.includes('marron')) return '#A97142';
+            if (lower.includes('black') || lower.includes('negro')) return '#1F2937';
+            return '#CBD5E1'; // Default Gray
+        };
 
-  // Skeleton Loader
-  if (isGlobalLoading) {
-      return (
-        <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full animate-pulse">
-            <div className="h-8 w-48 bg-gray-200 rounded-lg mb-8"></div>
-            <div className="grid grid-cols-4 gap-6 mb-8">
-                {[1,2,3,4].map(i => <div key={i} className="h-32 bg-gray-100 rounded-3xl"></div>)}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 h-[450px] bg-gray-100 rounded-3xl"></div>
-                <div className="h-[450px] bg-gray-100 rounded-3xl"></div>
-            </div>
-        </div>
-      );
-  }
+        // Orden lógico aproximado para la visualización
+        const orderMap: Record<string, number> = { 
+            white: 1, yellow: 2, orange: 3, green: 4, blue: 5, purple: 6, brown: 7, black: 8 
+        };
 
-  return (
-    <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        
-        {/* Header & Controls */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-            <div>
-                <h1 className="text-3xl font-black tracking-tight text-text-main flex items-center gap-3">
-                    Dashboard
-                    <span className="text-lg font-medium text-text-secondary bg-gray-100 px-3 py-1 rounded-xl capitalize">
-                        {format(currentDate, 'MMMM yyyy', { locale: es })}
-                    </span>
-                </h1>
-                <p className="text-text-secondary mt-1">
-                    Vista general de tu academia en tiempo real.
-                </p>
-            </div>
+        return Object.entries(distribution).map(([name, value]) => {
+            const key = Object.keys(orderMap).find(k => name.toLowerCase().includes(k)) || 'z';
+            return {
+                name,
+                value,
+                fill: getColor(name),
+                order: orderMap[key] || 99
+            };
+        }).sort((a, b) => a.order - b.order);
+    }, [students]);
+
+    // 6. Total Cuentas por Cobrar
+    const totalReceivable = stats.pendingCollection + stats.overdueAmount;
+
+    // 7. Top Deudores (Alertas)
+    const topDebtors = useMemo(() => {
+        return students
+            .filter(s => s.balance > 0)
+            .sort((a, b) => b.balance - a.balance)
+            .slice(0, 5);
+    }, [students]);
+
+    return (
+        <div className="p-6 md:p-10 max-w-[1600px] mx-auto w-full flex flex-col gap-8 animate-in fade-in duration-500">
             
-            <div className="flex items-center gap-3">
-                {/* Date Navigator Controls */}
-                <div className="flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
-                    <button onClick={handlePrevPeriod} className="p-2 hover:bg-gray-100 rounded-lg text-text-secondary transition-colors">
-                        <span className="material-symbols-outlined text-xl">chevron_left</span>
-                    </button>
-                    <button onClick={() => setCurrentDate(new Date())} className="px-3 text-xs font-bold text-text-main hover:bg-gray-50 rounded-lg transition-colors border-x border-transparent hover:border-gray-100">
-                        Hoy
-                    </button>
-                    <button onClick={handleNextPeriod} className="p-2 hover:bg-gray-100 rounded-lg text-text-secondary transition-colors">
-                        <span className="material-symbols-outlined text-xl">chevron_right</span>
-                    </button>
+            {/* --- HEADER --- */}
+            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+                <div>
+                    <h1 className="text-3xl font-black tracking-tight text-text-main">Dashboard</h1>
+                    <p className="text-text-secondary mt-1">Resumen general de tu academia.</p>
                 </div>
-
-                {/* View Toggle */}
-                <div className="bg-white border border-gray-200 rounded-xl p-1 flex shadow-sm">
+                
+                {/* Selector de Tiempo (Segment Control) */}
+                <div className="bg-white p-1 rounded-xl shadow-sm border border-gray-200 flex">
                     <button 
                         onClick={() => setTimeRange('month')}
-                        className={`px-6 py-2 text-xs font-bold rounded-lg transition-all ${
+                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
                             timeRange === 'month' 
-                            ? 'bg-black text-white shadow-md' 
-                            : 'text-text-secondary hover:text-text-main hover:bg-gray-50'
+                            ? 'bg-gray-900 text-white shadow-md' 
+                            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                         }`}
                     >
                         Mensual
                     </button>
                     <button 
                         onClick={() => setTimeRange('year')}
-                        className={`px-6 py-2 text-xs font-bold rounded-lg transition-all ${
+                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
                             timeRange === 'year' 
-                            ? 'bg-black text-white shadow-md' 
-                            : 'text-text-secondary hover:text-text-main hover:bg-gray-50'
+                            ? 'bg-gray-900 text-white shadow-md' 
+                            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                         }`}
                     >
                         Anual
                     </button>
                 </div>
             </div>
-        </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {kpis.map((kpi, idx) => {
-                const hasTrend = kpi.trend !== 0 && !isNaN(kpi.trend) && isFinite(kpi.trend);
-                const isPositive = kpi.trend > 0;
-                const isBadTrend = kpi.isInverse ? isPositive : !isPositive; 
+            {/* --- FILA 1: KPIs --- */}
+            <div className="grid grid-cols-12 gap-6">
                 
-                return (
-                    <div key={idx} className="bg-white p-6 rounded-[1.5rem] shadow-card border border-gray-100 flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className={`size-12 rounded-2xl flex items-center justify-center ${kpi.bg} ${kpi.color}`}>
-                                <span className="material-symbols-outlined text-2xl">{kpi.icon}</span>
-                            </div>
-                            {hasTrend && (
-                                <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${isBadTrend ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                    <span className="material-symbols-outlined text-sm">{isPositive ? 'trending_up' : 'trending_down'}</span>
-                                    {Math.abs(kpi.trend).toFixed(1)}%
-                                </div>
-                            )}
-                        </div>
-                        <div>
-                            <p className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{kpi.label}</p>
-                            <h3 className="text-3xl font-black text-text-main mt-1 tracking-tight">{kpi.value}</h3>
+                {/* KPI 1: Ingresos */}
+                <div className="col-span-12 md:col-span-6 lg:col-span-3 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between h-40">
+                    <div className="flex justify-between items-start">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Ingresos ({timeRange === 'month' ? 'Mes' : 'Año'})</span>
+                        <div className="size-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+                            <span className="material-symbols-outlined">payments</span>
                         </div>
                     </div>
-                );
-            })}
-        </div>
-
-        {/* Chart & Alerts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Chart */}
-            <div className="lg:col-span-2 bg-white p-8 rounded-[2rem] shadow-card border border-gray-100 flex flex-col h-[450px]">
-                <div className="flex justify-between items-center mb-8">
                     <div>
-                        <h3 className="text-xl font-bold text-text-main">
-                            Tendencia de Ingresos
-                        </h3>
-                        <p className="text-sm text-text-secondary capitalize">
-                            {timeRange === 'year' ? 'Rendimiento Anual' : 'Últimos 6 meses'}
-                        </p>
-                    </div>
-                    {/* Dynamic total badge in chart header */}
-                    <div className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold">
-                        Total: ${stats.totalRevenue.toLocaleString()}
+                        <span className="text-3xl font-black text-text-main tracking-tight">
+                            ${displayRevenue.toLocaleString('es-MX', { maximumFractionDigits: 0 })}
+                        </span>
                     </div>
                 </div>
-                
-                <div className="flex-1 w-full min-h-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#007AFF" stopOpacity={0.4}/>
-                                    <stop offset="95%" stopColor="#007AFF" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                            <XAxis 
-                                dataKey="name" 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{fill: '#9CA3AF', fontSize: 11, fontWeight: 600}} 
-                                dy={10}
-                            />
-                            <YAxis 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{fill: '#9CA3AF', fontSize: 11}} 
-                                tickFormatter={(value) => value >= 1000 ? `$${value/1000}k` : `$${value}`}
-                            />
-                            <Tooltip 
-                                contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)', padding: '12px 16px' }}
-                                cursor={{ stroke: '#007AFF', strokeWidth: 2, strokeDasharray: '4 4' }}
-                                formatter={(value: number) => [
-                                    new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value), 
-                                    'Ingresos'
-                                ]}
-                                labelStyle={{ color: '#6B7280', marginBottom: '4px', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}
-                            />
-                            <Area 
-                                type="monotone" 
-                                dataKey="value" 
-                                stroke="#007AFF" 
-                                strokeWidth={4} 
-                                fillOpacity={1} 
-                                fill="url(#colorRevenue)" 
-                                animationDuration={1000}
-                                animationEasing="ease-out"
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
+
+                {/* KPI 2: Alumnos Activos */}
+                <div className="col-span-12 md:col-span-6 lg:col-span-3 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between h-40" onClick={() => navigate('/master/students')}>
+                    <div className="flex justify-between items-start">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Alumnos Activos</span>
+                        <div className="size-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <span className="material-symbols-outlined">groups</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span className="text-3xl font-black text-text-main tracking-tight">
+                            {stats.activeStudents}
+                        </span>
+                    </div>
+                </div>
+
+                {/* KPI 3: Alumnos Nuevos */}
+                <div className="col-span-12 md:col-span-6 lg:col-span-3 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between h-40">
+                    <div className="flex justify-between items-start">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Alumnos Nuevos</span>
+                        <div className="size-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                            <span className="material-symbols-outlined">person_add</span>
+                        </div>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-black text-text-main tracking-tight">
+                            +{newStudentsCount}
+                        </span>
+                        <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                            {timeRange === 'month' ? 'Este Mes' : 'Este Año'}
+                        </span>
+                    </div>
+                </div>
+
+                {/* KPI 4: Cuentas por Cobrar */}
+                <div className="col-span-12 md:col-span-6 lg:col-span-3 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between h-40 cursor-pointer hover:border-red-200 transition-colors" onClick={() => navigate('/master/finance')}>
+                    <div className="flex justify-between items-start">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Por Cobrar</span>
+                        <div className="size-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+                            <span className="material-symbols-outlined">account_balance_wallet</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span className="text-3xl font-black text-text-main tracking-tight">
+                            ${totalReceivable.toLocaleString('es-MX', { maximumFractionDigits: 0 })}
+                        </span>
+                        {stats.overdueAmount > 0 && (
+                            <p className="text-[10px] font-bold text-red-500 mt-1">
+                                ${stats.overdueAmount.toLocaleString()} Vencido
+                            </p>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Critical Alerts */}
-            <div className="bg-white p-8 rounded-[2rem] shadow-card border border-gray-100 flex flex-col h-[450px]">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-xl font-bold text-text-main flex items-center gap-2">
-                            Top Deudores
-                            {criticalDebtors.length > 0 && <span className="flex size-2 rounded-full bg-red-500 animate-pulse"></span>}
-                        </h3>
-                        <p className="text-sm text-text-secondary">Riesgo financiero crítico.</p>
+            {/* --- FILA 2: GRÁFICAS --- */}
+            <div className="grid grid-cols-12 gap-6">
+                
+                {/* Gráfica Principal: Ingresos */}
+                <div className="col-span-12 lg:col-span-8 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm min-h-[400px] flex flex-col">
+                    <h3 className="text-lg font-bold text-text-main mb-6">Ingresos</h3>
+                    <div className="flex-1 w-full min-h-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={revenueChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#007AFF" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#007AFF" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                                <XAxis 
+                                    dataKey="name" 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    tick={{fill: '#9CA3AF', fontSize: 11, fontWeight: 600}} 
+                                    dy={10}
+                                />
+                                <YAxis 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    tick={{fill: '#9CA3AF', fontSize: 11}} 
+                                    tickFormatter={(value) => `$${value >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`}
+                                />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)' }}
+                                    formatter={(value: number) => [
+                                        new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(value) || 0), 
+                                        'Ingresos'
+                                    ]}
+                                />
+                                <Area 
+                                    type="monotone" 
+                                    dataKey="total" 
+                                    stroke="#007AFF" 
+                                    strokeWidth={3} 
+                                    fillOpacity={1} 
+                                    fill="url(#colorRevenue)" 
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                    {criticalDebtors.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-text-secondary opacity-60 text-center">
-                            <div className="size-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
-                                <span className="material-symbols-outlined text-3xl text-gray-400">check_circle</span>
+                {/* Gráfica Secundaria: Población por Grado */}
+                <div className="col-span-12 lg:col-span-4 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm min-h-[400px] flex flex-col">
+                    <h3 className="text-lg font-bold text-text-main mb-2">Alumnos por Grado</h3>
+                    <div className="flex-1 relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={studentsByRank}
+                                    innerRadius={70}
+                                    outerRadius={90}
+                                    paddingAngle={4}
+                                    dataKey="value"
+                                    stroke="none"
+                                    cornerRadius={6}
+                                >
+                                    {studentsByRank.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col">
+                            <span className="text-4xl font-black text-text-main">{stats.activeStudents}</span>
+                            <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Total</span>
+                        </div>
+                    </div>
+                    {/* Leyenda Limpia */}
+                    <div className="mt-4 flex flex-wrap gap-2 justify-center">
+                        {studentsByRank.map((rank) => (
+                            <div key={rank.name} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-50 border border-gray-100">
+                                <span className="size-2 rounded-full" style={{ backgroundColor: rank.fill }}></span>
+                                <span className="text-[10px] font-bold text-gray-600">{rank.name} ({rank.value})</span>
                             </div>
-                            <p className="text-sm font-medium">Sin deudas críticas.</p>
-                            <p className="text-xs">¡Excelente gestión!</p>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* --- FILA 3: DETALLES (Alertas de Deuda) --- */}
+            <div className="col-span-12 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-text-main flex items-center gap-2">
+                        <span className="material-symbols-outlined text-red-500">warning</span>
+                        Alertas de Deuda
+                    </h3>
+                    <button onClick={() => navigate('/master/finance')} className="text-sm font-bold text-primary hover:underline">Gestionar Todo</button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                    {topDebtors.length === 0 ? (
+                        <div className="col-span-full py-8 text-center text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                            <span className="material-symbols-outlined text-3xl mb-2">check_circle</span>
+                            <p className="text-sm font-medium">¡Sin deudores críticos!</p>
                         </div>
                     ) : (
-                        criticalDebtors.map(debtor => (
-                            <div key={debtor.id} className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-red-100 hover:bg-red-50/30 transition-all group cursor-pointer" onClick={() => navigate('/master/finance')}>
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                    <Avatar src={debtor.avatarUrl} name={debtor.name} className="size-10 rounded-full shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-bold text-text-main truncate">{debtor.name}</p>
-                                        <p className="text-xs text-red-500 font-bold flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-[10px]">warning</span>
-                                            ${debtor.balance.toLocaleString()}
-                                        </p>
+                        topDebtors.map(debtor => (
+                            <div key={debtor.id} className="p-4 rounded-2xl bg-red-50/50 border border-red-100 hover:shadow-md transition-all cursor-pointer group" onClick={() => navigate('/master/finance')}>
+                                <div className="flex items-center gap-3 mb-3">
+                                    <Avatar src={debtor.avatarUrl} name={debtor.name} className="size-10 rounded-full" />
+                                    <div className="overflow-hidden">
+                                        <p className="text-sm font-bold text-gray-900 truncate">{debtor.name}</p>
+                                        <p className="text-xs text-gray-500 truncate">{debtor.email}</p>
                                     </div>
                                 </div>
-                                <span className="material-symbols-outlined text-gray-300 group-hover:text-red-400 transition-colors">chevron_right</span>
+                                <div className="flex justify-between items-end border-t border-red-100 pt-3">
+                                    <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Pendiente</span>
+                                    <span className="text-lg font-black text-red-600 group-hover:scale-105 transition-transform">
+                                        ${debtor.balance.toLocaleString()}
+                                    </span>
+                                </div>
                             </div>
                         ))
                     )}
                 </div>
-
-                <div className="pt-6 border-t border-gray-100 mt-auto">
-                    <button 
-                        onClick={() => navigate('/master/finance')}
-                        className="w-full py-3 rounded-xl bg-gray-900 text-white font-bold text-sm hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-lg"
-                    >
-                        Gestionar Cobranza
-                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                    </button>
-                </div>
             </div>
+
         </div>
-    </div>
-  );
+    );
 };
 
 export default MasterDashboard;
