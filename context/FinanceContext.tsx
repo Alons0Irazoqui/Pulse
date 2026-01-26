@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { TuitionRecord, ManualChargeData, ChargeCategory, Student } from '../types';
+import { TuitionRecord, ManualChargeData, ChargeCategory, Student, TuitionStatus } from '../types';
 import { PulseService } from '../services/pulseService';
 import { useAuth } from './AuthContext';
 import { useAcademy } from './AcademyContext'; // Need academy settings for billing
@@ -330,10 +330,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const approvePayment = (recordId: string, amountPaid?: number) => {
         setRecords(prev => prev.map(r => {
             if (r.id === recordId) {
-                const amountToApply = amountPaid !== undefined ? amountPaid : (r.amount + r.penaltyAmount);
-                const totalDebt = r.amount + r.penaltyAmount;
+                // Critical Fix: Ensure Total Debt includes Penalty
+                const totalDebt = r.amount + (r.penaltyAmount || 0);
+                
+                // If amountPaid is undefined, we assume full payment of the TOTAL debt
+                const amountToApply = amountPaid !== undefined ? amountPaid : totalDebt;
+                
                 const remaining = Math.max(0, totalDebt - amountToApply);
                 
+                // Logic: If remaining is negligible (floating point tolerance), we consider it fully paid.
+                const isPaidFull = remaining < 0.01;
+
                 // History Update
                 const newHistoryItem = {
                     date: new Date().toISOString(),
@@ -343,9 +350,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
                 return {
                     ...r,
-                    status: remaining < 0.01 ? 'paid' : 'partial',
-                    amount: remaining,
-                    penaltyAmount: 0, // Penalty usually cleared first or included in debt logic
+                    status: isPaidFull ? 'paid' : 'partial',
+                    // STRICT LIQUIDATION LOGIC:
+                    // If paid full, amount becomes 0.
+                    // If partial, amount is the remaining balance.
+                    amount: isPaidFull ? 0 : remaining,
+                    // Penalty is cleared (merged into payment or remaining balance) to avoid phantom debts.
+                    penaltyAmount: 0, 
                     paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
                 };
             }
@@ -359,7 +370,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (r.id === recordId) {
                 return {
                     ...r,
-                    status: r.dueDate < getLocalDate() ? 'overdue' : 'pending',
+                    status: (r.dueDate < getLocalDate() ? 'overdue' : 'pending') as TuitionStatus,
                     paymentDate: null,
                     proofUrl: null,
                     batchPaymentId: undefined
@@ -373,51 +384,70 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const approveBatchPayment = (batchId: string, totalAmountPaid: number) => {
         setRecords(prev => {
             const batchRecords = prev.filter(r => r.batchPaymentId === batchId);
-            // Sort by due date
+            // Sort by due date (Oldest first) for waterfall application
             batchRecords.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
             
             let available = totalAmountPaid;
+            
             const updatedBatch = batchRecords.map(r => {
-                const debt = r.amount + r.penaltyAmount;
+                // Critical Fix: Calculate full debt including penalty for correct waterfall
+                const totalDebt = r.amount + (r.penaltyAmount || 0);
                 let paid = 0;
                 
-                // Priority logic: Mandatory vs Partial
+                // Allocation Logic
                 if (!r.canBePaidInParts) {
-                    if (available >= debt - 0.01) {
-                        paid = debt;
-                        available -= debt;
+                    // Mandatory items: All or nothing
+                    if (available >= totalDebt - 0.01) {
+                        paid = totalDebt;
+                        available -= totalDebt;
                     }
                 } else {
+                    // Flexible items: Fill as much as possible
                     if (available > 0) {
-                        paid = Math.min(available, debt);
+                        paid = Math.min(available, totalDebt);
                         available -= paid;
                     }
                 }
 
-                const remaining = debt - paid;
+                const remaining = Math.max(0, totalDebt - paid);
+                const isPaidFull = remaining < 0.01;
                 
-                const newHistoryItem = {
-                    date: new Date().toISOString(),
-                    amount: paid,
-                    method: r.method || 'Batch'
-                };
-
+                // Only update if paid something or if we need to reset status
                 if (paid > 0) {
+                    const newHistoryItem = {
+                        date: new Date().toISOString(),
+                        amount: paid,
+                        method: r.method || 'Batch'
+                    };
+
                     return {
                         ...r,
-                        status: remaining < 0.01 ? 'paid' : 'partial',
-                        amount: remaining,
-                        penaltyAmount: 0,
+                        status: isPaidFull ? 'paid' : 'partial',
+                        // STRICT LIQUIDATION LOGIC:
+                        amount: isPaidFull ? 0 : remaining,
+                        penaltyAmount: 0, // Penalty is addressed (either paid or merged into remaining 'amount')
                         paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
                     } as TuitionRecord;
-                } else {
-                    return {
+                } 
+                
+                // If not paid, return as is (but ensure it's not stuck in 'in_review' if it wasn't covered)
+                // Actually, if we are approving the batch, items NOT covered should probably revert to pending/overdue 
+                // OR stay as partial if they were partially paid before? 
+                // For simplicity in this batch logic, if paid == 0, we assume the batch didn't cover it at all.
+                // However, the `in_review` status needs to be cleared.
+                // If paid == 0, we revert status based on due date.
+                if (paid === 0) {
+                     return {
                         ...r,
-                        status: r.dueDate < getLocalDate() ? 'overdue' : 'pending',
-                    } as TuitionRecord;
+                        status: (r.dueDate < getLocalDate() ? 'overdue' : 'pending') as TuitionStatus,
+                        // Keep amounts as is
+                    };
                 }
+
+                return r;
             });
 
+            // Merge updates back into state
             return prev.map(r => {
                 const updated = updatedBatch.find(u => u.id === r.id);
                 return updated || r;
@@ -432,7 +462,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (r.batchPaymentId === batchId) {
                 return {
                     ...r,
-                    status: r.dueDate < getLocalDate() ? 'overdue' : 'pending',
+                    status: (r.dueDate < getLocalDate() ? 'overdue' : 'pending') as TuitionStatus,
                     paymentDate: null,
                     proofUrl: null,
                     batchPaymentId: undefined
@@ -443,19 +473,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addToast('Lote de pagos rechazado', 'info');
     };
 
-    const updateRecordAmount = (recordId: string, newAmount: number) => {
+    const updateRecordAmount = (recordId: string, newTotal: number) => {
         setRecords(prev => {
-            // 1. Snapshot: Find target to calculate Delta
             const targetRecord = prev.find(r => r.id === recordId);
             if (!targetRecord) return prev;
 
-            // 2. Delta Calculation: Old - New
-            // Positive delta means reduction (e.g. 500 - 300 = 200). We subtract 200 from total.
-            const delta = targetRecord.amount - newAmount;
+            // Current Total including penalty
+            const currentTotal = targetRecord.amount + (targetRecord.penaltyAmount || 0);
+            
+            // Delta based on TOTAL difference
+            const delta = currentTotal - newTotal;
             const batchId = targetRecord.batchPaymentId;
 
             return prev.map(r => {
-                // Check if this record is part of the affected group (Target or Batch Sibling)
                 const isTarget = r.id === recordId;
                 const isBatchSibling = batchId && r.batchPaymentId === batchId;
 
@@ -463,7 +493,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 if (!isTarget && !isBatchSibling) return r;
 
                 // Calculate new declared amount if applicable
-                // Note: declaredAmount is the Total Transaction Value shared by the batch
                 let updatedDeclared = r.declaredAmount;
                 if (r.declaredAmount !== undefined) {
                     updatedDeclared = r.declaredAmount - delta;
@@ -473,13 +502,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 if (isTarget) {
                     const updatedRecord = { 
                         ...r, 
-                        amount: newAmount,
-                        originalAmount: newAmount, // Sync original to match new reality
+                        amount: newTotal, // Set new total as the base amount
+                        penaltyAmount: 0, // Reset penalty as it's merged into the new total
+                        originalAmount: newTotal, 
                         declaredAmount: updatedDeclared
                     };
 
                     // Auto-resolve if amount becomes 0 or negative
-                    if (newAmount <= 0) {
+                    if (newTotal <= 0) {
                         updatedRecord.status = 'paid';
                         updatedRecord.paymentDate = updatedRecord.paymentDate || new Date().toISOString();
                         updatedRecord.amount = 0; 
@@ -490,7 +520,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 }
 
                 // CASE B: Batch Siblings
-                // Only update the shared declaredAmount context
                 if (isBatchSibling) {
                     return {
                         ...r,

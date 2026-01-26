@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
@@ -60,12 +59,16 @@ const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: nu
  * DEBT AMOUNT EDITOR
  */
 const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (id: string, val: number) => void }) => {
-    const [val, setVal] = useState(item.amount.toString());
+    // FIX: Initialize with Total Debt (Amount + Penalty)
+    const totalDebt = item.amount + (item.penaltyAmount || 0);
+    const [val, setVal] = useState(totalDebt.toString());
     const { addToast } = useToast();
     
     useEffect(() => {
-        setVal(item.amount.toString());
-    }, [item.amount]);
+        // Sync state if prop changes externally
+        const currentTotal = item.amount + (item.penaltyAmount || 0);
+        setVal(currentTotal.toString());
+    }, [item.amount, item.penaltyAmount]);
 
     const handleSave = () => {
         const num = parseFloat(val);
@@ -75,7 +78,9 @@ const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (
         }
     };
 
-    const hasChanged = parseFloat(val) !== item.amount;
+    // Check against total
+    const currentTotal = item.amount + (item.penaltyAmount || 0);
+    const hasChanged = parseFloat(val) !== currentTotal;
 
     return (
         <div className="flex flex-col items-end gap-2" onClick={e => e.stopPropagation()}>
@@ -689,7 +694,7 @@ const Finance: React.FC = () => {
                                                                     onUpdate={(id, val) => updateRecordAmount(id, val)}
                                                                 />
                                                             ) : (
-                                                                <span className="text-xs text-gray-500 font-mono">Deuda Original: ${item.amount}</span>
+                                                                <span className="text-xs text-gray-500 font-mono">Deuda Original: ${item.amount + (item.penaltyAmount || 0)}</span>
                                                             )}
                                                         </div>
                                                     </div>
