@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { TuitionRecord, ManualChargeData, ChargeCategory, Student } from '../types';
 import { PulseService } from '../services/pulseService';
@@ -164,21 +163,21 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, [records, students, isFinanceLoading, academySettings, batchUpdateStudents]);
 
 
-    // --- CALCULATE STATS (Derived) ---
+    // --- CALCULATE STATS (Derived - REAL DATA) ---
     useEffect(() => {
         if (isFinanceLoading) return;
 
-        // 1. Calculate Stats
+        // 1. Calculate General Stats
         const pending = records.filter(r => ['pending', 'partial', 'charged'].includes(r.status));
         const overdue = records.filter(r => r.status === 'overdue');
         
         const totalPending = pending.reduce((acc, r) => acc + r.amount, 0);
         const totalOverdue = overdue.reduce((acc, r) => acc + r.amount + r.penaltyAmount, 0);
         
-        // Calculate Revenue (Total Paid)
+        // Calculate Total Revenue (Total Paid Historically)
         const totalRevenue = records.reduce((acc, r) => {
-            if (r.status === 'paid') return acc + (r.originalAmount || r.amount); // Full amount paid
-            if (r.status === 'partial') return acc + ((r.originalAmount || r.amount) - r.amount); // Part paid
+            if (r.status === 'paid') return acc + (r.originalAmount ?? r.amount); // Full amount paid
+            if (r.status === 'partial') return acc + ((r.originalAmount ?? r.amount) - r.amount); // Part paid
             return acc;
         }, 0);
 
@@ -189,25 +188,67 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             activeStudents: students.filter(s => s.status === 'active').length
         });
 
-        // Generate Chart Data
-        const generateChartData = () => {
+        // 2. Generate Real Chart Data
+        const generateRealChartData = () => {
             const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-            const currentMonthIdx = new Date().getMonth();
-            
-            // Rolling 6 months
-            const rolling = [];
-            for (let i = 5; i >= 0; i--) {
-                let idx = currentMonthIdx - i;
-                if (idx < 0) idx += 12;
-                rolling.push({ name: months[idx], total: Math.random() * 5000 + 2000 }); // Mock data for visualization if not computed
-            }
-            setRollingRevenueData(rolling);
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonthIdx = now.getMonth();
 
-            // Year to Date
-            const ytd = months.map(m => ({ name: m, total: Math.random() * 8000 + 3000 }));
-            setMonthlyRevenueData(ytd);
+            // Initialize Annual Data (Current Year) - Filled with 0s
+            const annualTotals = new Array(12).fill(0);
+
+            // Initialize Rolling Data (Last 6 Months)
+            const rollingStats: { monthIndex: number; year: number; name: string; total: number }[] = [];
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                rollingStats.push({
+                    monthIndex: d.getMonth(),
+                    year: d.getFullYear(),
+                    name: months[d.getMonth()],
+                    total: 0
+                });
+            }
+
+            // Iterate Records
+            records.forEach(r => {
+                // Only count actual payments
+                if ((r.status === 'paid' || r.status === 'partial') && r.paymentDate) {
+                    const pDate = new Date(r.paymentDate);
+                    const pYear = pDate.getFullYear();
+                    const pMonth = pDate.getMonth();
+
+                    // Calculate Real Paid Amount
+                    let paidAmount = 0;
+                    if (r.status === 'paid') {
+                        // If paid, the revenue is the original total (or amount if legacy)
+                        paidAmount = (r.originalAmount ?? r.amount);
+                    } else {
+                        // If partial, the revenue collected so far is Total - Remaining Debt
+                        paidAmount = (r.originalAmount ?? r.amount) - r.amount;
+                    }
+
+                    // A. Annual Chart (Current Year Only)
+                    if (pYear === currentYear) {
+                        annualTotals[pMonth] += paidAmount;
+                    }
+
+                    // B. Rolling Chart (Specific Month/Year match)
+                    const rollingMatch = rollingStats.find(
+                        item => item.monthIndex === pMonth && item.year === pYear
+                    );
+                    if (rollingMatch) {
+                        rollingMatch.total += paidAmount;
+                    }
+                }
+            });
+
+            // Set State
+            setMonthlyRevenueData(months.map((m, i) => ({ name: m, total: annualTotals[i] })));
+            setRollingRevenueData(rollingStats.map(r => ({ name: r.name, total: r.total })));
         };
-        generateChartData();
+
+        generateRealChartData();
 
     }, [records, isFinanceLoading, students]);
 
