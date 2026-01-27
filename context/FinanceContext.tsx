@@ -331,7 +331,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setRecords(prev => prev.map(r => {
             if (r.id === recordId) {
                 // Critical Fix: Ensure Total Debt includes Penalty
-                const totalDebt = r.amount + (r.penaltyAmount || 0);
+                const currentPenalty = r.penaltyAmount || 0;
+                const totalDebt = r.amount + currentPenalty;
                 
                 // If amountPaid is undefined, we assume full payment of the TOTAL debt
                 const amountToApply = amountPaid !== undefined ? amountPaid : totalDebt;
@@ -355,6 +356,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     // If paid full, amount becomes 0.
                     // If partial, amount is the remaining balance.
                     amount: isPaidFull ? 0 : remaining,
+                    
+                    // CRITICAL FIX: If paid full, merge penalty into originalAmount so Revenue Stats see 950 (not 800)
+                    // If partial, we keep originalAmount as is until liquidation? 
+                    // Actually, if we clear penaltyAmount, we must account for it somewhere.
+                    // For Simplicity: If paid full, we bump originalAmount.
+                    originalAmount: isPaidFull ? (r.originalAmount ?? r.amount) + currentPenalty : (r.originalAmount ?? r.amount),
+                    
                     // Penalty is cleared (merged into payment or remaining balance) to avoid phantom debts.
                     penaltyAmount: 0, 
                     paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
@@ -391,7 +399,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             
             const updatedBatch = batchRecords.map(r => {
                 // Critical Fix: Calculate full debt including penalty for correct waterfall
-                const totalDebt = r.amount + (r.penaltyAmount || 0);
+                const currentPenalty = r.penaltyAmount || 0;
+                const totalDebt = r.amount + currentPenalty;
                 let paid = 0;
                 
                 // Allocation Logic
@@ -425,17 +434,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                         status: isPaidFull ? 'paid' : 'partial',
                         // STRICT LIQUIDATION LOGIC:
                         amount: isPaidFull ? 0 : remaining,
+                        // CRITICAL FIX: Merge penalty into originalAmount on full payment
+                        originalAmount: isPaidFull ? (r.originalAmount ?? r.amount) + currentPenalty : (r.originalAmount ?? r.amount),
+                        
                         penaltyAmount: 0, // Penalty is addressed (either paid or merged into remaining 'amount')
                         paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
                     } as TuitionRecord;
                 } 
                 
-                // If not paid, return as is (but ensure it's not stuck in 'in_review' if it wasn't covered)
-                // Actually, if we are approving the batch, items NOT covered should probably revert to pending/overdue 
-                // OR stay as partial if they were partially paid before? 
-                // For simplicity in this batch logic, if paid == 0, we assume the batch didn't cover it at all.
-                // However, the `in_review` status needs to be cleared.
-                // If paid == 0, we revert status based on due date.
+                // If not paid, revert (simplified)
                 if (paid === 0) {
                      return {
                         ...r,

@@ -250,6 +250,20 @@ const Finance: React.FC = () => {
       };
   }, [records]);
 
+  // -- LOGIC: CALCULATE FINAL APPROVAL AMOUNT --
+  const amountToApprove = useMemo(() => {
+      if (!activeGroup) return 0;
+      
+      // AUTO-CORRECTION LOGIC:
+      // If declared amount exists AND is >= real debt, use declared (maybe a tip or credit).
+      // If declared amount < real debt (likely error or ignoring penalty), FORCE real debt to liquidate fully.
+      // Or fallback to real debt if no declared amount.
+      if (activeGroup.declaredAmount !== undefined && activeGroup.declaredAmount >= activeGroup.totalRemainingDebt) {
+          return activeGroup.declaredAmount;
+      }
+      return activeGroup.totalRemainingDebt;
+  }, [activeGroup]);
+
   // -- PREVIEW CALCULATION (Exact Match to Approve Logic) --
   const previewDistribution = useMemo(() => {
       if (!activeGroup) return [];
@@ -259,7 +273,7 @@ const Finance: React.FC = () => {
       const mandatory = items.filter(r => !r.canBePaidInParts);
       const splittable = items.filter(r => r.canBePaidInParts);
 
-      let available = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalRemainingDebt;
+      let available = amountToApprove;
       const preview = [];
 
       // 1. Mandatory First
@@ -291,25 +305,25 @@ const Finance: React.FC = () => {
           }
       }
       return preview;
-  }, [activeGroup]);
+  }, [activeGroup, amountToApprove]);
 
 
   // -- ACTIONS --
 
   const handleApprove = () => {
       if (!activeGroup) return;
-      const amountToApprove = activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalRemainingDebt;
+      
+      // The logic is now hoisted to `amountToApprove` memo.
+      // We pass this corrected amount to the context.
 
       // ---------------------------------------------------------
       // AUTO-GENERATE RECEIPTS FOR APPROVED ITEMS
-      // Iterate based on the waterfall preview (since that's what will be applied)
       // ---------------------------------------------------------
       previewDistribution.forEach(item => {
           if (item._paid > 0) {
-              // Calculate rough history for display (Total Original - Current Debt Before Pay)
               const previouslyPaid = (item.originalAmount || item.amount) - item.amount;
               const history = previouslyPaid > 0 ? [{
-                  date: item.paymentDate || new Date().toISOString(), // Fallback date
+                  date: item.paymentDate || new Date().toISOString(),
                   amount: previouslyPaid,
                   method: 'Pago Previo'
               }] : [];
@@ -652,18 +666,32 @@ const Finance: React.FC = () => {
                             {/* Total Amount Display */}
                             <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
                                 <div className="flex items-center justify-between mb-2">
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Monto Declarado</p>
+                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Monto a Aprobar</p>
                                     <span className="bg-white border border-gray-200 px-3 py-1 rounded-lg text-xs font-bold text-gray-700 shadow-sm">
                                         {activeGroup.mainRecord.method}
                                     </span>
                                 </div>
                                 <p className="text-4xl font-black text-gray-900 tracking-tight">
-                                    ${(activeGroup.declaredAmount !== undefined ? activeGroup.declaredAmount : activeGroup.totalRemainingDebt).toFixed(2)}
+                                    ${amountToApprove.toFixed(2)}
                                 </p>
-                                {activeGroup.declaredAmount !== undefined && activeGroup.declaredAmount < activeGroup.totalRemainingDebt && (
-                                    <p className="text-xs text-orange-600 font-bold mt-2 flex items-center gap-1 bg-orange-50 w-fit px-2 py-1 rounded-lg border border-orange-100">
-                                        <span className="material-symbols-outlined text-[14px]">warning</span>
-                                        Pago parcial. Deuda total era ${activeGroup.totalRemainingDebt}
+                                
+                                {/* Difference Alert */}
+                                {activeGroup.declaredAmount !== undefined && activeGroup.declaredAmount < amountToApprove && (
+                                    <div className="mt-3 p-2 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-2">
+                                        <span className="material-symbols-outlined text-blue-500 text-sm mt-0.5">auto_fix_high</span>
+                                        <div>
+                                            <p className="text-xs font-bold text-blue-700">Ajuste Automático</p>
+                                            <p className="text-[10px] text-blue-600 leading-tight">
+                                                El alumno declaró ${activeGroup.declaredAmount}, pero se aprobará el total de la deuda (${amountToApprove}) para liquidar recargos.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {activeGroup.declaredAmount !== undefined && activeGroup.declaredAmount > amountToApprove && (
+                                    <p className="text-xs text-green-600 font-bold mt-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[14px]">arrow_upward</span>
+                                        Monto mayor al esperado (Saldo a favor/Propina)
                                     </p>
                                 )}
                             </div>

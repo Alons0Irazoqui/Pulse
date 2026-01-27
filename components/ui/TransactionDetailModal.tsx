@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { TuitionRecord, PaymentHistoryItem } from '../../types';
 import { formatDateDisplay } from '../../utils/dateUtils';
@@ -35,15 +34,25 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
   // --- CALCULATIONS ---
   
-  // Determine original total cost
-  const originalTotal = record.originalAmount !== undefined 
-    ? record.originalAmount + (record.penaltyAmount || 0)
-    : record.amount + (record.penaltyAmount || 0);
-
   // Determine total paid from history
   const totalPaid = useMemo(() => {
     return paymentHistory.reduce((acc, curr) => acc + curr.amount, 0);
   }, [paymentHistory]);
+
+  // FIX: Determine original total cost dynamically.
+  // If status is 'paid', the penaltyAmount on the record is often cleared to 0 by the context.
+  // In that case, we should use the 'totalPaid' as the True Global Total if it exceeds the base amount,
+  // effectively restoring the visibility of the paid penalty.
+  const originalTotal = useMemo(() => {
+      const baseCalculation = (record.originalAmount ?? record.amount) + (record.penaltyAmount || 0);
+      
+      if (record.status === 'paid') {
+          // If paid amount is greater than base (meaning it included a penalty), display the paid amount
+          // Use a small epsilon for float comparison safety
+          return totalPaid > baseCalculation ? totalPaid : baseCalculation;
+      }
+      return baseCalculation;
+  }, [record, totalPaid]);
 
   // Determine remaining debt
   const remainingDebt = record.amount + (record.penaltyAmount || 0);

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
@@ -663,7 +662,8 @@ const StudentPayments: React.FC = () => {
                                       </span>
                                   </div>
                                   <div className="text-right w-full sm:w-auto flex justify-between sm:block items-center">
-                                      <span className="text-lg font-bold text-gray-600 block">${record.amount.toFixed(2)}</span>
+                                      {/* Correctly display Amount + Penalty while in review */}
+                                      <span className="text-lg font-bold text-gray-600 block">${(record.amount + (record.penaltyAmount || 0)).toFixed(2)}</span>
                                       <p className="text-[10px] text-amber-600 font-bold uppercase tracking-wide mt-1">Validando...</p>
                                   </div>
                               </MotionDiv>
