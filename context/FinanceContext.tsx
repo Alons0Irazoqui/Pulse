@@ -94,7 +94,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         loadFinanceData();
     }, [loadFinanceData]);
 
-    // --- SYNC ENGINE: OVERDUE CHECK & STUDENT STATUS UPDATE ---
+    // --- SYNC ENGINE: OVERDUE CHECK, DEBT CALCULATION & EXAM READINESS ---
     useEffect(() => {
         if (isFinanceLoading || students.length === 0) return;
 
@@ -119,13 +119,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             return; 
         }
 
-        // 2. Calculate Student Balances & Update Status
+        // 2. Calculate Student Balances & Update Status Logic
         const studentsToUpdate: Student[] = [];
         
         students.forEach(student => {
+            // A. Calculate Debt
             const studentRecords = records.filter(r => r.studentId === student.id);
-            
-            // Calculate REAL Debt (Pending + Overdue + Partial + Charged)
             const debt = studentRecords.reduce((acc, r) => {
                 if (['pending', 'overdue', 'partial', 'charged'].includes(r.status)) {
                     return acc + r.amount + r.penaltyAmount;
@@ -133,26 +132,40 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 return acc;
             }, 0);
 
+            // B. Calculate Exam Readiness
+            const currentRank = academySettings.ranks.find(r => r.id === student.rankId);
+            const requiredAttendance = currentRank ? currentRank.requiredAttendance : 9999;
+            const isAcademicReady = student.attendance >= requiredAttendance;
+            const hasDebt = debt > 0.01;
+
             let newStatus = student.status;
 
-            // LOGIC CHANGE: If ANY debt exists (> 0), mark as 'debtor'.
-            // Previously might have checked only for 'overdue' records.
-            if (debt > 0.01) {
-                // Force 'debtor' if active or exam_ready. 
-                // We assume inactive students stay inactive unless manually reactivated.
-                if (newStatus === 'active' || newStatus === 'exam_ready') {
-                    newStatus = 'debtor';
-                }
-            } else {
-                // If paid off, revert 'debtor' to 'active'
-                if (newStatus === 'debtor') {
-                    newStatus = 'active';
+            // C. Determine Status (Priority Logic)
+            // REFINED LOGIC: Exam Readiness > Debt Status
+            if (student.status !== 'inactive') {
+                if (isAcademicReady) {
+                    // Priority 1: Academic Achievement.
+                    // Even if they have debt, we want to show they are ready for exam.
+                    // The debt will still be visible in the 'Balance' column (red text).
+                    newStatus = 'exam_ready';
+                } else {
+                    // Priority 2: Financial Status
+                    if (hasDebt) {
+                        newStatus = 'debtor';
+                    } else {
+                        // Priority 3: Default Active
+                        newStatus = 'active';
+                    }
                 }
             }
 
-            // Detect if update is needed (Floating point comparison for balance)
+            // Detect if update is needed (Balance update or Status transition)
             const currentBalance = student.balance || 0;
-            if (Math.abs(currentBalance - debt) > 0.01 || student.status !== newStatus) {
+            // Use epsilon for float comparison
+            const balanceChanged = Math.abs(currentBalance - debt) > 0.01;
+            const statusChanged = student.status !== newStatus;
+
+            if (balanceChanged || statusChanged) {
                 studentsToUpdate.push({ ...student, balance: debt, status: newStatus });
             }
         });
@@ -194,8 +207,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
             const now = new Date();
             const currentYear = now.getFullYear();
-            const currentMonthIdx = now.getMonth();
-
+            
             // Initialize Annual Data (Current Year) - Filled with 0s
             const annualTotals = new Array(12).fill(0);
 
@@ -222,10 +234,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     // Calculate Real Paid Amount
                     let paidAmount = 0;
                     if (r.status === 'paid') {
-                        // If paid, the revenue is the original total (or amount if legacy)
                         paidAmount = (r.originalAmount ?? r.amount);
                     } else {
-                        // If partial, the revenue collected so far is Total - Remaining Debt
                         paidAmount = (r.originalAmount ?? r.amount) - r.amount;
                     }
 
@@ -266,8 +276,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const createManualCharge = (data: ManualChargeData) => {
         if (currentUser?.role !== 'master') return;
         
-        // Strict number casting to avoid '500' string issues
-        const cleanAmount = Number(data.amount);
+        const finalAmount = Number(data.amount);
 
         const newRecord: TuitionRecord = {
             id: generateId('chg'),
@@ -276,12 +285,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             studentName: students.find(s => s.id === data.studentId)?.name || 'Estudiante',
             concept: data.title,
             description: data.description,
-            amount: cleanAmount,
-            originalAmount: cleanAmount,
-            penaltyAmount: 0,
+            amount: finalAmount, 
+            originalAmount: finalAmount, 
+            penaltyAmount: 0, 
             dueDate: data.dueDate,
             paymentDate: null,
-            status: 'charged', // Or 'pending'
+            status: 'charged',
             type: 'charge',
             category: data.category,
             method: 'System',
@@ -334,19 +343,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const approvePayment = (recordId: string, amountPaid?: number) => {
         setRecords(prev => prev.map(r => {
             if (r.id === recordId) {
-                // Critical Fix: Ensure Total Debt includes Penalty
                 const currentPenalty = r.penaltyAmount || 0;
                 const totalDebt = r.amount + currentPenalty;
-                
-                // If amountPaid is undefined, we assume full payment of the TOTAL debt
                 const amountToApply = amountPaid !== undefined ? amountPaid : totalDebt;
-                
                 const remaining = Math.max(0, totalDebt - amountToApply);
-                
-                // Logic: If remaining is negligible (floating point tolerance), we consider it fully paid.
                 const isPaidFull = remaining < 0.01;
 
-                // History Update
                 const newHistoryItem = {
                     date: new Date().toISOString(),
                     amount: amountToApply,
@@ -356,18 +358,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 return {
                     ...r,
                     status: isPaidFull ? 'paid' : 'partial',
-                    // STRICT LIQUIDATION LOGIC:
-                    // If paid full, amount becomes 0.
-                    // If partial, amount is the remaining balance.
                     amount: isPaidFull ? 0 : remaining,
-                    
-                    // CRITICAL FIX: If paid full, merge penalty into originalAmount so Revenue Stats see 950 (not 800)
-                    // If partial, we keep originalAmount as is until liquidation? 
-                    // Actually, if we clear penaltyAmount, we must account for it somewhere.
-                    // For Simplicity: If paid full, we bump originalAmount.
                     originalAmount: isPaidFull ? (r.originalAmount ?? r.amount) + currentPenalty : (r.originalAmount ?? r.amount),
-                    
-                    // Penalty is cleared (merged into payment or remaining balance) to avoid phantom debts.
                     penaltyAmount: 0, 
                     paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
                 };
@@ -402,20 +394,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             let available = totalAmountPaid;
             
             const updatedBatch = batchRecords.map(r => {
-                // Critical Fix: Calculate full debt including penalty for correct waterfall
                 const currentPenalty = r.penaltyAmount || 0;
                 const totalDebt = r.amount + currentPenalty;
                 let paid = 0;
                 
                 // Allocation Logic
                 if (!r.canBePaidInParts) {
-                    // Mandatory items: All or nothing
                     if (available >= totalDebt - 0.01) {
                         paid = totalDebt;
                         available -= totalDebt;
                     }
                 } else {
-                    // Flexible items: Fill as much as possible
                     if (available > 0) {
                         paid = Math.min(available, totalDebt);
                         available -= paid;
@@ -425,7 +414,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 const remaining = Math.max(0, totalDebt - paid);
                 const isPaidFull = remaining < 0.01;
                 
-                // Only update if paid something or if we need to reset status
                 if (paid > 0) {
                     const newHistoryItem = {
                         date: new Date().toISOString(),
@@ -436,29 +424,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     return {
                         ...r,
                         status: isPaidFull ? 'paid' : 'partial',
-                        // STRICT LIQUIDATION LOGIC:
                         amount: isPaidFull ? 0 : remaining,
-                        // CRITICAL FIX: Merge penalty into originalAmount on full payment
                         originalAmount: isPaidFull ? (r.originalAmount ?? r.amount) + currentPenalty : (r.originalAmount ?? r.amount),
-                        
-                        penaltyAmount: 0, // Penalty is addressed (either paid or merged into remaining 'amount')
+                        penaltyAmount: 0, 
                         paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
                     } as TuitionRecord;
                 } 
                 
-                // If not paid, revert (simplified)
                 if (paid === 0) {
                      return {
                         ...r,
                         status: (r.dueDate < getLocalDate() ? 'overdue' : 'pending') as TuitionStatus,
-                        // Keep amounts as is
                     };
                 }
 
                 return r;
             });
 
-            // Merge updates back into state
             return prev.map(r => {
                 const updated = updatedBatch.find(u => u.id === r.id);
                 return updated || r;
@@ -500,26 +482,22 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 const isTarget = r.id === recordId;
                 const isBatchSibling = batchId && r.batchPaymentId === batchId;
 
-                // If unrelated, return immediately
                 if (!isTarget && !isBatchSibling) return r;
 
-                // Calculate new declared amount if applicable
                 let updatedDeclared = r.declaredAmount;
                 if (r.declaredAmount !== undefined) {
                     updatedDeclared = r.declaredAmount - delta;
                 }
 
-                // CASE A: The Edited Record
                 if (isTarget) {
                     const updatedRecord = { 
                         ...r, 
-                        amount: newTotal, // Set new total as the base amount
-                        penaltyAmount: 0, // Reset penalty as it's merged into the new total
+                        amount: newTotal,
+                        penaltyAmount: 0, 
                         originalAmount: newTotal, 
                         declaredAmount: updatedDeclared
                     };
 
-                    // Auto-resolve if amount becomes 0 or negative
                     if (newTotal <= 0) {
                         updatedRecord.status = 'paid';
                         updatedRecord.paymentDate = updatedRecord.paymentDate || new Date().toISOString();
@@ -530,7 +508,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     return updatedRecord;
                 }
 
-                // CASE B: Batch Siblings
                 if (isBatchSibling) {
                     return {
                         ...r,
@@ -545,14 +522,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     const deleteRecord = (recordId: string) => {
-        // 1. Optimistic UI update
         setRecords(prev => prev.filter(r => r.id !== recordId));
-        
-        // 2. HARD DELETE from DB (LocalStorage) using Service
-        // This ensures that when 'savePayments' (merge) runs next, the old record isn't revived,
-        // and also cleans it up immediately for other contexts.
         PulseService.deletePayment(recordId);
-        
         addToast('Registro eliminado', 'info');
     };
 
@@ -566,11 +537,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const newCharges: TuitionRecord[] = [];
 
         activeStudents.forEach(student => {
-            // Check if already charged for this month
             const exists = records.some(r => r.studentId === student.id && r.month === monthContext && r.category === 'Mensualidad');
             if (exists) return;
 
-            // Use academy settings for billing day, fallback to 10th
             const billingDay = academySettings.paymentSettings.lateFeeDay || 10;
             const dueDate = `${monthContext}-${billingDay.toString().padStart(2, '0')}`;
 
@@ -605,7 +574,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     const purgeStudentDebts = (studentId: string) => {
-        // Removes all pending debts. Keeps paid history.
         setRecords(prev => prev.filter(r => {
             if (r.studentId === studentId) {
                 return r.status === 'paid';
@@ -619,7 +587,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     const uploadProof = (recordId: string, file: File) => {
-        // Wrapper for single upload, uses batch logic internally
         registerBatchPayment([recordId], file, 'Transferencia', 0, []); 
     };
 

@@ -92,6 +92,24 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [academySettings, setAcademySettings] = useState<AcademySettings>(PulseService.getAcademySettings(academyId));
   const [messages, setMessages] = useState<Message[]>([]);
 
+  // --- LOGIC: PROMOTION TRIGGER ---
+  // Checks if student meets requirements and updates status automatically
+  const checkPromotionEligibility = useCallback((student: Student): Student => {
+      const currentRank = academySettings.ranks.find(r => r.id === student.rankId);
+      
+      // Safety check if rank exists
+      if (!currentRank) return student;
+
+      // Logic: Attendance Threshold Reached
+      if (student.attendance >= currentRank.requiredAttendance) {
+          // Only promote if currently active or debtor (not inactive, and not already exam_ready)
+          if (student.status === 'active' || student.status === 'debtor') {
+              return { ...student, status: 'exam_ready' };
+          }
+      }
+      return student;
+  }, [academySettings.ranks]);
+
   // --- CALENDAR ENGINE ---
   const calculateCalendarEvents = useCallback((currentClasses: ClassCategory[], currentEvents: Event[]) => {
       const generatedEvents: CalendarEvent[] = [];
@@ -293,12 +311,16 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateStudent = (updatedStudent: Student) => {
       if (currentUser?.role !== 'master') return;
-      const newStudents = students.map(s => s.id === updatedStudent.id ? { ...updatedStudent, balance: s.balance } : s);
+      
+      // APPLY TRIGGER: Check promotion eligibility on manual update
+      const studentWithEligibility = checkPromotionEligibility(updatedStudent);
+
+      const newStudents = students.map(s => s.id === studentWithEligibility.id ? { ...studentWithEligibility, balance: s.balance } : s);
       setStudents(newStudents);
       PulseService.saveStudents(newStudents); // Explicit Save
       
       const userDB = PulseService.getUsersDB();
-      const updatedDB = userDB.map(u => u.id === updatedStudent.userId ? { ...u, name: updatedStudent.name, email: updatedStudent.email } : u);
+      const updatedDB = userDB.map(u => u.id === studentWithEligibility.userId ? { ...u, name: studentWithEligibility.name, email: studentWithEligibility.email } : u);
       localStorage.setItem('pulse_users_db', JSON.stringify(updatedDB));
       
       addToast('Datos del alumno actualizados', 'success');
@@ -395,12 +417,15 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const lastPresentRecord = history.find(r => r.status === 'present' || r.status === 'late');
         const lastAttendanceDate = lastPresentRecord ? lastPresentRecord.date : s.lastAttendance;
 
-        return { 
+        const updatedStudent = { 
             ...s, 
             attendance: newAttendanceCount, 
             attendanceHistory: history,
             lastAttendance: lastAttendanceDate
         };
+
+        // APPLY TRIGGER: Check promotion eligibility immediately
+        return checkPromotionEligibility(updatedStudent);
       }
       return s;
     });
@@ -431,12 +456,15 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     
                     const newAttendanceCount = history.filter(r => r.status === 'present' || r.status === 'late').length;
                     
-                    return { 
+                    const updatedStudent = { 
                         ...s, 
                         attendance: newAttendanceCount, 
                         attendanceHistory: history, 
                         lastAttendance: recordDate
                     };
+
+                    // APPLY TRIGGER: Check promotion eligibility
+                    return checkPromotionEligibility(updatedStudent);
                }
           }
           return s;
@@ -462,6 +490,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
               rankColor: nextRank.color, 
               attendance: 0, 
               attendanceHistory: [], 
+              status: 'active' as const, // Reset status to active after promotion
               promotionHistory: [historyItem, ...(s.promotionHistory || [])] 
           };
       });

@@ -1,5 +1,7 @@
 
 export type RankColor = 'white' | 'yellow' | 'orange' | 'green' | 'blue' | 'purple' | 'brown' | 'black';
+
+// Data Architecture Update: Removed 'exam_ready_debt'. Financial status is now decoupled from academic status.
 export type StudentStatus = 'active' | 'inactive' | 'debtor' | 'exam_ready';
 
 export interface Rank {
@@ -7,7 +9,7 @@ export interface Rank {
     name: string;
     color: RankColor;
     order: number;
-    requiredAttendance: number;
+    requiredAttendance: number; // Field confirmed for Exam Logic
 }
 
 export interface BankDetails {

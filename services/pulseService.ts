@@ -429,7 +429,8 @@ export const PulseService = {
     },
 
     deletePayment: (recordId: string) => {
-        // CRITICAL: Actually remove from storage, do not use mergeAndSave
+        // CRITICAL FIX: Actually remove from storage, do not use mergeAndSave which only updates/adds.
+        // This ensures that when a record is deleted in UI, it stays deleted in DB.
         const raw = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
         const allPayments = raw ? JSON.parse(raw) : [];
         const filtered = allPayments.filter((p: any) => p.id !== recordId);
