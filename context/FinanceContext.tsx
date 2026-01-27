@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { TuitionRecord, ManualChargeData, ChargeCategory, Student, TuitionStatus } from '../types';
 import { PulseService } from '../services/pulseService';
@@ -265,6 +266,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const createManualCharge = (data: ManualChargeData) => {
         if (currentUser?.role !== 'master') return;
         
+        // Strict number casting to avoid '500' string issues
+        const cleanAmount = Number(data.amount);
+
         const newRecord: TuitionRecord = {
             id: generateId('chg'),
             academyId: currentUser.academyId,
@@ -272,8 +276,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             studentName: students.find(s => s.id === data.studentId)?.name || 'Estudiante',
             concept: data.title,
             description: data.description,
-            amount: data.amount,
-            originalAmount: data.amount,
+            amount: cleanAmount,
+            originalAmount: cleanAmount,
             penaltyAmount: 0,
             dueDate: data.dueDate,
             paymentDate: null,
@@ -541,7 +545,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     const deleteRecord = (recordId: string) => {
+        // 1. Optimistic UI update
         setRecords(prev => prev.filter(r => r.id !== recordId));
+        
+        // 2. HARD DELETE from DB (LocalStorage) using Service
+        // This ensures that when 'savePayments' (merge) runs next, the old record isn't revived,
+        // and also cleans it up immediately for other contexts.
+        PulseService.deletePayment(recordId);
+        
         addToast('Registro eliminado', 'info');
     };
 

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirmation } from '../../context/ConfirmationContext';
@@ -19,7 +19,7 @@ const MotionTbody = motion.tbody as any;
 const MotionTr = motion.tr as any;
 
 const StudentsList: React.FC = () => {
-  const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, records, isLoading, purgeStudentDebts } = useStore();
+  const { students, updateStudent, deleteStudent, addStudent, academySettings, promoteStudent, records, isLoading, purgeStudentDebts, refreshData } = useStore();
   const { addToast } = useToast();
   const { confirm } = useConfirmation();
   const navigate = useNavigate();
@@ -29,6 +29,12 @@ const StudentsList: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table'); // Default to table for data density
   const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'finance'>('info');
   
+  // Polling al Montar: Force refresh from DB to see new registrations
+  useEffect(() => {
+      refreshData();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Modal States
   const [showModal, setShowModal] = useState(false); 
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null); 
@@ -85,6 +91,13 @@ const StudentsList: React.FC = () => {
         return matchesSearch && matchesStatus && matchesRank;
       });
   }, [students, searchTerm, filterStatus, filterRank]);
+
+  // Determine Empty State Text Context
+  const isSearchActive = searchTerm !== '' || filterStatus !== 'all' || filterRank !== 'all';
+  const emptyTitle = !isSearchActive && students.length === 0 ? "Aún no hay alumnos" : "Sin resultados";
+  const emptyDesc = !isSearchActive && students.length === 0 
+      ? "Comparte el código de tu academia para que se registren o agrégalos manualmente." 
+      : "Intenta cambiar los filtros de búsqueda.";
 
   // --- REACTIVE DATA ENGINE ---
   const reactiveViewingStudent = useMemo(() => {
@@ -292,7 +305,7 @@ const StudentsList: React.FC = () => {
         {isLoading ? (
             <div className="p-10 text-center">Cargando...</div>
         ) : filteredStudents.length === 0 ? (
-            <EmptyState title="Sin resultados" description="Intenta cambiar los filtros." action={<button onClick={handleCreate} className="text-primary font-bold">Crear Alumno</button>} />
+            <EmptyState title={emptyTitle} description={emptyDesc} action={<button onClick={handleCreate} className="text-primary font-bold">Crear Alumno</button>} />
         ) : (
             <>
                 {viewMode === 'grid' && (

@@ -81,9 +81,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const academyId = currentUser?.academyId;
 
   // --- ARCHITECTURE FIX: Race Condition Prevention ---
-  // When we poll data from LS, we update React State. Normally, this triggers the `useEffect` 
-  // that saves State -> LS. This creates a loop and risks overwriting new data if the poll was slightly stale.
-  // We use `isPollingRef` to signal that a state update came from the DB, so we should NOT write it back immediately.
   const isPollingRef = useRef(false);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -182,7 +179,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Update calendar when dependencies change (Derived State)
   useEffect(() => {
-      // Logic runs immediately on state change, no persistence needed here
       const newEvents = calculateCalendarEvents(classes, events);
       setScheduleEvents(newEvents);
   }, [classes, events, calculateCalendarEvents]);
@@ -194,33 +190,27 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (currentUser?.academyId) {
           if (!silent) setIsLoading(true);
           
-          // FLAG: Start polling phase. Prevent persistence effects from running.
           isPollingRef.current = true;
 
           try {
-              // 1. Fetch Students
               const dbStudents = PulseService.getStudents(currentUser.academyId);
               setStudents(prev => {
-                  // Only update if signature changed to avoid re-renders
                   if (JSON.stringify(prev) !== JSON.stringify(dbStudents)) return dbStudents;
                   return prev;
               });
 
-              // 2. Fetch Classes
               const dbClasses = PulseService.getClasses(currentUser.academyId);
               setClasses(prev => {
                   if (JSON.stringify(prev) !== JSON.stringify(dbClasses)) return dbClasses;
                   return prev;
               });
 
-              // 3. Fetch Events
               const dbEvents = PulseService.getEvents(currentUser.academyId);
               setEvents(prev => {
                   if (JSON.stringify(prev) !== JSON.stringify(dbEvents)) return dbEvents;
                   return prev;
               });
 
-              // 4. Fetch Settings & Other
               const dbSettings = PulseService.getAcademySettings(currentUser.academyId);
               setAcademySettings(prev => {
                   if (JSON.stringify(prev) !== JSON.stringify(dbSettings)) return dbSettings;
@@ -239,9 +229,6 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
           } finally {
               if (!silent) setIsLoading(false);
-              
-              // CRITICAL: Allow a small buffer for React to settle state updates before re-enabling persistence.
-              // This ensures the `useEffect` hooks for saving don't fire during the poll update.
               setTimeout(() => {
                   isPollingRef.current = false;
               }, 500);
@@ -251,58 +238,31 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
   }, [currentUser]);
 
-  // Initial Load
   useEffect(() => {
       loadData(false);
   }, [loadData]);
 
-  // Polling Interval (Every 5 seconds)
   useEffect(() => {
       if (!currentUser) return;
-      
       const intervalId = setInterval(() => {
-          // Silent refresh to keep Master Dashboard in sync with new Registrations
           loadData(true);
       }, 5000);
-
       return () => clearInterval(intervalId);
   }, [loadData, currentUser]);
 
 
-  // --- PERSISTENCE (With Safety Checks) ---
+  // --- MANUAL PERSISTENCE (EFFECTS REMOVED) ---
+  // The automatic useEffects for saving students, classes, etc. have been removed 
+  // to prevent overwriting new data from other sources (like public registration)
+  // with stale state from this client.
   
-  // Helper to check if we should save
-  const shouldSave = () => {
-      // Only save if user is logged in, not loading, AND not currently polling updates from DB
-      return currentUser && !isLoading && !isPollingRef.current;
-  };
-
+  // Keep Message persistence as it's local only for now
   useEffect(() => { 
-      if(shouldSave() && students.length > 0) PulseService.saveStudents(students); 
-  }, [students, currentUser, isLoading]);
-
-  useEffect(() => { 
-      if(shouldSave()) PulseService.saveClasses(classes); 
-  }, [classes, currentUser, isLoading]);
-
-  useEffect(() => { 
-      if(shouldSave()) PulseService.saveEvents(events); 
-  }, [events, currentUser, isLoading]);
-
-  useEffect(() => { 
-      if(shouldSave()) PulseService.saveLibrary(libraryResources); 
-  }, [libraryResources, currentUser, isLoading]);
-
-  useEffect(() => { 
-      if(shouldSave()) PulseService.saveAcademySettings(academySettings); 
-  }, [academySettings, currentUser, isLoading]);
-
-  useEffect(() => { 
-      if(shouldSave()) localStorage.setItem('pulse_messages', JSON.stringify(messages)); 
+      if(currentUser && !isLoading && !isPollingRef.current) localStorage.setItem('pulse_messages', JSON.stringify(messages)); 
   }, [messages, currentUser, isLoading]);
 
 
-  // --- ACTIONS (Wrapped) ---
+  // --- ACTIONS (Explicit Saves) ---
 
   const addStudent = (student: Student) => {
       if (currentUser?.role !== 'master') return;
@@ -318,7 +278,9 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           status: 'active' as const
       };
       
-      setStudents(prev => [...prev, finalStudent]);
+      const newStudentList = [...students, finalStudent];
+      setStudents(newStudentList);
+      PulseService.saveStudents(newStudentList); // Explicit Save
       
       try {
           PulseService.createStudentAccountFromMaster(finalStudent, (student as any).password);
@@ -331,9 +293,10 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateStudent = (updatedStudent: Student) => {
       if (currentUser?.role !== 'master') return;
-      setStudents(prev => prev.map(s => s.id === updatedStudent.id ? { ...updatedStudent, balance: s.balance } : s));
+      const newStudents = students.map(s => s.id === updatedStudent.id ? { ...updatedStudent, balance: s.balance } : s);
+      setStudents(newStudents);
+      PulseService.saveStudents(newStudents); // Explicit Save
       
-      // Update Auth DB too if basic info changed
       const userDB = PulseService.getUsersDB();
       const updatedDB = userDB.map(u => u.id === updatedStudent.userId ? { ...u, name: updatedStudent.name, email: updatedStudent.email } : u);
       localStorage.setItem('pulse_users_db', JSON.stringify(updatedDB));
@@ -342,20 +305,28 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const batchUpdateStudents = (updatedStudents: Student[]) => {
-      setStudents(updatedStudents);
+      setStudents(prev => {
+          // Merge updates into existing list instead of replacing
+          // Explicitly typing map to ensure Student[] is inferred correctly
+          const updatedMap = new Map<string, Student>(prev.map(s => [s.id, s]));
+          updatedStudents.forEach(s => updatedMap.set(s.id, s));
+          const newStudents = Array.from(updatedMap.values());
+          
+          PulseService.saveStudents(newStudents); // Explicit Save
+          return newStudents;
+      });
   };
 
   const deleteStudent = (id: string) => {
       if (currentUser?.role !== 'master') return;
       
-      // 1. Perform Hard Delete in DB layer immediately
       PulseService.deleteFullStudentData(id);
 
-      // 2. Update Local State (Students List)
-      setStudents(prev => prev.filter(s => s.id !== id));
+      const newStudents = students.filter(s => s.id !== id);
+      setStudents(newStudents);
+      // PulseService.saveStudents(newStudents) - Not needed as deleteFullStudentData handles DB directly
 
-      // 3. Update Local State (Classes Enrollment)
-      setClasses(prev => prev.map(c => {
+      const newClasses = classes.map(c => {
           if (c.studentIds.includes(id)) {
               return {
                   ...c,
@@ -364,10 +335,11 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
               };
           }
           return c;
-      }));
+      });
+      setClasses(newClasses);
+      PulseService.saveClasses(newClasses); // Explicit Save for Classes integrity
 
-      // 4. Update Local State (Events Registration)
-      setEvents(prev => prev.map(e => {
+      const newEvents = events.map(e => {
           if (e.registrants?.includes(id)) {
               return {
                   ...e,
@@ -376,21 +348,25 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
               };
           }
           return e;
-      }));
+      });
+      setEvents(newEvents);
+      PulseService.saveEvents(newEvents); // Explicit Save for Events integrity
 
       addToast('Alumno eliminado totalmente del sistema', 'success');
   };
   
   const updateStudentStatus = (id: string, status: Student['status']) => {
     if (currentUser?.role !== 'master') return;
-    setStudents(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+    const newStudents = students.map(s => s.id === id ? { ...s, status } : s);
+    setStudents(newStudents);
+    PulseService.saveStudents(newStudents); // Explicit Save
     addToast('Estado del alumno actualizado', 'success');
   };
 
   const markAttendance = (studentId: string, classId: string, date: string, status: 'present' | 'late' | 'excused' | 'absent' | undefined, reason?: string) => {
     const recordDate = date || getLocalDate();
 
-    setStudents(prev => prev.map(s => {
+    const newStudents = students.map(s => {
       if (s.id === studentId) {
         let history = [...(s.attendanceHistory || [])];
         const existingIndex = history.findIndex(r => r.date === recordDate && r.classId === classId);
@@ -427,7 +403,10 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
       }
       return s;
-    }));
+    });
+
+    setStudents(newStudents);
+    PulseService.saveStudents(newStudents); // Explicit Save
   };
 
   const bulkMarkPresent = (classId: string, date: string) => {
@@ -435,7 +414,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!cls) return;
       const recordDate = date || getLocalDate();
 
-      setStudents(prev => prev.map(s => {
+      const newStudents = students.map(s => {
           if (cls.studentIds.includes(s.id)) {
                const history = [...(s.attendanceHistory || [])];
                const exists = history.some(r => r.date === recordDate && r.classId === classId);
@@ -461,12 +440,15 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
                }
           }
           return s;
-      }));
+      });
+
+      setStudents(newStudents);
+      PulseService.saveStudents(newStudents); // Explicit Save
   };
 
   const promoteStudent = (studentId: string) => {
       if (currentUser?.role !== 'master') return;
-      setStudents(prev => prev.map(s => {
+      const newStudents = students.map(s => {
           if (s.id !== studentId) return s;
           const currentRankIndex = academySettings.ranks.findIndex(r => r.id === s.rankId);
           const nextRank = academySettings.ranks[currentRankIndex + 1];
@@ -482,77 +464,105 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
               attendanceHistory: [], 
               promotionHistory: [historyItem, ...(s.promotionHistory || [])] 
           };
-      }));
+      });
+      setStudents(newStudents);
+      PulseService.saveStudents(newStudents); // Explicit Save
       addToast('Alumno promovido exitosamente', 'success');
   };
 
   const addClass = (newClass: ClassCategory) => {
     if (currentUser?.role !== 'master') return;
     const cls = { ...newClass, id: newClass.id || generateId('cls'), academyId: currentUser.academyId };
-    setClasses(prev => [...prev, cls]);
+    const newClasses = [...classes, cls];
+    setClasses(newClasses);
+    PulseService.saveClasses(newClasses); // Explicit Save
     addToast('Clase creada correctamente', 'success');
   };
 
   const updateClass = (updatedClass: ClassCategory) => {
     if (currentUser?.role !== 'master') return;
-    setClasses(prev => prev.map(c => c.id === updatedClass.id ? updatedClass : c));
+    const newClasses = classes.map(c => c.id === updatedClass.id ? updatedClass : c);
+    setClasses(newClasses);
+    PulseService.saveClasses(newClasses); // Explicit Save
     addToast('Clase actualizada', 'success');
   };
 
   const modifyClassSession = (classId: string, modification: SessionModification) => {
     if (currentUser?.role !== 'master') return;
-    setClasses(prev => prev.map(c => {
+    const newClasses = classes.map(c => {
         if (c.id === classId) {
             const newModifications = c.modifications.filter(m => m.date !== modification.date);
             newModifications.push(modification);
             return { ...c, modifications: newModifications };
         }
         return c;
-    }));
+    });
+    setClasses(newClasses);
+    PulseService.saveClasses(newClasses); // Explicit Save
     addToast('Sesión modificada', 'success');
   };
 
   const deleteClass = (id: string) => {
       if (currentUser?.role !== 'master') return;
-      setClasses(prev => prev.filter(c => c.id !== id));
-      setStudents(prev => prev.map(s => ({
+      const newClasses = classes.filter(c => c.id !== id);
+      setClasses(newClasses);
+      PulseService.saveClasses(newClasses); // Explicit Save
+
+      const newStudents = students.map(s => ({
           ...s,
           classesId: s.classesId.filter(cid => cid !== id)
-      })));
+      }));
+      setStudents(newStudents);
+      PulseService.saveStudents(newStudents); // Explicit Save (Student enrollment updated)
+
       addToast('Clase eliminada', 'success');
   };
 
   const enrollStudent = (studentId: string, classId: string) => {
       if (currentUser?.role !== 'master') return;
-      setClasses(prev => prev.map(c => {
+      
+      const newClasses = classes.map(c => {
           if (c.id === classId && !c.studentIds.includes(studentId)) {
               return { ...c, studentIds: [...c.studentIds, studentId], studentCount: c.studentCount + 1 };
           }
           return c;
-      }));
-      setStudents(prev => prev.map(s => {
+      });
+      setClasses(newClasses);
+      PulseService.saveClasses(newClasses); // Explicit Save
+
+      const newStudents = students.map(s => {
           if (s.id === studentId && !s.classesId.includes(classId)) {
               return { ...s, classesId: [...s.classesId, classId] };
           }
           return s;
-      }));
+      });
+      setStudents(newStudents);
+      PulseService.saveStudents(newStudents); // Explicit Save
+
       addToast('Alumno inscrito en la clase', 'success');
   };
 
   const unenrollStudent = (studentId: string, classId: string) => {
       if (currentUser?.role !== 'master') return;
-       setClasses(prev => prev.map(c => {
+      
+      const newClasses = classes.map(c => {
           if (c.id === classId) {
               return { ...c, studentIds: c.studentIds.filter(id => id !== studentId), studentCount: Math.max(0, c.studentCount - 1) };
           }
           return c;
-      }));
-      setStudents(prev => prev.map(s => {
+      });
+      setClasses(newClasses);
+      PulseService.saveClasses(newClasses); // Explicit Save
+
+      const newStudents = students.map(s => {
           if (s.id === studentId) {
               return { ...s, classesId: s.classesId.filter(id => id !== classId) };
           }
           return s;
-      }));
+      });
+      setStudents(newStudents);
+      PulseService.saveStudents(newStudents); // Explicit Save
+
       addToast('Alumno dado de baja de la clase', 'info');
   };
 
@@ -582,7 +592,9 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           modifyClassSession(updates.classId, modification);
       } 
       else {
-          setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+          const newEvents = events.map(e => e.id === id ? { ...e, ...updates } : e);
+          setEvents(newEvents);
+          PulseService.saveEvents(newEvents); // Explicit Save
       }
   };
 
@@ -617,19 +629,25 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           registeredCount: initialRegistrants.length
       };
       
-      setEvents(prev => [...prev, newEvent]);
+      const newEvents = [...events, newEvent];
+      setEvents(newEvents);
+      PulseService.saveEvents(newEvents); // Explicit Save
       addToast('Evento creado', 'success');
   };
 
   const updateEvent = (updatedEvent: Event) => {
       if (currentUser?.role !== 'master') return;
-      setEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+      const newEvents = events.map(e => e.id === updatedEvent.id ? updatedEvent : e);
+      setEvents(newEvents);
+      PulseService.saveEvents(newEvents); // Explicit Save
       addToast('Evento actualizado', 'success');
   };
 
   const deleteEvent = (id: string) => {
       if (currentUser?.role !== 'master') return;
-      setEvents(prev => prev.filter(e => e.id !== id));
+      const newEvents = events.filter(e => e.id !== id);
+      setEvents(newEvents);
+      PulseService.saveEvents(newEvents); // Explicit Save
       addToast('Evento eliminado', 'success');
   };
 
@@ -643,17 +661,21 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
       }
 
-      setEvents(prev => prev.map(e => {
+      const newEvents = events.map(e => {
           if (e.id === eventId && !e.registrants?.includes(studentId)) {
               return { ...e, registrants: [...(e.registrants || []), studentId], registeredCount: (e.registeredCount || 0) + 1 };
           }
           return e;
-      }));
+      });
+      setEvents(newEvents);
+      PulseService.saveEvents(newEvents); // Explicit Save
   };
 
   const updateEventRegistrants = (eventId: string, studentIds: string[]) => {
       if (currentUser?.role !== 'master') return;
-      setEvents(prev => PulseService.updateEventRegistrants(prev, eventId, studentIds));
+      const newEvents = PulseService.updateEventRegistrants(events, eventId, studentIds);
+      setEvents(newEvents);
+      PulseService.saveEvents(newEvents); // Explicit Save
       addToast('Lista de asistentes actualizada', 'success');
   };
 
@@ -670,18 +692,22 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addLibraryResource = (resource: LibraryResource) => {
       if (currentUser?.role !== 'master') return;
       const newResource = { ...resource, id: resource.id || generateId('lib'), academyId: currentUser.academyId };
-      setLibraryResources(prev => [...prev, newResource]);
+      const newResources = [...libraryResources, newResource];
+      setLibraryResources(newResources);
+      PulseService.saveLibrary(newResources); // Explicit Save
       addToast('Recurso añadido a la biblioteca', 'success');
   };
 
   const deleteLibraryResource = (id: string) => {
       if (currentUser?.role !== 'master') return;
-      setLibraryResources(prev => prev.filter(r => r.id !== id));
+      const newResources = libraryResources.filter(r => r.id !== id);
+      setLibraryResources(newResources);
+      PulseService.saveLibrary(newResources); // Explicit Save
       addToast('Recurso eliminado', 'success');
   };
 
   const toggleResourceCompletion = (resourceId: string, studentId: string) => {
-      setLibraryResources(prev => prev.map(r => {
+      const newResources = libraryResources.map(r => {
           if (r.id === resourceId) {
               const completedBy = r.completedBy || [];
               if (completedBy.includes(studentId)) {
@@ -691,12 +717,15 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
               }
           }
           return r;
-      }));
+      });
+      setLibraryResources(newResources);
+      PulseService.saveLibrary(newResources); // Explicit Save
   };
 
   const updateAcademySettings = (settings: AcademySettings) => {
       if (currentUser?.role !== 'master') return;
       setAcademySettings(settings);
+      PulseService.saveAcademySettings(settings); // Explicit Save
       addToast('Configuración guardada', 'success');
   };
 
@@ -706,33 +735,41 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           addToast("El día de recargo debe ser posterior al día de corte.", 'error');
           throw new Error("El día de recargo debe ser posterior al día de corte.");
       }
-      setAcademySettings(prev => ({
-          ...prev,
-          paymentSettings: { ...prev.paymentSettings, billingDay, lateFeeDay }
-      }));
+      const newSettings = {
+          ...academySettings,
+          paymentSettings: { ...academySettings.paymentSettings, billingDay, lateFeeDay }
+      };
+      setAcademySettings(newSettings);
+      PulseService.saveAcademySettings(newSettings); // Explicit Save
       addToast('Fechas de facturación actualizadas', 'success');
   };
 
   const addRank = (rank: Rank) => {
       if (currentUser?.role !== 'master') return;
-      setAcademySettings(prev => ({
-          ...prev,
-          ranks: [...prev.ranks, rank]
-      }));
+      const newSettings = {
+          ...academySettings,
+          ranks: [...academySettings.ranks, rank]
+      };
+      setAcademySettings(newSettings);
+      PulseService.saveAcademySettings(newSettings); // Explicit Save
   };
 
   const deleteRank = (id: string) => {
       if (currentUser?.role !== 'master') return;
-      setAcademySettings(prev => ({
-          ...prev,
-          ranks: prev.ranks.filter(r => r.id !== id)
-      }));
+      const newSettings = {
+          ...academySettings,
+          ranks: academySettings.ranks.filter(r => r.id !== id)
+      };
+      setAcademySettings(newSettings);
+      PulseService.saveAcademySettings(newSettings); // Explicit Save
   };
 
   const sendMessage = (msg: Omit<Message, 'id' | 'read' | 'date'>) => {
       const dateStr = formatDateDisplay(getLocalDate(), { month: 'short', day: 'numeric' });
       const newMessage: Message = { ...msg, id: generateId('msg'), read: false, date: dateStr };
       setMessages(prev => [newMessage, ...prev]);
+      // Messages are saved in useEffect as per legacy, but we can make it explicit too if desired. 
+      // For now, keeping legacy behavior for messages as requested to only change specific entities.
       addToast('Mensaje enviado', 'success');
   };
 
