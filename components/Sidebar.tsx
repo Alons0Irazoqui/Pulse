@@ -1,3 +1,4 @@
+
 import React, { memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -18,26 +19,24 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
   const masterLinks = [
     { name: 'Dashboard', icon: 'grid_view', path: '/master/dashboard' },
-    { name: 'Students', icon: 'groups', path: '/master/students' },
-    { name: 'Schedule', icon: 'calendar_month', path: '/master/schedule' },
-    { name: 'Library', icon: 'video_library', path: '/master/library' },
-    { name: 'Finance', icon: 'account_balance_wallet', path: '/master/finance' },
-    { name: 'Settings', icon: 'settings', path: '/master/settings' },
+    { name: 'Estudiantes', icon: 'groups', path: '/master/students' },
+    { name: 'Calendario', icon: 'calendar_today', path: '/master/schedule' },
+    { name: 'Biblioteca', icon: 'video_library', path: '/master/library' },
+    { name: 'Finanzas', icon: 'payments', path: '/master/finance' },
+    { name: 'Configuración', icon: 'settings', path: '/master/settings' },
   ];
 
   const studentLinks = [
-    { name: 'Progress Profile', icon: 'dashboard', path: '/student/dashboard' },
-    { name: 'Mis Clases', icon: 'class', path: '/student/classes' },
-    ...(academySettings.modules.library ? [{ name: 'Library', icon: 'school', path: '/student/library' }] : []),
-    { name: 'Schedule', icon: 'calendar_today', path: '/student/schedule' },
-    ...(academySettings.modules.payments ? [{ name: 'Payments', icon: 'credit_card', path: '/student/payments' }] : []),
-    { name: 'Settings', icon: 'settings', path: '/student/settings' },
+    { name: 'Mi Progreso', icon: 'dashboard', path: '/student/dashboard' },
+    { name: 'Clases', icon: 'class', path: '/student/classes' },
+    ...(academySettings.modules.library ? [{ name: 'Biblioteca', icon: 'school', path: '/student/library' }] : []),
+    { name: 'Horarios', icon: 'calendar_month', path: '/student/schedule' },
+    ...(academySettings.modules.payments ? [{ name: 'Pagos', icon: 'credit_card', path: '/student/payments' }] : []),
+    { name: 'Ajustes', icon: 'settings', path: '/student/settings' },
   ];
 
   const links = role === 'master' ? masterLinks : studentLinks;
-
   const displayName = currentUser?.name || (role === 'master' ? 'Sensei' : 'Alumno');
-  const displaySubtext = role === 'master' ? academySettings.name : 'Estudiante';
   
   const handleLogout = () => {
       logout();
@@ -46,41 +45,42 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
 
   return (
     <>
-      {/* Mobile Backdrop */}
       <div 
         className={`fixed inset-0 bg-gray-900/20 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
-      {/* Sidebar Container - Clean White Surface */}
       <aside 
         className={`
           fixed md:static inset-y-0 left-0 z-50
-          flex flex-col w-72 h-full bg-white border-r border-gray-200
-          transform transition-transform duration-300 ease-out shadow-xl md:shadow-none
+          flex flex-col w-72 h-full bg-white
+          transform transition-transform duration-300 ease-out border-r border-transparent
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
-        <div className="flex flex-col h-full p-6 justify-between overflow-y-auto">
+        <div className="flex flex-col h-full px-4 py-6 justify-between overflow-y-auto">
           <div className="flex flex-col gap-8">
-            {/* Branding Header */}
-            <div className="flex items-center gap-3 px-2">
-                <div className="size-8 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg flex items-center justify-center shadow-md shadow-orange-200">
-                    <span className="material-symbols-outlined text-xl">school</span>
+            
+            {/* BRANDING IKC MANAGEMENT - ENTERPRISE BOLD */}
+            <div className="flex items-center justify-between px-4 mt-2">
+                <div className="flex flex-col">
+                    <h1 className="text-4xl font-black tracking-tighter text-primary leading-none">
+                        IKC
+                    </h1>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1 ml-0.5">
+                        Management
+                    </span>
                 </div>
-                <h1 className="text-xl font-bold tracking-tight text-gray-900">
-                    Academy Pro
-                </h1>
                 <button 
                   onClick={onClose} 
-                  className="md:hidden ml-auto size-8 flex items-center justify-center bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-full transition-colors"
+                  className="md:hidden text-gray-400 hover:text-gray-900 bg-gray-50 rounded-full p-1"
                 >
                   <span className="material-symbols-outlined text-lg">close</span>
                 </button>
             </div>
 
-            {/* Navigation Links */}
-            <nav className="flex flex-col gap-1">
+            {/* NAVIGATION */}
+            <nav className="flex flex-col gap-1.5">
               {links.map((link) => {
                 const isActive = location.pathname.startsWith(link.path);
                 return (
@@ -88,10 +88,10 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
                         key={link.path}
                         to={link.path}
                         onClick={onClose}
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm font-medium ${
+                        className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm font-bold ${
                             isActive
-                                ? 'bg-orange-50 text-orange-600'
-                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                ? 'bg-primary text-white shadow-none' 
+                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                             }`}
                     >
                         <span className={`material-symbols-outlined text-[20px] ${isActive ? 'filled' : ''}`}>
@@ -106,29 +106,28 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
             </nav>
           </div>
 
-          {/* User Footer */}
-          <div className="pt-6 border-t border-gray-100">
-              <div className="flex items-center gap-3 px-2 mb-4">
+          <div className="pt-4 border-t border-gray-50">
+              <div className="flex items-center gap-3 px-3 mb-2 p-2.5 rounded-2xl bg-gray-50 border border-transparent">
                 <Avatar 
                     src={currentUser?.avatarUrl} 
                     name={displayName} 
-                    className="size-10 rounded-full bg-gray-100 border border-gray-200 text-gray-600" 
+                    className="size-9 rounded-full bg-white text-gray-700 text-xs shadow-sm" 
                 />
                 <div className="flex flex-col overflow-hidden">
-                  <span className="text-sm font-bold text-gray-900 truncate">
+                  <span className="text-xs font-bold text-gray-900 truncate">
                       {displayName}
                   </span>
-                  <span className="text-xs text-gray-500 truncate">
-                      {displaySubtext}
+                  <span className="text-[10px] text-gray-500 truncate font-medium uppercase tracking-wide">
+                      {role === 'master' ? 'Director' : 'Estudiante'}
                   </span>
                 </div>
               </div>
 
               <button 
                   onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors w-full text-left text-sm font-medium"
+                  className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors w-full text-left text-xs font-bold uppercase tracking-wider"
               >
-                <span className="material-symbols-outlined text-[20px]">logout</span>
+                <span className="material-symbols-outlined text-[18px]">logout</span>
                 <span>Cerrar Sesión</span>
               </button>
           </div>

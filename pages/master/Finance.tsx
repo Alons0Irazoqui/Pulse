@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
@@ -16,14 +17,14 @@ const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: nu
     switch (status) {
         case 'paid':
             return (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-100 uppercase tracking-wide">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-green-50 text-green-700 uppercase tracking-wide">
                     <span className="material-symbols-outlined text-[14px] filled">check_circle</span>
                     Pagado
                 </span>
             );
         case 'in_review':
             return (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 uppercase tracking-wide animate-pulse">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 uppercase tracking-wide">
                     <span className="material-symbols-outlined text-[14px] filled">hourglass_top</span>
                     Revisar
                 </span>
@@ -31,23 +32,23 @@ const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: nu
         case 'overdue':
             return (
                 <div className="flex flex-col items-start gap-1">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-100 uppercase tracking-wide">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-red-50 text-red-700 uppercase tracking-wide">
                         <span className="material-symbols-outlined text-[14px] filled">warning</span>
                         Vencido
                     </span>
-                    {penalty > 0 && <span className="text-[10px] text-red-500 font-bold ml-1">+${penalty} Recargo</span>}
+                    {penalty > 0 && <span className="text-[10px] text-primary font-bold ml-1">+${penalty} Recargo</span>}
                 </div>
             );
         case 'partial':
             return (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-100 uppercase tracking-wide">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-gray-100 text-gray-700 uppercase tracking-wide">
                     <span className="material-symbols-outlined text-[14px] filled">pie_chart</span>
                     Parcial
                 </span>
             );
         default: // pending
             return (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200 uppercase tracking-wide">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-gray-100 text-gray-500 uppercase tracking-wide">
                     <span className="material-symbols-outlined text-[14px]">pending</span>
                     Pendiente
                 </span>
@@ -59,13 +60,11 @@ const StatusBadge: React.FC<{ status: TuitionStatus; amount: number; penalty: nu
  * DEBT AMOUNT EDITOR
  */
 const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (id: string, val: number) => void }) => {
-    // FIX: Initialize with Total Debt (Amount + Penalty)
     const totalDebt = item.amount + (item.penaltyAmount || 0);
     const [val, setVal] = useState(totalDebt.toString());
     const { addToast } = useToast();
     
     useEffect(() => {
-        // Sync state if prop changes externally
         const currentTotal = item.amount + (item.penaltyAmount || 0);
         setVal(currentTotal.toString());
     }, [item.amount, item.penaltyAmount]);
@@ -78,7 +77,6 @@ const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (
         }
     };
 
-    // Check against total
     const currentTotal = item.amount + (item.penaltyAmount || 0);
     const hasChanged = parseFloat(val) !== currentTotal;
 
@@ -89,7 +87,7 @@ const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold pointer-events-none text-sm">$</span>
                     <input 
                         type="number"
-                        className="w-32 pl-7 pr-3 py-2 bg-[#F9FAFB] border border-gray-200 rounded-xl text-lg font-bold text-gray-900 outline-none focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all text-right"
+                        className="w-32 pl-7 pr-3 py-2 bg-background-input border-transparent rounded-lg text-lg font-bold text-gray-900 outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all text-right"
                         value={val}
                         onChange={(e) => setVal(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && hasChanged && handleSave()}
@@ -101,7 +99,7 @@ const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (
             {hasChanged && (
                 <button 
                     onClick={handleSave}
-                    className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-95 animate-in fade-in slide-in-from-right-2 duration-300"
+                    className="flex items-center gap-1.5 bg-primary hover:bg-primary-hover text-white px-3 py-1.5 rounded-lg transition-all active:scale-95 animate-in fade-in slide-in-from-right-2 duration-300"
                 >
                     <span className="material-symbols-outlined text-[16px] font-bold">check</span>
                     <span className="text-xs font-bold">Actualizar</span>
@@ -112,13 +110,13 @@ const DebtAmountEditor = ({ item, onUpdate }: { item: TuitionRecord, onUpdate: (
 };
 
 interface GroupedTransaction {
-    id: string; // BatchID or RecordID
+    id: string; 
     isBatch: boolean;
     records: TuitionRecord[];
     mainRecord: TuitionRecord; 
-    totalOriginalAmount: number; // The FULL COST (e.g. 1000)
-    totalRemainingDebt: number;  // What is left to pay (e.g. 20)
-    declaredAmount?: number;     // Amount paid in this specific transaction
+    totalOriginalAmount: number; 
+    totalRemainingDebt: number;  
+    declaredAmount?: number;     
     itemCount: number;
 }
 
@@ -146,12 +144,9 @@ const Finance: React.FC = () => {
   const [viewDetailRecord, setViewDetailRecord] = useState<TuitionRecord | null>(null);
   const [isChargeModalOpen, setIsChargeModalOpen] = useState(false);
 
-  // -- DATA PROCESSING --
-
-  // 1. Filter Raw Records
+  // -- DATA PROCESSING (Simplified for brevity) --
   const rawFilteredRecords = useMemo(() => {
       let filtered = records;
-
       if (activeTab === 'review') filtered = filtered.filter(r => r.status === 'in_review');
       else if (activeTab === 'pending') filtered = filtered.filter(r => r.status === 'pending' || r.status === 'charged' || r.status === 'partial');
       else if (activeTab === 'overdue') filtered = filtered.filter(r => r.status === 'overdue');
@@ -159,22 +154,16 @@ const Finance: React.FC = () => {
 
       if (searchQuery) {
           const q = searchQuery.toLowerCase();
-          filtered = filtered.filter(r => 
-              r.studentName?.toLowerCase().includes(q) || 
-              r.concept.toLowerCase().includes(q) ||
-              r.amount.toString().includes(q)
-          );
+          filtered = filtered.filter(r => r.studentName?.toLowerCase().includes(q) || r.concept.toLowerCase().includes(q) || r.amount.toString().includes(q));
       }
       return filtered;
   }, [records, activeTab, searchQuery]);
 
-  // 2. Group by Batch (Smart Grouping)
   const groupedTransactions: GroupedTransaction[] = useMemo(() => {
       const groups: Record<string, TuitionRecord[]> = {};
       const result: GroupedTransaction[] = [];
       const processedIds = new Set<string>();
 
-      // Group batch items
       rawFilteredRecords.forEach(r => {
           if (r.batchPaymentId && activeTab === 'review') { 
               if (!groups[r.batchPaymentId]) groups[r.batchPaymentId] = [];
@@ -182,21 +171,17 @@ const Finance: React.FC = () => {
           }
       });
 
-      // Build objects
       rawFilteredRecords.forEach(r => {
           if (processedIds.has(r.id)) return;
-
           if (r.batchPaymentId && groups[r.batchPaymentId] && activeTab === 'review') {
               const batchItems = groups[r.batchPaymentId];
               batchItems.forEach(i => processedIds.add(i.id));
               const declared = batchItems.find(i => i.declaredAmount !== undefined)?.declaredAmount;
-              
               result.push({
                   id: r.batchPaymentId,
                   isBatch: true,
                   records: batchItems,
                   mainRecord: r,
-                  // Logic Fix: Sum the Original Amounts to show Total Value
                   totalOriginalAmount: batchItems.reduce((acc, item) => acc + (item.originalAmount ?? item.amount) + item.penaltyAmount, 0),
                   totalRemainingDebt: batchItems.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0),
                   declaredAmount: declared,
@@ -209,7 +194,6 @@ const Finance: React.FC = () => {
                   isBatch: false,
                   records: [r],
                   mainRecord: r,
-                  // Logic Fix: Use originalAmount for display if available
                   totalOriginalAmount: (r.originalAmount ?? r.amount) + r.penaltyAmount,
                   totalRemainingDebt: r.amount + r.penaltyAmount,
                   declaredAmount: r.declaredAmount,
@@ -217,20 +201,14 @@ const Finance: React.FC = () => {
               });
           }
       });
-
       return result.sort((a, b) => new Date(b.mainRecord.dueDate).getTime() - new Date(a.mainRecord.dueDate).getTime());
-
   }, [rawFilteredRecords, activeTab]);
 
-  // -- REACTIVE ACTIVE GROUP --
   const activeGroup = useMemo(() => {
       if (!selectedGroup) return null;
-      
       const freshRecords = records.filter(r => selectedGroup.records.some(old => old.id === r.id));
       if (freshRecords.length === 0) return null;
-
       const mainRecord = freshRecords.find(r => r.id === selectedGroup.mainRecord.id) || freshRecords[0];
-      
       return {
           ...selectedGroup,
           records: freshRecords,
@@ -241,7 +219,6 @@ const Finance: React.FC = () => {
       };
   }, [selectedGroup, records]);
 
-  // -- STATS --
   const stats = useMemo(() => {
       return {
           review: records.filter(r => r.status === 'in_review').length,
@@ -250,33 +227,22 @@ const Finance: React.FC = () => {
       };
   }, [records]);
 
-  // -- LOGIC: CALCULATE FINAL APPROVAL AMOUNT --
   const amountToApprove = useMemo(() => {
       if (!activeGroup) return 0;
-      
-      // AUTO-CORRECTION LOGIC:
-      // If declared amount exists AND is >= real debt, use declared (maybe a tip or credit).
-      // If declared amount < real debt (likely error or ignoring penalty), FORCE real debt to liquidate fully.
-      // Or fallback to real debt if no declared amount.
       if (activeGroup.declaredAmount !== undefined && activeGroup.declaredAmount >= activeGroup.totalRemainingDebt) {
           return activeGroup.declaredAmount;
       }
       return activeGroup.totalRemainingDebt;
   }, [activeGroup]);
 
-  // -- PREVIEW CALCULATION (Exact Match to Approve Logic) --
   const previewDistribution = useMemo(() => {
       if (!activeGroup) return [];
-      
       const items = [...activeGroup.records].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-      
       const mandatory = items.filter(r => !r.canBePaidInParts);
       const splittable = items.filter(r => r.canBePaidInParts);
-
       let available = amountToApprove;
       const preview = [];
 
-      // 1. Mandatory First
       for (const item of mandatory) {
           const debt = item.amount + item.penaltyAmount;
           if (available >= debt - 0.01) {
@@ -284,12 +250,9 @@ const Finance: React.FC = () => {
               available -= debt;
           } else {
               preview.push({ ...item, _status: 'unpaid', _paid: 0, _remaining: debt });
-              // Money effectively 0 for subsequent items
               available = 0; 
           }
       }
-
-      // 2. Splittable Next (Waterfall)
       for (const item of splittable) {
           const debt = item.amount + item.penaltyAmount;
           if (available <= 0.01) {
@@ -307,48 +270,21 @@ const Finance: React.FC = () => {
       return preview;
   }, [activeGroup, amountToApprove]);
 
-
   // -- ACTIONS --
-
   const handleApprove = () => {
       if (!activeGroup) return;
-      
-      // The logic is now hoisted to `amountToApprove` memo.
-      // We pass this corrected amount to the context.
-
-      // ---------------------------------------------------------
-      // AUTO-GENERATE RECEIPTS FOR APPROVED ITEMS
-      // ---------------------------------------------------------
       previewDistribution.forEach(item => {
           if (item._paid > 0) {
               const previouslyPaid = (item.originalAmount || item.amount) - item.amount;
-              const history = previouslyPaid > 0 ? [{
-                  date: item.paymentDate || new Date().toISOString(),
-                  amount: previouslyPaid,
-                  method: 'Pago Previo'
-              }] : [];
-
-              generateReceipt(
-                  item, 
-                  academySettings, 
-                  currentUser, 
-                  {
-                      paymentStatus: item._status === 'paid' ? 'completed' : 'partial',
-                      currentPaymentAmount: item._paid,
-                      paymentHistory: history
-                  }
-              );
+              const history = previouslyPaid > 0 ? [{ date: item.paymentDate || new Date().toISOString(), amount: previouslyPaid, method: 'Pago Previo' }] : [];
+              generateReceipt(item, academySettings, currentUser, { paymentStatus: item._status === 'paid' ? 'completed' : 'partial', currentPaymentAmount: item._paid, paymentHistory: history });
           }
       });
-
-      if (activeGroup.isBatch) {
-          approveBatchPayment(activeGroup.id, amountToApprove);
-      } else {
+      if (activeGroup.isBatch) approveBatchPayment(activeGroup.id, amountToApprove);
+      else {
           if (activeGroup.mainRecord.category !== 'Mensualidad' && amountToApprove < activeGroup.totalRemainingDebt) {
                approveBatchPayment(activeGroup.records[0].batchPaymentId || `temp-${activeGroup.records[0].id}`, amountToApprove);
-          } else {
-               approvePayment(activeGroup.id, amountToApprove);
-          }
+          } else approvePayment(activeGroup.id, amountToApprove);
       }
       setSelectedGroup(null);
   };
@@ -356,16 +292,13 @@ const Finance: React.FC = () => {
   const handleReject = () => {
       if (!activeGroup) return;
       confirm({
-          title: activeGroup.isBatch ? 'Rechazar Lote Completo' : 'Rechazar Pago',
-          message: 'El estatus volverá a Pendiente/Vencido y se notificará al alumno.',
+          title: activeGroup.isBatch ? 'Rechazar Lote' : 'Rechazar Pago',
+          message: 'El estatus volverá a Pendiente.',
           type: 'danger',
           confirmText: 'Rechazar',
           onConfirm: () => {
-              if (activeGroup.isBatch) {
-                  rejectBatchPayment(activeGroup.id);
-              } else {
-                  rejectPayment(activeGroup.id);
-              }
+              if (activeGroup.isBatch) rejectBatchPayment(activeGroup.id);
+              else rejectPayment(activeGroup.id);
               setSelectedGroup(null);
           }
       });
@@ -375,12 +308,10 @@ const Finance: React.FC = () => {
       setViewDetailRecord(null);
       confirm({
           title: 'Eliminar Movimiento',
-          message: '¿Estás seguro de que deseas eliminar este movimiento? Esta acción no se puede deshacer y borrará el historial de pagos asociado.',
+          message: 'Esta acción no se puede deshacer.',
           type: 'danger',
           confirmText: 'Eliminar',
-          onConfirm: () => {
-              deleteRecord(record.id);
-          }
+          onConfirm: () => deleteRecord(record.id)
       });
   };
 
@@ -389,7 +320,7 @@ const Finance: React.FC = () => {
           title: 'Generar Mensualidades',
           message: `¿Generar el cargo de mensualidad para todos los alumnos activos?`,
           type: 'info',
-          confirmText: 'Generar Cargos',
+          confirmText: 'Generar',
           onConfirm: () => generateMonthlyBilling()
       });
   };
@@ -398,7 +329,7 @@ const Finance: React.FC = () => {
       const data = groupedTransactions.map(g => ({
           Fecha: g.mainRecord.dueDate,
           Alumno: g.mainRecord.studentName,
-          Concepto: g.isBatch ? `Lote (${g.itemCount} items)` : g.mainRecord.concept,
+          Concepto: g.isBatch ? `Lote (${g.itemCount})` : g.mainRecord.concept,
           Monto: g.totalOriginalAmount,
           Estado: g.mainRecord.status,
           Metodo: g.mainRecord.method || '-'
@@ -408,22 +339,23 @@ const Finance: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#F5F5F7]">
+    <div className="flex flex-col h-full bg-background-light">
         {/* --- HEADER --- */}
-        <div className="bg-white border-b border-gray-200 px-6 py-6 md:px-10 sticky top-0 z-20 shadow-sm">
+        <div className="bg-white border-b border-transparent px-6 py-6 md:px-10 sticky top-0 z-20">
             <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight text-gray-900">Control Financiero</h1>
-                    <p className="text-gray-500 mt-1 font-medium">Valida pagos, gestiona cobros y revisa el historial.</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">Control Financiero</h1>
+                    <p className="text-gray-500 mt-1 font-medium">Valida pagos y gestiona cobros.</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                    <button onClick={handleExport} className="px-4 py-2.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all text-sm flex items-center gap-2 active:scale-95">
+                    <button onClick={handleExport} className="px-4 py-2.5 bg-background-input text-gray-600 font-bold rounded-lg hover:bg-gray-200 transition-all text-sm flex items-center gap-2">
                         <span className="material-symbols-outlined text-lg">download</span> Exportar
                     </button>
-                    <button onClick={() => setIsChargeModalOpen(true)} className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all text-sm flex items-center gap-2 shadow-lg shadow-orange-500/30 active:scale-95">
+                    {/* RED BUTTONS - NO ORANGE */}
+                    <button onClick={() => setIsChargeModalOpen(true)} className="px-5 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary-hover transition-all text-sm flex items-center gap-2 shadow-sm">
                         <span className="material-symbols-outlined text-lg">add_circle</span> Nuevo Cargo
                     </button>
-                    <button onClick={handleGenerateBilling} className="px-5 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all text-sm flex items-center gap-2 shadow-lg active:scale-95">
+                    <button onClick={handleGenerateBilling} className="px-5 py-2.5 bg-gray-900 text-white font-bold rounded-lg hover:bg-black transition-all text-sm flex items-center gap-2 shadow-sm">
                         <span className="material-symbols-outlined text-lg">payments</span> Generar Mensualidad
                     </button>
                 </div>
@@ -431,7 +363,7 @@ const Finance: React.FC = () => {
 
             {/* --- TABS --- */}
             <div className="max-w-[1600px] mx-auto mt-8 flex flex-col md:flex-row gap-4 justify-between items-center">
-                <div className="flex bg-gray-100 p-1.5 rounded-2xl w-full md:w-auto overflow-x-auto no-scrollbar shadow-inner">
+                <div className="flex bg-background-input p-1 rounded-xl w-full md:w-auto overflow-x-auto no-scrollbar">
                     {[
                         { id: 'review', label: 'Por Revisar', count: stats.review, icon: 'rate_review' },
                         { id: 'pending', label: 'Pendientes', count: stats.pending, icon: 'pending' },
@@ -442,17 +374,17 @@ const Finance: React.FC = () => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
                                 activeTab === tab.id 
-                                ? 'bg-white text-orange-600 shadow-sm' 
-                                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'
+                                ? 'bg-white text-primary shadow-sm' 
+                                : 'text-gray-500 hover:text-gray-900'
                             }`}
                         >
                             <span className={`material-symbols-outlined text-[20px] ${activeTab === tab.id ? 'filled' : ''}`}>{tab.icon}</span>
                             {tab.label}
                             {tab.count !== null && tab.count > 0 && (
                                 <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] ${
-                                    tab.id === 'review' ? 'bg-amber-100 text-amber-700' : 
+                                    tab.id === 'review' ? 'bg-blue-100 text-blue-700' : 
                                     tab.id === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-600'
                                 }`}>
                                     {tab.count}
@@ -463,13 +395,13 @@ const Finance: React.FC = () => {
                 </div>
 
                 <div className="relative w-full md:w-80 group">
-                    <span className="absolute left-4 top-3 text-gray-400 group-focus-within:text-orange-500 material-symbols-outlined text-[20px] transition-colors">search</span>
+                    <span className="absolute left-4 top-3 text-gray-400 material-symbols-outlined text-[20px]">search</span>
                     <input 
                         type="text" 
                         value={searchQuery} 
                         onChange={e => setSearchQuery(e.target.value)} 
-                        placeholder="Buscar alumno, monto..." 
-                        className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-medium focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all" 
+                        placeholder="Buscar alumno..." 
+                        className="w-full pl-12 pr-4 py-3 bg-background-input border-transparent rounded-lg text-sm font-medium focus:bg-white focus:ring-0 focus:border-primary transition-all" 
                     />
                 </div>
             </div>
@@ -477,11 +409,11 @@ const Finance: React.FC = () => {
 
         {/* --- LIST CONTENT --- */}
         <div className="flex-1 overflow-y-auto p-6 md:px-10">
-            <div className="max-w-[1600px] mx-auto bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden min-h-[400px]">
+            <div className="max-w-[1600px] mx-auto bg-white rounded-xl border border-transparent overflow-hidden min-h-[400px]">
                 {groupedTransactions.length === 0 ? (
                     <EmptyState 
                         title="Sin movimientos" 
-                        description={activeTab === 'review' ? "¡Excelente! No tienes pagos pendientes de revisar." : "No se encontraron registros con estos filtros."}
+                        description={activeTab === 'review' ? "¡Excelente! No tienes pagos pendientes." : "No se encontraron registros."}
                         icon="check_circle"
                     />
                 ) : (
@@ -499,16 +431,10 @@ const Finance: React.FC = () => {
                         <tbody className="divide-y divide-gray-50">
                             {groupedTransactions.map(group => {
                                 const { mainRecord, isBatch, totalOriginalAmount, totalRemainingDebt, declaredAmount } = group;
-                                
-                                // Logic for display values
                                 const isPaid = mainRecord.status === 'paid';
                                 const isPartial = mainRecord.status === 'partial' || (declaredAmount !== undefined && declaredAmount < totalOriginalAmount);
                                 const paidSoFar = totalOriginalAmount - totalRemainingDebt;
-                                
-                                // Logic for Master Edit Permission (Mensualidad Only)
                                 const isMensualidad = mainRecord.category === 'Mensualidad' || mainRecord.concept.toLowerCase().includes('mensualidad');
-
-                                // Tooltip text for detailed breakdown
                                 const breakdownTooltip = `Total: $${totalOriginalAmount} \nPagado: $${paidSoFar} \nRestante: $${totalRemainingDebt}`;
 
                                 return (
@@ -535,7 +461,7 @@ const Finance: React.FC = () => {
                                                 <div className="flex flex-col">
                                                     <span className="font-bold text-gray-900 text-xs uppercase tracking-wide flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-[14px] text-purple-500">layers</span>
-                                                        Pago Lote ({group.itemCount} items)
+                                                        Lote ({group.itemCount})
                                                     </span>
                                                     <span className="text-xs mt-0.5 truncate max-w-[200px] text-gray-400">
                                                         {group.records.map(r => r.concept).join(', ')}
@@ -544,15 +470,13 @@ const Finance: React.FC = () => {
                                             ) : (
                                                 <span>{mainRecord.concept}</span>
                                             )}
-                                            {mainRecord.method && <span className="ml-2 text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 border border-gray-200">{mainRecord.method}</span>}
+                                            {mainRecord.method && <span className="ml-2 text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 border border-transparent">{mainRecord.method}</span>}
                                         </td>
                                         <td className="px-6 py-5">
                                             <StatusBadge status={mainRecord.status} amount={mainRecord.amount} penalty={mainRecord.penaltyAmount} />
                                         </td>
                                         
-                                        {/* CRITICAL UPDATE: MONTO COLUMN */}
                                         <td className="px-6 py-5 text-right" title={breakdownTooltip}>
-                                            {/* Show Editor ONLY if in review, not batch, AND is Mensualidad category */}
                                             {mainRecord.status === 'in_review' && !isBatch && isMensualidad ? (
                                                 <div className="flex justify-end">
                                                     <DebtAmountEditor 
@@ -562,21 +486,18 @@ const Finance: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-col items-end">
-                                                    {/* ALWAYS SHOW FULL TOTAL AMOUNT */}
-                                                    <span className={`font-black text-sm tracking-tight ${isPaid ? 'text-green-600' : 'text-gray-900'}`}>
+                                                    <span className={`font-black text-sm tracking-tight ${isPaid ? 'text-green-700' : 'text-gray-900'}`}>
                                                         ${totalOriginalAmount.toFixed(2)}
                                                     </span>
-                                                    
-                                                    {/* SHOW PROGRESS IF PARTIAL */}
                                                     {isPartial && !isPaid && (
                                                         <div className="mt-1 flex flex-col items-end gap-0.5">
                                                             <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden">
                                                                 <div 
-                                                                    className="h-full bg-orange-500 rounded-full" 
+                                                                    className="h-full bg-primary rounded-full" 
                                                                     style={{ width: `${(paidSoFar / totalOriginalAmount) * 100}%` }}
                                                                 ></div>
                                                             </div>
-                                                            <span className="text-[10px] text-orange-600 font-bold">
+                                                            <span className="text-[10px] text-primary font-bold">
                                                                 Abonado: ${paidSoFar.toFixed(2)}
                                                             </span>
                                                         </div>
@@ -589,24 +510,22 @@ const Finance: React.FC = () => {
                                             {mainRecord.status === 'in_review' ? (
                                                 <button 
                                                     onClick={(e) => { e.stopPropagation(); setSelectedGroup(group); }}
-                                                    className="bg-gray-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-gray-900/10 transition-all active:scale-95 flex items-center gap-2 ml-auto"
+                                                    className="bg-primary hover:bg-primary-hover text-white text-xs font-bold px-4 py-2.5 rounded-lg transition-all active:scale-95 flex items-center gap-2 ml-auto"
                                                 >
                                                     <span className="material-symbols-outlined text-sm">visibility</span>
-                                                    Revisar
+                                                    Validar
                                                 </button>
                                             ) : (mainRecord.status === 'paid' || mainRecord.status === 'partial') ? (
                                                 <button 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        // BATCH DOWNLOAD HANDLING
                                                         if (group.isBatch) {
                                                             group.records.forEach(r => generateReceipt(r, academySettings, currentUser));
                                                         } else {
                                                             generateReceipt(mainRecord, academySettings, currentUser);
                                                         }
                                                     }}
-                                                    className="size-9 bg-gray-50 hover:bg-white text-gray-400 hover:text-orange-600 border border-gray-200 rounded-xl transition-all shadow-sm flex items-center justify-center ml-auto"
-                                                    title={group.isBatch ? "Descargar Recibos del Lote" : "Descargar Recibo"}
+                                                    className="size-9 bg-gray-50 hover:bg-white text-gray-400 hover:text-primary rounded-lg transition-all flex items-center justify-center ml-auto"
                                                 >
                                                     <span className="material-symbols-outlined text-[18px]">
                                                         {group.isBatch ? 'folder_open' : 'receipt_long'}
@@ -625,18 +544,17 @@ const Finance: React.FC = () => {
             </div>
         </div>
 
-        {/* --- REVIEW MODAL (BATCH/ACTION) --- */}
+        {/* --- REVIEW MODAL --- */}
         {activeGroup && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white rounded-[2rem] w-full max-w-4xl h-[85vh] shadow-2xl flex overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
+                <div className="bg-white rounded-2xl w-full max-w-4xl h-[85vh] shadow-xl flex overflow-hidden animate-in zoom-in-95 duration-200 border border-transparent">
                     
-                    {/* Left: Proof Image */}
                     <div className="w-1/2 bg-gray-50 flex items-center justify-center relative p-6 border-r border-gray-100">
                         {activeGroup.mainRecord.proofUrl ? (
                             activeGroup.mainRecord.proofType?.includes('pdf') ? (
-                                <iframe src={activeGroup.mainRecord.proofUrl} className="w-full h-full rounded-2xl border border-gray-200 shadow-sm" />
+                                <iframe src={activeGroup.mainRecord.proofUrl} className="w-full h-full rounded-xl border border-gray-200" />
                             ) : (
-                                <img src={activeGroup.mainRecord.proofUrl} className="max-w-full max-h-full object-contain rounded-xl shadow-lg" />
+                                <img src={activeGroup.mainRecord.proofUrl} className="max-w-full max-h-full object-contain rounded-lg shadow-sm" />
                             )
                         ) : (
                             <div className="text-gray-300 flex flex-col items-center">
@@ -644,17 +562,13 @@ const Finance: React.FC = () => {
                                 <p className="font-medium text-sm">Sin comprobante visible</p>
                             </div>
                         )}
-                        <div className="absolute top-6 left-6 bg-white/80 backdrop-blur-md text-gray-900 px-4 py-1.5 rounded-full text-xs font-bold border border-gray-200 shadow-sm">
-                            Comprobante {activeGroup.isBatch ? '(Lote)' : ''}
-                        </div>
                     </div>
 
-                    {/* Right: Validation & Waterfall Preview */}
                     <div className="w-1/2 flex flex-col bg-white">
                         <div className="p-8 border-b border-gray-100 flex justify-between items-start">
                             <div>
                                 <h2 className="text-2xl font-black text-gray-900 mb-1 tracking-tight">Revisión de Pago</h2>
-                                <p className="text-gray-500 text-sm font-medium">Distribución automática de fondos.</p>
+                                <p className="text-gray-500 text-sm font-medium">Distribución de fondos.</p>
                             </div>
                             <button onClick={() => setSelectedGroup(null)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
                                 <span className="material-symbols-outlined">close</span>
@@ -662,59 +576,32 @@ const Finance: React.FC = () => {
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                            
-                            {/* Total Amount Display */}
-                            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+                            <div className="bg-gray-50 rounded-xl p-6 border border-transparent">
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Monto a Aprobar</p>
-                                    <span className="bg-white border border-gray-200 px-3 py-1 rounded-lg text-xs font-bold text-gray-700 shadow-sm">
+                                    <span className="bg-white border border-transparent px-3 py-1 rounded-lg text-xs font-bold text-gray-700">
                                         {activeGroup.mainRecord.method}
                                     </span>
                                 </div>
                                 <p className="text-4xl font-black text-gray-900 tracking-tight">
                                     ${amountToApprove.toFixed(2)}
                                 </p>
-                                
-                                {/* Difference Alert */}
-                                {activeGroup.declaredAmount !== undefined && activeGroup.declaredAmount < amountToApprove && (
-                                    <div className="mt-3 p-2 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-2">
-                                        <span className="material-symbols-outlined text-blue-500 text-sm mt-0.5">auto_fix_high</span>
-                                        <div>
-                                            <p className="text-xs font-bold text-blue-700">Ajuste Automático</p>
-                                            <p className="text-[10px] text-blue-600 leading-tight">
-                                                El alumno declaró ${activeGroup.declaredAmount}, pero se aprobará el total de la deuda (${amountToApprove}) para liquidar recargos.
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {activeGroup.declaredAmount !== undefined && activeGroup.declaredAmount > amountToApprove && (
-                                    <p className="text-xs text-green-600 font-bold mt-2 flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[14px]">arrow_upward</span>
-                                        Monto mayor al esperado (Saldo a favor/Propina)
-                                    </p>
-                                )}
                             </div>
 
-                            {/* PREVIEW: Waterfall Distribution */}
                             <div>
-                                <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 ml-1 tracking-wider">Aplicación de Fondos</h4>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 ml-1 tracking-wider">Aplicación</h4>
                                 <div className="space-y-3">
                                     {previewDistribution.map((item: any) => {
-                                        // Logic for displaying Editor inside Modal: Only if Mensualidad
                                         const isMensualidadModal = item.category === 'Mensualidad' || item.concept.toLowerCase().includes('mensualidad');
-                                        
                                         return (
-                                            <div key={item.id} className="flex flex-col p-4 bg-white border border-gray-100 rounded-2xl relative overflow-hidden shadow-sm transition-all hover:border-gray-200">
-                                                {/* Status Indicator Bar */}
-                                                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                                                    item._status === 'paid' ? 'bg-green-500' : item._status === 'partial' ? 'bg-orange-500' : 'bg-red-300'
+                                            <div key={item.id} className="flex flex-col p-4 bg-white border border-gray-100 rounded-xl relative overflow-hidden transition-all hover:border-gray-200">
+                                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                                                    item._status === 'paid' ? 'bg-green-500' : item._status === 'partial' ? 'bg-primary' : 'bg-red-300'
                                                 }`}></div>
                                                 
                                                 <div className="flex justify-between items-start pl-3">
                                                     <div>
                                                         <span className="text-sm font-bold text-gray-900 block">{item.concept}</span>
-                                                        {/* SINGLE TRUTH EDITABLE DEBT */}
                                                         <div className="mt-2">
                                                             {isMensualidadModal ? (
                                                                 <DebtAmountEditor 
@@ -722,12 +609,12 @@ const Finance: React.FC = () => {
                                                                     onUpdate={(id, val) => updateRecordAmount(id, val)}
                                                                 />
                                                             ) : (
-                                                                <span className="text-xs text-gray-500 font-mono">Deuda Original: ${item.amount + (item.penaltyAmount || 0)}</span>
+                                                                <span className="text-xs text-gray-500 font-mono">Deuda: ${item.amount + (item.penaltyAmount || 0)}</span>
                                                             )}
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className={`font-mono font-bold text-sm ${item._status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>
+                                                        <span className={`font-mono font-bold text-sm ${item._status === 'paid' ? 'text-green-600' : 'text-primary'}`}>
                                                             ${item._paid.toFixed(2)}
                                                         </span>
                                                         <div className="text-[10px] font-bold uppercase mt-0.5 tracking-wide text-gray-400">
@@ -735,49 +622,19 @@ const Finance: React.FC = () => {
                                                         </div>
                                                     </div>
                                                 </div>
-
-                                                {item._remaining > 0 && (
-                                                    <div className="mt-3 pl-3 pt-2 border-t border-gray-50 flex items-center gap-2 text-xs text-orange-600 font-bold">
-                                                        <span className="material-symbols-outlined text-[14px]">pie_chart</span>
-                                                        Restarán ${item._remaining.toFixed(2)} por cobrar
-                                                    </div>
-                                                )}
                                             </div>
                                         );
                                     })}
                                 </div>
                             </div>
-
-                            {/* Time Validation */}
-                            {(() => {
-                                const getTimeValidation = (record: TuitionRecord) => {
-                                    if (!record.paymentDate) return { isLate: false, diffDays: 0 };
-                                    const due = new Date(record.dueDate);
-                                    const paid = new Date(record.paymentDate);
-                                    due.setHours(23, 59, 59, 999); 
-                                    const isLate = paid > due;
-                                    const diffTime = Math.abs(paid.getTime() - due.getTime());
-                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                                    return { isLate, diffDays };
-                                };
-                                const { isLate, diffDays } = getTimeValidation(activeGroup.mainRecord);
-                                return (
-                                    <div className={`rounded-2xl p-4 border text-xs ${isLate ? 'bg-red-50 border-red-100 text-red-700' : 'bg-green-50 border-green-100 text-green-700'}`}>
-                                        <div className="flex items-center gap-2 font-bold mb-1 uppercase tracking-wide">
-                                            <span className="material-symbols-outlined text-base">{isLate ? 'history_toggle_off' : 'verified_user'}</span>
-                                            {isLate ? 'Pago Tardío' : 'A Tiempo'}
-                                        </div>
-                                        <p className="font-medium opacity-80">{isLate ? `Subido ${diffDays} días después del vencimiento.` : `Subido antes de la fecha límite.`}</p>
-                                    </div>
-                                );
-                            })()}
                         </div>
 
                         <div className="p-8 border-t border-gray-100 bg-gray-50 flex gap-4">
-                            <button onClick={handleReject} className="flex-1 py-4 rounded-xl border border-gray-200 bg-white text-gray-600 font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all shadow-sm">Rechazar</button>
-                            <button onClick={handleApprove} className="flex-[2] py-4 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/20 transition-all active:scale-95 flex items-center justify-center gap-2">
+                            <button onClick={handleReject} className="flex-1 py-4 rounded-xl border border-gray-200 bg-white text-gray-600 font-bold hover:bg-red-50 hover:text-red-600 transition-all">Rechazar</button>
+                            {/* RED ACTION BUTTON */}
+                            <button onClick={handleApprove} className="flex-[2] py-4 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover transition-all active:scale-95 flex items-center justify-center gap-2">
                                 <span className="material-symbols-outlined">check_circle</span>
-                                Confirmar Distribución
+                                Confirmar
                             </button>
                         </div>
                     </div>
@@ -787,7 +644,6 @@ const Finance: React.FC = () => {
 
         <CreateChargeModal isOpen={isChargeModalOpen} onClose={() => setIsChargeModalOpen(false)} />
 
-        {/* --- DETAIL MODAL (READ-ONLY / HISTORY) --- */}
         <TransactionDetailModal
             isOpen={!!viewDetailRecord}
             onClose={() => setViewDetailRecord(null)}
@@ -798,16 +654,11 @@ const Finance: React.FC = () => {
             onReject={(r) => { rejectPayment(r.id); setViewDetailRecord(null); }}
             onDownloadReceipt={(r) => generateReceipt(r, academySettings, currentUser)}
             onReview={(r) => {
-                // Logic to transition from Detail Modal to Review/Waterfall Modal
                 const isBatch = !!r.batchPaymentId;
                 let groupRecords = [r];
-                
-                // If batch, we need to gather all related records to form the group correctly
                 if (isBatch) {
                      groupRecords = records.filter(item => item.batchPaymentId === r.batchPaymentId);
                 }
-                
-                // Construct the GroupedTransaction object expected by the Review Modal
                 const group: GroupedTransaction = {
                     id: isBatch ? r.batchPaymentId! : r.id,
                     isBatch: isBatch,
@@ -818,9 +669,8 @@ const Finance: React.FC = () => {
                     declaredAmount: groupRecords.find(i => i.declaredAmount !== undefined)?.declaredAmount,
                     itemCount: groupRecords.length
                 };
-                
-                setViewDetailRecord(null); // Close detail
-                setSelectedGroup(group);   // Open review
+                setViewDetailRecord(null);
+                setSelectedGroup(group);
             }}
             onDelete={() => {
                 if (viewDetailRecord) handleDeleteRecord(viewDetailRecord);

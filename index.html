@@ -1,10 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Academy Pro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <title>IKC Management</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script>
@@ -14,36 +15,41 @@
           extend: {
             colors: {
               primary: {
-                DEFAULT: "#F97316", // Premium Orange
-                hover: "#EA580C",
-                light: "#FFF7ED", // Orange 50
+                DEFAULT: "#EA3829", // Rojo Irazoqui (Red-Orange Professional)
+                hover: "#C92A1D",
+                light: "#FEF2F2", // Red 50 equivalent
               },
               background: {
-                light: "#F9FAFB", // Canvas Gray (GitHub style)
-                surface: "#FFFFFF", // Pure White
-                dark: "#111827",
+                light: "#F8F9FA", // Google Gray (Surface)
+                surface: "#FFFFFF",
+                dark: "#202124",
               },
               text: {
-                main: "#111827", // Gray 900
-                secondary: "#6B7280", // Gray 500
+                main: "#202124", // Google Black
+                secondary: "#5F6368", // Google Gray Text
               },
-              success: "#10B981",
-              warning: "#F59E0B",
-              danger: "#EF4444",
+              success: "#1E8E3E",
+              warning: "#F9AB00",
+              danger: "#D93025",
             },
             fontFamily: {
               sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
             },
+            // SHADOWS REMOVED (Flat Design)
             boxShadow: {
-              soft: "0 2px 10px rgba(0, 0, 0, 0.03)",
-              card: "0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)",
-              glass: "0 8px 32px 0 rgba(0, 0, 0, 0.04)",
-              glow: "0 0 20px rgba(249, 115, 22, 0.15)", // Orange glow
+              soft: "none",
+              card: "none",
+              glass: "none",
+              glow: "none",
+              lg: "none",
+              xl: "none",
+              '2xl': "none",
+              sm: "none",
+              md: "none",
             },
-            borderRadius: {
-              xl: "0.75rem",
-              "2xl": "1rem",
-              "3xl": "1.5rem",
+            // BORDERS REMOVED (Except for focus rings or separators by color)
+            borderColor: {
+                DEFAULT: "transparent",
             }
           },
         },
@@ -51,12 +57,11 @@
     </script>
     <style>
       :root {
-        --bg-canvas: #F9FAFB;
+        --bg-canvas: #F8F9FA;
         --bg-surface: #FFFFFF;
-        --border-subtle: #E5E7EB;
-        --text-main: #111827;
-        --text-secondary: #6B7280;
-        --primary: #F97316;
+        --text-main: #202124;
+        --text-secondary: #5F6368;
+        --primary: #EA3829;
       }
 
       body {
@@ -66,6 +71,7 @@
         -webkit-font-smoothing: antialiased;
       }
 
+      /* Google Style Icons */
       .material-symbols-outlined {
         font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
       }
@@ -73,18 +79,30 @@
         font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
       }
       
-      /* Updated Glass Effect - Subtler, Apple-like */
-      .glass-panel {
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(229, 231, 235, 0.5); /* Gray-200 alpha */
+      /* Enterprise Card Style - Flat, No Border */
+      .glass-panel, .glass-card, .bg-white {
+          background-color: #FFFFFF;
+          border: none !important;
+          box-shadow: none !important;
+      }
+
+      /* Inputs - Google Style (Filled Gray, No Border) */
+      input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], input[type="tel"], select, textarea {
+          background-color: #F1F3F4 !important; /* Google Input Gray */
+          border: none !important;
+          border-radius: 8px !important; /* Slightly squarer than Apple */
       }
       
-      .glass-card {
-          background: #FFFFFF;
-          border: 1px solid #E5E7EB;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+      input:focus, select:focus, textarea:focus {
+          background-color: #FFFFFF !important;
+          box-shadow: 0 0 0 2px var(--primary) !important; 
+          outline: none !important;
+      }
+
+      /* Buttons - Flat */
+      button {
+          box-shadow: none !important;
+          border: none !important;
       }
 
       .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -92,8 +110,8 @@
       
       /* Selection Color */
       ::selection {
-        background-color: rgba(249, 115, 22, 0.15);
-        color: #EA580C;
+        background-color: rgba(234, 56, 41, 0.2);
+        color: #EA3829;
       }
     </style>
   <script type="importmap">
@@ -117,5 +135,6 @@
 </head>
   <body class="antialiased">
     <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>

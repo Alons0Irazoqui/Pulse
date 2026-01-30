@@ -17,7 +17,6 @@ interface InputFieldProps {
   errors: FieldErrors<StudentRegistrationForm>;
   type?: string;
   placeholder?: string;
-  icon?: string;
   cols?: 1 | 2;
 }
 
@@ -28,30 +27,22 @@ const InputField: React.FC<InputFieldProps> = ({
   errors, 
   type = 'text', 
   placeholder, 
-  icon,
   cols = 1 
 }) => (
   <div className={cols === 2 ? 'col-span-1' : 'col-span-1 md:col-span-2'}>
     <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">{label}</label>
     <div className="relative group">
-      {icon && (
-          <span className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-orange-500 material-symbols-outlined text-[20px] transition-colors">
-              {icon}
-          </span>
-      )}
       <input
         {...register(name)}
         type={type}
         placeholder={placeholder}
-        className={`w-full rounded-xl border bg-gray-50 text-sm font-medium text-gray-900 py-3 transition-all placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-4 ${
-          errors[name]
-            ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
-            : 'border-gray-200 focus:border-orange-500 focus:ring-orange-500/10'
-        } ${icon ? 'pl-11 pr-4' : 'px-4'}`}
+        className={`w-full rounded-lg bg-gray-100 text-sm font-medium text-gray-900 py-3.5 px-4 transition-all placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-0 focus:border-primary ${
+          errors[name] ? 'bg-red-50 text-red-900' : ''
+        }`}
       />
     </div>
     {errors[name] && (
-      <p className="mt-1.5 ml-1 text-xs font-semibold text-red-500 animate-in slide-in-from-top-1 fade-in">
+      <p className="mt-1 ml-1 text-xs font-semibold text-red-500">
         {errors[name]?.message}
       </p>
     )}
@@ -59,9 +50,9 @@ const InputField: React.FC<InputFieldProps> = ({
 );
 
 const STEPS = [
-  { id: 1, title: 'Cuenta', icon: 'vpn_key' },
-  { id: 2, title: 'Alumno', icon: 'person' },
-  { id: 3, title: 'Tutor', icon: 'family_restroom' },
+  { id: 1, title: 'Cuenta' },
+  { id: 2, title: 'Alumno' },
+  { id: 3, title: 'Tutor' },
 ];
 
 const StudentRegistration: React.FC = () => {
@@ -71,7 +62,6 @@ const StudentRegistration: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Avatar logic
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -94,32 +84,23 @@ const StudentRegistration: React.FC = () => {
 
   const nextStep = async () => {
     let fieldsToValidate: (keyof StudentRegistrationForm)[] = [];
-
-    if (currentStep === 1) {
-      fieldsToValidate = ['academyCode', 'email', 'password', 'confirmPassword'];
-    } else if (currentStep === 2) {
-      fieldsToValidate = ['name', 'age', 'birthDate', 'cellPhone'];
-    }
+    if (currentStep === 1) fieldsToValidate = ['academyCode', 'email', 'password', 'confirmPassword'];
+    else if (currentStep === 2) fieldsToValidate = ['name', 'age', 'birthDate', 'cellPhone'];
 
     const isStepValid = await trigger(fieldsToValidate);
     
     if (currentStep === 1 && isStepValid) {
         const email = watch('email');
         if (PulseService.checkEmailExists(email)) {
-            setError('email', { type: 'manual', message: 'Este correo electrónico ya está registrado en la plataforma.' });
-            addToast('El correo ya está en uso por otro usuario.', 'error');
+            setError('email', { type: 'manual', message: 'Este correo ya está registrado.' });
             return;
         }
     }
 
-    if (isStepValid) {
-      setCurrentStep((prev) => prev + 1);
-    }
+    if (isStepValid) setCurrentStep((prev) => prev + 1);
   };
 
-  const prevStep = () => {
-    setCurrentStep((prev) => prev - 1);
-  };
+  const prevStep = () => setCurrentStep((prev) => prev - 1);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -136,249 +117,126 @@ const StudentRegistration: React.FC = () => {
 
   const onSubmit: SubmitHandler<StudentRegistrationForm> = async (data) => {
     setIsSubmitting(true);
-    
-    if (PulseService.checkEmailExists(data.email)) {
-        setIsSubmitting(false);
-        setError('email', { type: 'manual', message: 'Este correo electrónico ya está registrado en la plataforma.' });
-        addToast('Error de seguridad: Correo duplicado.', 'error');
-        return;
-    }
-
     try {
-        // Now passing the FULL data object, including avatarUrl
         const success = await registerStudent(data);
-
         if (success) {
-            addToast('Registro completado con éxito', 'success');
+            addToast('Registro completado', 'success');
             navigate('/student/dashboard');
         } else {
-            addToast('Error al registrar. Verifica el código de academia.', 'error');
+            addToast('Error al registrar.', 'error');
         }
     } catch (error) {
-        console.error(error);
-        addToast(error instanceof Error ? error.message : 'Ocurrió un error inesperado', 'error');
+        addToast(error instanceof Error ? error.message : 'Error inesperado', 'error');
     } finally {
         setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 md:p-6 font-sans">
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 font-sans">
       
-      {/* Background Decor */}
-      <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute top-[10%] right-[10%] w-[400px] h-[400px] bg-orange-100/50 rounded-full blur-[80px]"></div>
-          <div className="absolute bottom-[20%] left-[10%] w-[300px] h-[300px] bg-gray-200/50 rounded-full blur-[60px]"></div>
-      </div>
-
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl shadow-gray-200/50 border border-gray-100 relative z-10 flex flex-col overflow-hidden">
-        
-        {/* Header & Stepper */}
-        <div className="bg-white border-b border-gray-100 p-8 pb-6">
-            <div className="flex justify-between items-start mb-8">
-                <div>
-                    <h1 className="text-2xl font-black text-gray-900 tracking-tight">Alta de Alumno</h1>
-                    <p className="text-gray-500 text-sm mt-1">Completa tu perfil para unirte al dojo.</p>
-                </div>
-                <div className="size-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center">
-                    <span className="material-symbols-outlined">school</span>
-                </div>
+      <div className="w-full max-w-2xl">
+        {/* Header */}
+        <div className="mb-10 text-center">
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-2">Alta de Alumno</h1>
+            <div className="flex justify-center gap-2 mt-4">
+                {STEPS.map((step) => (
+                    <div key={step.id} className={`h-1 flex-1 rounded-full transition-all ${step.id <= currentStep ? 'bg-primary' : 'bg-gray-200'}`}></div>
+                ))}
             </div>
-
-            {/* Stepper UI */}
-            <div className="flex items-center relative">
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-100 rounded-full -z-10"></div>
-                <div 
-                    className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-orange-500 rounded-full -z-10 transition-all duration-500 ease-out"
-                    style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
-                ></div>
-                
-                <div className="flex justify-between w-full">
-                    {STEPS.map((step) => {
-                        const isActive = step.id === currentStep;
-                        const isCompleted = step.id < currentStep;
-                        
-                        return (
-                            <div key={step.id} className="flex flex-col items-center gap-2">
-                                <div className={`size-10 rounded-full flex items-center justify-center border-4 transition-all duration-300 ${
-                                    isActive ? 'bg-orange-500 border-orange-100 text-white shadow-lg shadow-orange-500/30 scale-110' : 
-                                    isCompleted ? 'bg-orange-500 border-orange-500 text-white' : 
-                                    'bg-white border-gray-200 text-gray-300'
-                                }`}>
-                                    <span className="material-symbols-outlined text-sm font-bold">
-                                        {isCompleted ? 'check' : step.icon}
-                                    </span>
-                                </div>
-                                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isActive ? 'text-orange-600' : 'text-gray-400'}`}>
-                                    {step.title}
-                                </span>
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">Paso {currentStep} de 3: {STEPS[currentStep-1].title}</p>
         </div>
 
-        {/* Form Content */}
-        <form onSubmit={handleSubmit(onSubmit)} className="p-8">
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             
-            {/* --- STEP 1: ACCOUNT --- */}
+            {/* STEP 1 */}
             {currentStep === 1 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                    <div className="md:col-span-2 p-4 bg-orange-50 rounded-xl border border-orange-100 flex gap-3 items-start mb-2">
-                        <span className="material-symbols-outlined text-orange-500 mt-0.5">info</span>
-                        <div>
-                            <h4 className="text-sm font-bold text-orange-800">Código de Academia</h4>
-                            <p className="text-xs text-orange-700 mt-1 leading-relaxed">Solicita este código a tu maestro. Es necesario para vincular tu perfil a la escuela correcta.</p>
-                        </div>
-                    </div>
-
-                    <InputField register={register} errors={errors} label="Código de Academia" name="academyCode" icon="vpn_key" placeholder="Ej. ACAD-1234" cols={2} />
-                    <InputField register={register} errors={errors} label="Correo Electrónico (Login)" name="email" type="email" icon="mail" placeholder="usuario@email.com" />
-                    
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <InputField register={register} errors={errors} label="Código de Academia" name="academyCode" placeholder="Ej. ACAD-1234" cols={2} />
+                    <InputField register={register} errors={errors} label="Email (Login)" name="email" type="email" placeholder="usuario@email.com" />
                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <InputField register={register} errors={errors} label="Contraseña" name="password" type="password" icon="lock" placeholder="Mínimo 6 caracteres" cols={2} />
-                        <InputField register={register} errors={errors} label="Confirmar Contraseña" name="confirmPassword" type="password" icon="lock_reset" placeholder="Repite la contraseña" cols={2} />
+                        <InputField register={register} errors={errors} label="Contraseña" name="password" type="password" placeholder="Mínimo 6 caracteres" cols={2} />
+                        <InputField register={register} errors={errors} label="Confirmar" name="confirmPassword" type="password" placeholder="Repite la contraseña" cols={2} />
                     </div>
                 </div>
             )}
 
-            {/* --- STEP 2: STUDENT PROFILE --- */}
+            {/* STEP 2 */}
             {currentStep === 2 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="md:col-span-2 flex justify-center mb-4">
                         <div 
                             onClick={() => fileInputRef.current?.click()}
-                            className="size-24 bg-gray-50 rounded-full flex items-center justify-center border-2 border-dashed border-gray-300 text-gray-400 cursor-pointer hover:border-orange-500 hover:text-orange-500 transition-all overflow-hidden relative group"
+                            className="size-24 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-200 transition-all overflow-hidden"
                         >
-                            {avatarPreview ? (
-                                <img src={avatarPreview} alt="Avatar Preview" className="w-full h-full object-cover" />
-                            ) : (
-                                <span className="material-symbols-outlined text-4xl">add_a_photo</span>
-                            )}
-                            {/* Overlay hint */}
-                            {!avatarPreview && <div className="absolute inset-0 bg-transparent group-hover:bg-orange-50/10 transition-colors"></div>}
+                            {avatarPreview ? <img src={avatarPreview} className="w-full h-full object-cover" /> : <span className="material-symbols-outlined text-3xl">add_a_photo</span>}
                         </div>
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            className="hidden" 
-                            accept="image/*"
-                            onChange={handleImageChange}
-                        />
+                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                     </div>
-
-                    <InputField register={register} errors={errors} label="Nombre Completo" name="name" icon="badge" placeholder="Nombre y Apellidos" />
-                    <InputField register={register} errors={errors} label="Celular del Alumno" name="cellPhone" type="tel" icon="smartphone" placeholder="10 dígitos" />
-                    
-                    <InputField register={register} errors={errors} label="Edad" name="age" type="number" icon="cake" placeholder="Años" cols={2} />
-                    <InputField register={register} errors={errors} label="Fecha de Nacimiento" name="birthDate" type="date" icon="calendar_month" cols={2} />
+                    <InputField register={register} errors={errors} label="Nombre Completo" name="name" placeholder="Nombre y Apellidos" />
+                    <InputField register={register} errors={errors} label="Celular" name="cellPhone" type="tel" placeholder="10 dígitos" />
+                    <InputField register={register} errors={errors} label="Edad" name="age" type="number" placeholder="Años" cols={2} />
+                    <InputField register={register} errors={errors} label="Fecha Nacimiento" name="birthDate" type="date" cols={2} />
                 </div>
             )}
 
-            {/* --- STEP 3: GUARDIAN INFO --- */}
+            {/* STEP 3 */}
             {currentStep === 3 && (
-                <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                    
-                    {/* Sección Tutor */}
+                <div className="space-y-8">
                     <div>
-                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-orange-500">supervisor_account</span>
-                            Datos del Responsable
-                        </h3>
+                        <h3 className="text-xs font-black text-primary uppercase tracking-widest mb-4">Datos del Tutor</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <InputField register={register} errors={errors} label="Nombre del Tutor" name="guardianName" placeholder="Nombre completo" />
+                            <InputField register={register} errors={errors} label="Nombre Tutor" name="guardianName" placeholder="Nombre completo" />
                             <div className="col-span-1">
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Parentesco</label>
-                                <div className="relative group">
-                                    <span className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-orange-500 material-symbols-outlined text-[20px]">diversity_3</span>
-                                    <select
-                                        {...register('guardianRelationship')}
-                                        className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-11 pr-4 py-3 text-sm font-medium text-gray-900 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all appearance-none outline-none"
-                                    >
-                                        <option value="Padre">Padre</option>
-                                        <option value="Madre">Madre</option>
-                                        <option value="Tutor Legal">Tutor Legal</option>
-                                        <option value="Familiar">Familiar</option>
-                                        <option value="Otro">Otro</option>
-                                    </select>
-                                </div>
+                                <select {...register('guardianRelationship')} className="w-full rounded-lg bg-gray-100 px-4 py-3.5 text-sm font-medium text-gray-900 border-none focus:bg-white focus:ring-0">
+                                    {['Padre', 'Madre', 'Tutor Legal', 'Familiar', 'Otro'].map(o => <option key={o} value={o}>{o}</option>)}
+                                </select>
                             </div>
-                            <InputField register={register} errors={errors} label="Email del Tutor" name="guardianEmail" type="email" icon="alternate_email" />
+                            <InputField register={register} errors={errors} label="Email Tutor" name="guardianEmail" type="email" />
                         </div>
                     </div>
-
-                    {/* Sección Teléfonos */}
                     <div>
-                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-gray-500">call</span>
-                            Teléfonos de Contacto
-                        </h3>
+                        <h3 className="text-xs font-black text-primary uppercase tracking-widest mb-4">Contacto</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <InputField register={register} errors={errors} label="Principal (Obligatorio)" name="guardianMainPhone" type="tel" icon="phone_iphone" cols={2} />
-                            <InputField register={register} errors={errors} label="Secundario (Opcional)" name="guardianSecondaryPhone" type="tel" icon="call" cols={2} />
-                            <InputField register={register} errors={errors} label="Terciario (Opcional)" name="guardianTertiaryPhone" type="tel" icon="call" cols={2} />
+                            <InputField register={register} errors={errors} label="Tel. Principal" name="guardianMainPhone" type="tel" cols={2} />
+                            <InputField register={register} errors={errors} label="Tel. 2 (Opcional)" name="guardianSecondaryPhone" type="tel" cols={2} />
+                            <InputField register={register} errors={errors} label="Tel. 3 (Opcional)" name="guardianTertiaryPhone" type="tel" cols={2} />
                         </div>
                     </div>
-
-                    {/* Sección Dirección */}
                     <div>
-                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-gray-500">home_pin</span>
-                            Dirección de Emergencia
-                        </h3>
+                        <h3 className="text-xs font-black text-primary uppercase tracking-widest mb-4">Dirección</h3>
                         <div className="grid grid-cols-6 gap-4">
-                            <div className="col-span-4"><InputField register={register} errors={errors} label="Calle" name="street" placeholder="Av. Principal" cols={2} /></div>
-                            <div className="col-span-2"><InputField register={register} errors={errors} label="No. Ext" name="exteriorNumber" placeholder="123" cols={2} /></div>
-                            
-                            <div className="col-span-2"><InputField register={register} errors={errors} label="No. Int" name="interiorNumber" placeholder="Apt 1" cols={2} /></div>
-                            <div className="col-span-2"><InputField register={register} errors={errors} label="Colonia" name="colony" placeholder="Centro" cols={2} /></div>
-                            <div className="col-span-2"><InputField register={register} errors={errors} label="C.P." name="zipCode" placeholder="00000" cols={2} /></div>
+                            <div className="col-span-4"><InputField register={register} errors={errors} label="Calle" name="street" cols={2} /></div>
+                            <div className="col-span-2"><InputField register={register} errors={errors} label="No. Ext" name="exteriorNumber" cols={2} /></div>
+                            <div className="col-span-2"><InputField register={register} errors={errors} label="Int" name="interiorNumber" cols={2} /></div>
+                            <div className="col-span-2"><InputField register={register} errors={errors} label="Colonia" name="colony" cols={2} /></div>
+                            <div className="col-span-2"><InputField register={register} errors={errors} label="CP" name="zipCode" cols={2} /></div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* --- FOOTER ACTIONS --- */}
-            <div className="flex items-center gap-4 mt-10 pt-6 border-t border-gray-100">
+            {/* Actions */}
+            <div className="flex items-center gap-4 mt-10">
                 {currentStep > 1 ? (
-                    <button
-                        type="button"
-                        onClick={prevStep}
-                        className="px-6 py-3.5 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 active:scale-95 transition-all flex items-center gap-2"
-                    >
-                        <span className="material-symbols-outlined text-lg">arrow_back</span>
-                        Atrás
-                    </button>
+                    <button type="button" onClick={prevStep} className="px-6 py-4 rounded-lg bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-all text-sm">Atrás</button>
                 ) : (
-                    <Link to="/login" className="px-6 py-3.5 rounded-xl border border-transparent text-gray-500 font-bold hover:bg-gray-50 transition-all text-sm">
-                        Cancelar
-                    </Link>
+                    <Link to="/login" className="px-6 py-4 rounded-lg bg-white text-gray-400 font-bold hover:text-gray-600 transition-all text-sm">Cancelar</Link>
                 )}
 
                 <button
                     type="button"
                     onClick={currentStep === 3 ? handleSubmit(onSubmit) : nextStep}
                     disabled={isSubmitting}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-orange-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                    className="flex-1 bg-primary hover:bg-red-600 text-white font-bold py-4 rounded-lg transition-all disabled:opacity-70"
                 >
-                    {isSubmitting ? (
-                        <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                    ) : (
-                        <>
-                            {currentStep === 3 ? 'Finalizar Registro' : 'Siguiente'}
-                            <span className="material-symbols-outlined text-lg">
-                                {currentStep === 3 ? 'check' : 'arrow_forward'}
-                            </span>
-                        </>
-                    )}
+                    {isSubmitting ? 'Procesando...' : (currentStep === 3 ? 'Finalizar Registro' : 'Siguiente')}
                 </button>
             </div>
-
         </form>
       </div>
-      
-      <p className="fixed bottom-6 text-xs text-gray-400 font-medium">© 2024 Academy Pro Systems.</p>
     </div>
   );
 };

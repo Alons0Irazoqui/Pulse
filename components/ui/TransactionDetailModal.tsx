@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { TuitionRecord, PaymentHistoryItem } from '../../types';
 import { formatDateDisplay } from '../../utils/dateUtils';
@@ -13,8 +14,8 @@ interface TransactionDetailModalProps {
   onDownloadReceipt?: (record: TuitionRecord) => void;
   onApprove?: (record: TuitionRecord) => void;
   onReject?: (record: TuitionRecord) => void;
-  onReview?: (record: TuitionRecord) => void; // New prop for master review flow
-  onDelete?: () => void; // New prop for deletion
+  onReview?: (record: TuitionRecord) => void; 
+  onDelete?: () => void; 
 }
 
 const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
@@ -32,45 +33,32 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 }) => {
   if (!isOpen || !record) return null;
 
-  // --- CALCULATIONS ---
-  
-  // Determine total paid from history
   const totalPaid = useMemo(() => {
     return paymentHistory.reduce((acc, curr) => acc + curr.amount, 0);
   }, [paymentHistory]);
 
-  // FIX: Determine original total cost dynamically.
-  // If status is 'paid', the penaltyAmount on the record is often cleared to 0 by the context.
-  // In that case, we should use the 'totalPaid' as the True Global Total if it exceeds the base amount,
-  // effectively restoring the visibility of the paid penalty.
   const originalTotal = useMemo(() => {
       const baseCalculation = (record.originalAmount ?? record.amount) + (record.penaltyAmount || 0);
-      
       if (record.status === 'paid') {
-          // If paid amount is greater than base (meaning it included a penalty), display the paid amount
-          // Use a small epsilon for float comparison safety
           return totalPaid > baseCalculation ? totalPaid : baseCalculation;
       }
       return baseCalculation;
   }, [record, totalPaid]);
 
-  // Determine remaining debt
   const remainingDebt = record.amount + (record.penaltyAmount || 0);
 
-  // Status Helpers
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'paid': return { label: 'Pagado', color: 'text-green-600', bg: 'bg-green-50', icon: 'check_circle' };
       case 'overdue': return { label: 'Vencido', color: 'text-red-600', bg: 'bg-red-50', icon: 'warning' };
       case 'partial': return { label: 'Parcial', color: 'text-orange-600', bg: 'bg-orange-50', icon: 'pie_chart' };
-      case 'in_review': return { label: 'En Revisión', color: 'text-amber-600', bg: 'bg-amber-50', icon: 'hourglass_top' };
+      case 'in_review': return { label: 'En Revisión', color: 'text-blue-600', bg: 'bg-blue-50', icon: 'hourglass_top' };
       default: return { label: 'Pendiente', color: 'text-gray-600', bg: 'bg-gray-100', icon: 'pending' };
     }
   };
 
   const statusConfig = getStatusConfig(record.status);
 
-  // Format Currency Helper
   const formatMoney = (amount: number) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
   };
@@ -78,11 +66,9 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden relative border border-gray-100 animate-in zoom-in-95 duration-300"
+        className="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden relative border border-transparent animate-in zoom-in-95 duration-300"
         onClick={(e) => e.stopPropagation()}
       >
-        
-        {/* --- HEADER --- */}
         <div className="flex items-start justify-between p-6 md:p-8 border-b border-gray-100 bg-white sticky top-0 z-10">
           <div className="flex items-center gap-4">
             <button 
@@ -107,19 +93,15 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             </div>
           </div>
           
-          {/* Desktop Total Display */}
           <div className="hidden md:block text-right">
              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Global</p>
              <p className="text-3xl font-black text-gray-900">{formatMoney(originalTotal)}</p>
           </div>
         </div>
 
-        {/* --- SCROLLABLE CONTENT --- */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-[#F9FAFB]">
-          
-          {/* 1. FINANCIAL SUMMARY CARDS */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-28">
+            <div className="bg-white p-5 rounded-2xl border border-transparent shadow-sm flex flex-col justify-between h-28">
                <div className="flex items-center gap-2 text-gray-400 mb-1">
                   <span className="material-symbols-outlined text-lg">receipt_long</span>
                   <span className="text-xs font-bold uppercase tracking-wider">Costo Orig.</span>
@@ -127,7 +109,7 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                <span className="text-2xl font-bold text-gray-900">{formatMoney(originalTotal)}</span>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-28">
+            <div className="bg-white p-5 rounded-2xl border border-transparent shadow-sm flex flex-col justify-between h-28">
                <div className="flex items-center gap-2 text-green-600 mb-1">
                   <span className="material-symbols-outlined text-lg">payments</span>
                   <span className="text-xs font-bold uppercase tracking-wider">Pagado</span>
@@ -135,15 +117,15 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                <span className="text-2xl font-bold text-green-600">{formatMoney(totalPaid)}</span>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-28">
-               <div className="flex items-center gap-2 text-orange-600 mb-1">
+            <div className="bg-white p-5 rounded-2xl border border-transparent shadow-sm flex flex-col justify-between h-28">
+               <div className="flex items-center gap-2 text-primary mb-1">
                   <span className="material-symbols-outlined text-lg">pie_chart</span>
                   <span className="text-xs font-bold uppercase tracking-wider">Pendiente</span>
                </div>
-               <span className="text-2xl font-bold text-orange-600">{formatMoney(remainingDebt)}</span>
+               <span className="text-2xl font-bold text-primary">{formatMoney(remainingDebt)}</span>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-28">
+            <div className="bg-white p-5 rounded-2xl border border-transparent shadow-sm flex flex-col justify-between h-28">
                <div className="flex items-center gap-2 text-gray-400 mb-1">
                   <span className="material-symbols-outlined text-lg">event</span>
                   <span className="text-xs font-bold uppercase tracking-wider">Vence</span>
@@ -152,8 +134,7 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             </div>
           </div>
 
-          {/* 2. TIMELINE HISTORY */}
-          <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+          <div className="bg-white rounded-3xl p-8 border border-transparent shadow-sm">
             <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined text-gray-400">history</span>
               Historial de Movimientos
@@ -166,18 +147,13 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               </div>
             ) : (
               <div className="space-y-0 relative">
-                {/* Vertical Line */}
                 <div className="absolute top-2 bottom-2 left-[19px] w-0.5 bg-gray-100"></div>
-
                 {paymentHistory.map((item, idx) => (
                   <div key={idx} className="relative pl-12 pb-8 last:pb-0 group">
-                    {/* Dot */}
                     <div className="absolute left-0 top-1 size-10 rounded-full bg-white border-4 border-blue-50 flex items-center justify-center z-10">
                        <div className="size-3 bg-blue-500 rounded-full"></div>
                     </div>
-
-                    {/* Card Content */}
-                    <div className="flex justify-between items-start bg-gray-50 p-4 rounded-xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 transition-colors">
+                    <div className="flex justify-between items-start bg-gray-50 p-4 rounded-xl border border-transparent hover:bg-gray-100 transition-colors">
                         <div>
                             <p className="text-sm font-bold text-gray-900 capitalize">
                                 {formatDateDisplay(item.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -203,12 +179,9 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           </div>
         </div>
 
-        {/* --- FOOTER ACTIONS --- */}
         <div className="p-6 border-t border-gray-100 bg-white flex flex-col md:flex-row justify-between items-center gap-4">
-            
-            {/* Student Info (Visible for Master or always valid context) */}
             <div className="flex items-center gap-3 w-full md:w-auto">
-                <div className="size-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold border border-gray-200">
+                <div className="size-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold">
                     {record.studentName.charAt(0)}
                 </div>
                 <div>
@@ -217,10 +190,7 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex gap-3 w-full md:w-auto items-center">
-                
-                {/* DELETE ACTION (Master Only) */}
                 {role === 'master' && onDelete && (
                     <button 
                         onClick={onDelete}
@@ -231,18 +201,17 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                     </button>
                 )}
 
-                {/* STUDENT ROLE ACTIONS */}
                 {role === 'student' && (
                     <>
-                        {/* Pay Button Logic */}
                         {remainingDebt > 0 && onPay && (
+                            /* RED PAY BUTTON */
                             <button 
                                 onClick={() => record.status !== 'in_review' && onPay(record)}
                                 disabled={record.status === 'in_review'}
                                 className={`flex-1 md:flex-none px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
                                     record.status === 'in_review'
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
-                                    : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/20 active:scale-95'
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-primary text-white hover:bg-red-700 active:scale-95'
                                 }`}
                             >
                                 <span className="material-symbols-outlined text-lg">
@@ -251,8 +220,6 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                                 {record.status === 'in_review' ? 'En Revisión' : 'Pagar'}
                             </button>
                         )}
-                        
-                        {/* Download Logic */}
                         {(record.status === 'paid' || record.status === 'partial') && onDownloadReceipt && (
                             <button 
                                 onClick={() => onDownloadReceipt(record)}
@@ -265,31 +232,28 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                     </>
                 )}
 
-                {/* MASTER ROLE ACTIONS */}
                 {role === 'master' && (
                     <>
                         {record.status === 'in_review' ? (
-                            /* Master Review Action - Launches Parent Modal */
                             <button 
                                 onClick={() => {
                                     if (onReview) {
                                         onReview(record);
-                                        onClose(); // Close details to show full review modal
+                                        onClose(); 
                                     }
                                 }}
-                                className="flex-1 md:flex-none px-6 py-3 rounded-xl bg-gray-900 text-white font-bold hover:bg-black shadow-lg shadow-gray-900/10 transition-all flex items-center justify-center gap-2 active:scale-95"
+                                className="flex-1 md:flex-none px-6 py-3 rounded-xl bg-primary text-white font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2 active:scale-95"
                             >
                                 <span className="material-symbols-outlined text-lg">fact_check</span>
-                                Revisar Comprobante
+                                Revisar
                             </button>
                         ) : (
-                            /* Standard Receipt Action */
                             <button 
                                 onClick={() => onDownloadReceipt && onDownloadReceipt(record)}
                                 className="flex-1 md:flex-none px-6 py-3 rounded-xl border border-gray-200 font-bold text-gray-700 hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
                             >
                                 <span className="material-symbols-outlined text-lg">print</span>
-                                Imprimir Recibo
+                                Imprimir
                             </button>
                         )}
                     </>

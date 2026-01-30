@@ -8,9 +8,16 @@ import { ToastProvider } from './context/ToastContext';
 import { ConfirmationProvider } from './context/ConfirmationContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import DashboardLayout from './layouts/DashboardLayout';
-import LandingPage from './pages/LandingPage';
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Auth Pages
 import Login from './pages/auth/Login';
 import RoleSelection from './pages/auth/RoleSelection';
+import StudentRegistration from './pages/auth/StudentRegistration';
+import MasterRegistration from './pages/auth/MasterRegistration';
+import MasterPinEntry from './pages/auth/MasterPinEntry'; // Nueva Página de PIN
+
+// Master Pages
 import MasterDashboard from './pages/master/MasterDashboard';
 import StudentsList from './pages/master/StudentsList';
 import ClassesManager from './pages/master/ClassesManager';
@@ -18,17 +25,18 @@ import MasterAttendanceDetail from './pages/master/MasterAttendanceDetail';
 import MasterEventDetail from './pages/master/MasterEventDetail'; 
 import MasterLibrary from './pages/master/MasterLibrary';
 import Finance from './pages/master/Finance';
+
+// Student Pages
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentClasses from './pages/student/StudentClasses';
 import StudentClassDetail from './pages/student/StudentClassDetail';
 import StudentSchedule from './pages/student/StudentSchedule';
 import StudentPayments from './pages/student/StudentPayments';
 import Library from './pages/student/Library';
+
+// Shared
 import Settings from './pages/shared/Settings';
-import StudentRegistration from './pages/auth/StudentRegistration';
-import MasterRegistration from './pages/auth/MasterRegistration';
 import Forbidden from './pages/Forbidden';
-import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
   return (
@@ -40,14 +48,19 @@ const App: React.FC = () => {
                 <ConfirmationProvider>
                 <Router>
                     <Routes>
-                    <Route path="/" element={<LandingPage />} />
+                    {/* --- RUTAS PÚBLICAS --- */}
+                    {/* La Landing Page ha sido eliminada. La raíz es Login. */}
+                    <Route path="/" element={<Login />} />
                     <Route path="/login" element={<Login />} />
+                    
                     <Route path="/role-selection" element={<RoleSelection />} />
+                    <Route path="/register/verify-pin" element={<MasterPinEntry />} />
                     <Route path="/register/student" element={<StudentRegistration />} />
                     <Route path="/register/master" element={<MasterRegistration />} />
+                    
                     <Route path="/403" element={<Forbidden />} />
                     
-                    {/* Master Routes (Protected) */}
+                    {/* --- RUTAS PROTEGIDAS MAESTRO --- */}
                     <Route path="/master/*" element={
                         <ProtectedRoute allowedRoles={['master']}>
                             <DashboardLayout>
@@ -66,7 +79,7 @@ const App: React.FC = () => {
                         </ProtectedRoute>
                     } />
 
-                    {/* Student Routes (Protected) */}
+                    {/* --- RUTAS PROTEGIDAS ALUMNO --- */}
                     <Route path="/student/*" element={
                         <ProtectedRoute allowedRoles={['student']}>
                             <DashboardLayout>

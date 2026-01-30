@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { TuitionRecord, ManualChargeData, ChargeCategory, Student, TuitionStatus } from '../types';
 import { PulseService } from '../services/pulseService';
 import { useAuth } from './AuthContext';
@@ -37,7 +37,7 @@ interface FinanceContextType {
     // Actions
     refreshFinance: () => void;
     createManualCharge: (data: ManualChargeData) => void;
-    createRecord: (record: TuitionRecord) => void; // Legacy support if needed, or alias to internal logic
+    createRecord: (record: TuitionRecord) => void; 
     approvePayment: (recordId: string, amountPaid?: number) => void;
     rejectPayment: (recordId: string) => void;
     approveBatchPayment: (batchId: string, totalAmountPaid: number) => void;
@@ -54,15 +54,22 @@ interface FinanceContextType {
     generateMonthlyBilling: () => void;
     purgeStudentDebts: (studentId: string) => void;
     getStudentPendingDebts: (studentId: string) => TuitionRecord[];
-    uploadProof: (recordId: string, file: File) => void; // Legacy single upload if needed
+    uploadProof: (recordId: string, file: File) => void; 
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { currentUser } = useAuth();
-    const { academySettings, students, batchUpdateStudents } = useAcademy(); // Extract batchUpdateStudents
+    const { academySettings, students, batchUpdateStudents } = useAcademy(); 
     const { addToast } = useToast();
+
+    // --- SAFETY REF TO PREVENT INFINITE LOOP ---
+    // This breaks the dependency cycle between FinanceContext render -> batchUpdateStudents -> AcademyContext render -> FinanceContext render
+    const batchUpdateRef = useRef(batchUpdateStudents);
+    useEffect(() => {
+        batchUpdateRef.current = batchUpdateStudents;
+    }, [batchUpdateStudents]);
 
     const [records, setRecords] = useState<TuitionRecord[]>([]);
     const [isFinanceLoading, setIsFinanceLoading] = useState(true);
@@ -99,14 +106,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (isFinanceLoading || students.length === 0) return;
 
         // 1. Check Overdue Status (Run once on records update)
-        // Detects 'pending' records that are past due date and flips them to 'overdue'
         const today = getLocalDate();
         let recordsUpdated = false;
         
         const processedRecords = records.map(r => {
             if (r.status === 'pending' && r.dueDate < today) {
                 recordsUpdated = true;
-                // Apply Late Fee if configured
                 const penalty = academySettings.paymentSettings?.lateFeeAmount || 0;
                 return { ...r, status: 'overdue', penaltyAmount: penalty } as TuitionRecord;
             }
@@ -114,7 +119,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
 
         if (recordsUpdated) {
-            // Update records first, this will re-trigger the effect to handle student status in next pass
             setRecords(processedRecords);
             return; 
         }
@@ -141,40 +145,31 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             let newStatus = student.status;
 
             // C. Determine Status (Priority Logic)
-            // REFINED LOGIC: Exam Readiness > Debt Status
             if (student.status !== 'inactive') {
                 if (isAcademicReady) {
-                    // Priority 1: Academic Achievement.
-                    // Even if they have debt, we want to show they are ready for exam.
-                    // The debt will still be visible in the 'Balance' column (red text).
                     newStatus = 'exam_ready';
                 } else {
-                    // Priority 2: Financial Status
                     if (hasDebt) {
                         newStatus = 'debtor';
                     } else {
-                        // Priority 3: Default Active
                         newStatus = 'active';
                     }
                 }
             }
 
-            // Detect if update is needed (Balance update or Status transition)
+            // Detect if update is needed
             const currentBalance = student.balance || 0;
-            // Use epsilon for float comparison
-            const balanceChanged = Math.abs(currentBalance - debt) > 0.01;
-            const statusChanged = student.status !== newStatus;
-
-            if (balanceChanged || statusChanged) {
+            if (Math.abs(currentBalance - debt) > 0.01 || student.status !== newStatus) {
                 studentsToUpdate.push({ ...student, balance: debt, status: newStatus });
             }
         });
 
         if (studentsToUpdate.length > 0) {
-            batchUpdateStudents(studentsToUpdate);
+            // SAFE CALL using Ref to prevent loop
+            batchUpdateRef.current(studentsToUpdate);
         }
 
-    }, [records, students, isFinanceLoading, academySettings, batchUpdateStudents]);
+    }, [records, students, isFinanceLoading, academySettings]); // removed batchUpdateStudents dependency to fix blank screen loop
 
 
     // --- CALCULATE STATS (Derived - REAL DATA) ---
@@ -188,10 +183,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const totalPending = pending.reduce((acc, r) => acc + r.amount, 0);
         const totalOverdue = overdue.reduce((acc, r) => acc + r.amount + r.penaltyAmount, 0);
         
-        // Calculate Total Revenue (Total Paid Historically)
         const totalRevenue = records.reduce((acc, r) => {
-            if (r.status === 'paid') return acc + (r.originalAmount ?? r.amount); // Full amount paid
-            if (r.status === 'partial') return acc + ((r.originalAmount ?? r.amount) - r.amount); // Part paid
+            if (r.status === 'paid') return acc + (r.originalAmount ?? r.amount); 
+            if (r.status === 'partial') return acc + ((r.originalAmount ?? r.amount) - r.amount); 
             return acc;
         }, 0);
 
@@ -208,10 +202,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const now = new Date();
             const currentYear = now.getFullYear();
             
-            // Initialize Annual Data (Current Year) - Filled with 0s
             const annualTotals = new Array(12).fill(0);
 
-            // Initialize Rolling Data (Last 6 Months)
             const rollingStats: { monthIndex: number; year: number; name: string; total: number }[] = [];
             for (let i = 5; i >= 0; i--) {
                 const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -223,15 +215,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 });
             }
 
-            // Iterate Records
             records.forEach(r => {
-                // Only count actual payments
                 if ((r.status === 'paid' || r.status === 'partial') && r.paymentDate) {
                     const pDate = new Date(r.paymentDate);
                     const pYear = pDate.getFullYear();
                     const pMonth = pDate.getMonth();
 
-                    // Calculate Real Paid Amount
                     let paidAmount = 0;
                     if (r.status === 'paid') {
                         paidAmount = (r.originalAmount ?? r.amount);
@@ -239,12 +228,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                         paidAmount = (r.originalAmount ?? r.amount) - r.amount;
                     }
 
-                    // A. Annual Chart (Current Year Only)
                     if (pYear === currentYear) {
                         annualTotals[pMonth] += paidAmount;
                     }
 
-                    // B. Rolling Chart (Specific Month/Year match)
                     const rollingMatch = rollingStats.find(
                         item => item.monthIndex === pMonth && item.year === pYear
                     );
@@ -254,7 +241,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 }
             });
 
-            // Set State
             setMonthlyRevenueData(months.map((m, i) => ({ name: m, total: annualTotals[i] })));
             setRollingRevenueData(rollingStats.map(r => ({ name: r.name, total: r.total })));
         };
@@ -275,9 +261,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const createManualCharge = (data: ManualChargeData) => {
         if (currentUser?.role !== 'master') return;
-        
         const finalAmount = Number(data.amount);
-
         const newRecord: TuitionRecord = {
             id: generateId('chg'),
             academyId: currentUser.academyId,
@@ -298,13 +282,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             canBePaidInParts: data.canBePaidInParts,
             relatedEventId: data.relatedEventId
         };
-
         setRecords(prev => [...prev, newRecord]);
         addToast('Cargo generado exitosamente', 'success');
     };
 
     const createRecord = (record: TuitionRecord) => {
-        // Legacy support
         setRecords(prev => [...prev, record]);
     };
 
@@ -315,7 +297,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         totalAmount: number,
         details: { description: string; amount: number }[]
     ) => {
-        // Simulate File Upload (In real app, upload to storage and get URL)
         const fakeUrl = file ? URL.createObjectURL(file) : null;
         const proofType = file?.type;
         const batchId = generateId('batch');
@@ -331,8 +312,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     proofType: proofType,
                     method: method,
                     batchPaymentId: batchId,
-                    declaredAmount: totalAmount, // Store total paid for this batch in each record for context
-                    details: details // Store breakdown if needed
+                    declaredAmount: totalAmount,
+                    details: details 
                 };
             }
             return r;
@@ -388,7 +369,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const approveBatchPayment = (batchId: string, totalAmountPaid: number) => {
         setRecords(prev => {
             const batchRecords = prev.filter(r => r.batchPaymentId === batchId);
-            // Sort by due date (Oldest first) for waterfall application
             batchRecords.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
             
             let available = totalAmountPaid;
@@ -398,7 +378,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 const totalDebt = r.amount + currentPenalty;
                 let paid = 0;
                 
-                // Allocation Logic
                 if (!r.canBePaidInParts) {
                     if (available >= totalDebt - 0.01) {
                         paid = totalDebt;
@@ -446,7 +425,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 return updated || r;
             });
         });
-        
         addToast('Lote de pagos aprobado', 'success');
     };
 
@@ -471,10 +449,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const targetRecord = prev.find(r => r.id === recordId);
             if (!targetRecord) return prev;
 
-            // Current Total including penalty
             const currentTotal = targetRecord.amount + (targetRecord.penaltyAmount || 0);
-            
-            // Delta based on TOTAL difference
             const delta = currentTotal - newTotal;
             const batchId = targetRecord.batchPaymentId;
 
@@ -504,7 +479,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                         updatedRecord.amount = 0; 
                         updatedRecord.penaltyAmount = 0; 
                     } 
-                    
                     return updatedRecord;
                 }
 
@@ -514,7 +488,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                         declaredAmount: updatedDeclared
                     };
                 }
-
                 return r;
             });
         });

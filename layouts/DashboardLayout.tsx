@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import { useLocation } from 'react-router-dom';
@@ -19,25 +20,23 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         onClose={() => setIsMobileMenuOpen(false)} 
       />
       
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Mobile Header */}
-        <header className="md:hidden flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 z-30 sticky top-0">
-            <div className="flex items-center gap-2">
-                 <div className="flex items-center justify-center size-8 rounded-lg bg-primary text-white shadow-md shadow-orange-200">
-                    <span className="material-symbols-outlined text-lg">school</span>
-                 </div>
-                 <span className="font-bold text-lg text-text-main tracking-tight">Academy Pro</span>
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#F8F9FA]">
+        {/* Mobile Header - Minimal */}
+        <header className="md:hidden flex items-center justify-between px-6 py-4 bg-white z-30 sticky top-0">
+            <div className="flex flex-col">
+                 <span className="font-black text-xl text-primary tracking-tighter leading-none">IKC</span>
+                 <span className="text-[8px] font-bold uppercase tracking-widest text-gray-500">Management</span>
             </div>
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
-              className="text-text-secondary hover:text-text-main p-2 hover:bg-gray-50 rounded-lg transition-colors focus:outline-none active:scale-95"
+              className="text-gray-600 hover:bg-gray-50 p-2 rounded-lg transition-colors focus:outline-none"
             >
                 <span className="material-symbols-outlined text-2xl">menu</span>
             </button>
         </header>
 
-        {/* Main Content Area - Canvas Background */}
-        <main className="flex-1 overflow-y-auto scrollbar-hide bg-[#F9FAFB]">
+        {/* Main Content Area - Clean Canvas */}
+        <main className="flex-1 overflow-y-auto scrollbar-hide">
             {children}
         </main>
       </div>
