@@ -17,28 +17,9 @@ const YearView: React.FC<YearViewProps> = ({ date, events, onNavigate, onMonthCl
     const months = Array.from({ length: 12 }, (_, i) => addMonths(yearStart, i));
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-3xl p-6 shadow-card border border-gray-200 overflow-y-auto animate-in fade-in duration-300">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-8 sticky top-0 bg-white z-20 py-2">
-                <h2 className="text-4xl font-black text-text-main tracking-tight">{format(date, 'yyyy')}</h2>
-                <div className="flex bg-gray-100 rounded-xl p-1 shadow-inner">
-                    <button 
-                        onClick={() => onNavigate(new Date(date.getFullYear() - 1, 0, 1))}
-                        className="p-2 hover:bg-white rounded-lg text-text-secondary transition-all shadow-sm hover:shadow active:scale-90"
-                    >
-                        <span className="material-symbols-outlined text-sm">chevron_left</span>
-                    </button>
-                    <button 
-                        onClick={() => onNavigate(new Date(date.getFullYear() + 1, 0, 1))}
-                        className="p-2 hover:bg-white rounded-lg text-text-secondary transition-all shadow-sm hover:shadow active:scale-90"
-                    >
-                        <span className="material-symbols-outlined text-sm">chevron_right</span>
-                    </button>
-                </div>
-            </div>
-
+        <div className="flex flex-col h-full overflow-y-auto animate-in fade-in duration-500 pr-2">
             {/* Grid of Months */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-10 gap-y-12 pb-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-12 gap-y-16 pb-10">
                 {months.map(month => (
                     <MonthCell 
                         key={month.toISOString()} 
@@ -72,23 +53,23 @@ const MonthCell: React.FC<MonthCellProps> = ({ month, events, onMonthClick, onDa
     const isCurrentMonth = isSameMonth(new Date(), month);
 
     return (
-        <div className="flex flex-col gap-3 group">
+        <div className="flex flex-col gap-4 group">
             {/* Interactive Header */}
             <button 
                 onClick={() => onMonthClick(month)}
-                className="text-left px-2 py-1 rounded-lg -ml-2 hover:bg-gray-50 transition-colors flex items-center justify-between group/header"
+                className="text-left flex items-center gap-2 group/header hover:opacity-70 transition-opacity w-fit"
             >
-                <h3 className={`text-lg font-bold capitalize ${isCurrentMonth ? 'text-primary' : 'text-gray-900'}`}>
+                <h3 className={`text-xl font-bold capitalize tracking-tight ${isCurrentMonth ? 'text-red-600' : 'text-gray-900'}`}>
                     {format(month, 'MMMM', { locale: es })}
                 </h3>
-                <span className="material-symbols-outlined text-gray-300 text-sm opacity-0 group-hover/header:opacity-100 transition-opacity -translate-x-2 group-hover/header:translate-x-0">
-                    arrow_forward
+                <span className="material-symbols-outlined text-gray-400 text-sm opacity-0 -translate-x-2 transition-all group-hover/header:opacity-100 group-hover/header:translate-x-0">
+                    open_in_full
                 </span>
             </button>
             
-            <div className="grid grid-cols-7 text-center">
+            <div className="grid grid-cols-7 text-center gap-y-3">
                 {['D','L','M','M','J','V','S'].map((d, i) => (
-                    <span key={i} className="text-[10px] font-bold text-gray-300 py-1">{d}</span>
+                    <span key={i} className="text-[10px] font-bold text-gray-300 uppercase">{d}</span>
                 ))}
                 
                 {/* Empty slots for start of month */}
@@ -103,35 +84,28 @@ const MonthCell: React.FC<MonthCellProps> = ({ month, events, onMonthClick, onDa
                     const hasEvent = dayEvents.length > 0;
                     const isToday = isSameDay(day, new Date());
                     
-                    // Logic for determining dot color priority
-                    let dotColor = 'bg-gray-200';
-                    if (hasEvent) {
-                        if (dayEvents.some(e => e.type === 'exam')) dotColor = 'bg-purple-500';
-                        else if (dayEvents.some(e => e.type === 'tournament')) dotColor = 'bg-orange-500';
-                        else dotColor = 'bg-blue-500';
-                    }
-
                     return (
-                        <button 
+                        <div 
                             key={day.toISOString()} 
-                            onClick={() => onDayClick(day)}
-                            className={`
-                                aspect-square flex flex-col items-center justify-center relative rounded-full transition-all duration-200
-                                hover:bg-gray-100 active:scale-90 active:bg-gray-200
-                                ${isToday ? 'bg-black text-white hover:bg-gray-800' : ''}
-                            `}
+                            onClick={() => onDayClick(day)} // Optional interaction in year view
+                            className="relative flex flex-col items-center justify-start h-8 cursor-pointer group/day"
                         >
-                            <span className={`text-xs font-medium z-10 ${hasEvent && !isToday ? 'font-bold text-text-main' : ''} ${!hasEvent && !isToday ? 'text-gray-500' : ''}`}>
+                            <span 
+                                className={`
+                                    flex items-center justify-center size-7 text-xs font-medium rounded-full transition-all z-10
+                                    ${isToday 
+                                        ? 'bg-red-600 text-white shadow-md shadow-red-200 font-bold' 
+                                        : 'text-gray-700 group-hover/day:bg-gray-100'}
+                                `}
+                            >
                                 {format(day, 'd')}
                             </span>
+                            
+                            {/* Heatmap Indicator (Red Dot) */}
                             {hasEvent && !isToday && (
-                                <div className={`size-1.5 rounded-full mt-0.5 ${dotColor}`}></div>
+                                <div className="absolute bottom-0.5 size-1 rounded-full bg-red-500"></div>
                             )}
-                            {/* Dot for today is hidden or styled differently */}
-                            {hasEvent && isToday && (
-                                <div className="size-1 rounded-full mt-0.5 bg-white"></div>
-                            )}
-                        </button>
+                        </div>
                     );
                 })}
             </div>
