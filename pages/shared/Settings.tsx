@@ -26,6 +26,7 @@ const Settings: React.FC = () => {
   });
 
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+  const [showPassword, setShowPassword] = useState(false); // Estado para mostrar/ocultar contraseña
 
   // --- LOCAL STATE: ACADEMY (MASTER ONLY) ---
   const [academyData, setAcademyData] = useState(academySettings);
@@ -33,6 +34,15 @@ const Settings: React.FC = () => {
   useEffect(() => {
       setAcademyData(academySettings);
   }, [academySettings]);
+
+  // --- LOCAL STATE: EMERGENCY (STUDENT) ---
+  const [emergencyData, setEmergencyData] = useState<Student | null>(student ? JSON.parse(JSON.stringify(student)) : null);
+
+  useEffect(() => {
+      if (student) {
+          setEmergencyData(JSON.parse(JSON.stringify(student)));
+      }
+  }, [student]);
 
   // --- LOCAL STATE: MODALS ---
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void}>({
@@ -78,6 +88,16 @@ const Settings: React.FC = () => {
       }
   };
   const triggerFileInput = () => fileInputRef.current?.click();
+
+  // --- HANDLERS: EMERGENCY ---
+  const handleEmergencySave = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!emergencyData || !student) return;
+      // In a real app, students might request a change rather than direct update.
+      // Since context restricts `updateStudent` to Master role, we should ideally have a `requestProfileUpdate` or loosen the restriction.
+      // For this UI demo, we will simulate the update in local state and toast.
+      addToast('Solicitud de actualización enviada a administración.', 'info');
+  };
 
   // --- HANDLERS: ACADEMY CONFIGURATION ---
 
@@ -239,20 +259,44 @@ const Settings: React.FC = () => {
                            </div>
                       </form>
 
+                      {/* Password Form with Show Toggle */}
                       <form onSubmit={handlePasswordChange} className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
-                          <h3 className="text-lg font-bold text-text-main mb-6">Seguridad</h3>
+                          <div className="flex justify-between items-center mb-6">
+                              <h3 className="text-lg font-bold text-text-main">Seguridad</h3>
+                              <button 
+                                type="button" 
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="text-xs font-bold text-text-secondary flex items-center gap-1.5 hover:text-primary transition-colors bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100"
+                              >
+                                  <span className="material-symbols-outlined text-[18px]">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                                  {showPassword ? 'Ocultar' : 'Mostrar'}
+                              </button>
+                          </div>
+                          
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <div className="space-y-2">
                                   <label className="text-sm font-semibold text-text-main">Nueva Contraseña</label>
-                                  <input type="password" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-sm focus:border-primary focus:ring-primary" />
+                                  <input 
+                                    type={showPassword ? "text" : "password"} 
+                                    value={passwords.new} 
+                                    onChange={e => setPasswords({...passwords, new: e.target.value})} 
+                                    className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-sm focus:border-primary focus:ring-primary" 
+                                    placeholder="Mínimo 6 caracteres"
+                                  />
                               </div>
                               <div className="space-y-2">
                                   <label className="text-sm font-semibold text-text-main">Confirmar Contraseña</label>
-                                  <input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-sm focus:border-primary focus:ring-primary" />
+                                  <input 
+                                    type={showPassword ? "text" : "password"} 
+                                    value={passwords.confirm} 
+                                    onChange={e => setPasswords({...passwords, confirm: e.target.value})} 
+                                    className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-sm focus:border-primary focus:ring-primary" 
+                                    placeholder="Repite la nueva contraseña"
+                                  />
                               </div>
                           </div>
                           <div className="mt-8 flex justify-end">
-                                <button type="submit" className="px-6 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold shadow-lg hover:bg-black">Actualizar Contraseña</button>
+                                <button type="submit" className="px-6 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold shadow-lg hover:bg-black transition-all active:scale-95">Actualizar Contraseña</button>
                            </div>
                       </form>
                   </div>
@@ -502,8 +546,71 @@ const Settings: React.FC = () => {
               )}
 
               {/* --- TAB: EMERGENCY (STUDENT) --- */}
-              {activeTab === 'emergency' && student && (
-                  <EmergencyCard student={student} />
+              {activeTab === 'emergency' && student && emergencyData && (
+                  <div className="flex flex-col gap-8">
+                      {/* Read-Only View of Current Data */}
+                      <EmergencyCard student={student} />
+
+                      <form onSubmit={handleEmergencySave} className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
+                          <div className="flex justify-between items-start mb-6">
+                              <div>
+                                <h3 className="text-lg font-bold text-text-main">Editar Datos de Contacto</h3>
+                                <p className="text-sm text-text-secondary mt-1">Mantén esta información actualizada para casos de emergencia.</p>
+                              </div>
+                          </div>
+
+                          <div className="space-y-5">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                  <label className="block">
+                                      <span className="text-xs font-bold text-text-secondary uppercase">Nombre Tutor</span>
+                                      <input value={emergencyData.guardian.fullName} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, fullName: e.target.value}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                  </label>
+                                  <label className="block">
+                                      <span className="text-xs font-bold text-text-secondary uppercase">Parentesco</span>
+                                      <select value={emergencyData.guardian.relationship} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, relationship: e.target.value as any}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm">
+                                          {['Padre', 'Madre', 'Tutor Legal', 'Familiar', 'Otro'].map(r => <option key={r} value={r}>{r}</option>)}
+                                      </select>
+                                  </label>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                  <label className="block">
+                                      <span className="text-xs font-bold text-text-secondary uppercase">Tel. Principal</span>
+                                      <input value={emergencyData.guardian.phones.main} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, phones: {...emergencyData.guardian.phones, main: e.target.value}}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                  </label>
+                                  <label className="block">
+                                      <span className="text-xs font-bold text-text-secondary uppercase">Tel. 2 (Opcional)</span>
+                                      <input value={emergencyData.guardian.phones.secondary || ''} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, phones: {...emergencyData.guardian.phones, secondary: e.target.value}}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                  </label>
+                                  <label className="block">
+                                      <span className="text-xs font-bold text-text-secondary uppercase">Tel. 3 (Opcional)</span>
+                                      <input value={emergencyData.guardian.phones.tertiary || ''} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, phones: {...emergencyData.guardian.phones, tertiary: e.target.value}}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                  </label>
+                              </div>
+                              
+                              <div className="pt-4 border-t border-gray-100">
+                                  <span className="text-xs font-bold text-text-secondary uppercase mb-2 block">Dirección de Emergencia</span>
+                                  <div className="grid grid-cols-4 gap-3">
+                                      <div className="col-span-3">
+                                          <input placeholder="Calle" value={emergencyData.guardian.address.street} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, address: {...emergencyData.guardian.address, street: e.target.value}}})} className="block w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      </div>
+                                      <div className="col-span-1">
+                                          <input placeholder="No. Ext" value={emergencyData.guardian.address.exteriorNumber} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, address: {...emergencyData.guardian.address, exteriorNumber: e.target.value}}})} className="block w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      </div>
+                                      <div className="col-span-2">
+                                          <input placeholder="Colonia" value={emergencyData.guardian.address.colony} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, address: {...emergencyData.guardian.address, colony: e.target.value}}})} className="block w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      </div>
+                                      <div className="col-span-1">
+                                          <input placeholder="CP" value={emergencyData.guardian.address.zipCode} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, address: {...emergencyData.guardian.address, zipCode: e.target.value}}})} className="block w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div className="mt-8 flex justify-end">
+                                <button type="submit" className="px-6 py-2.5 rounded-xl bg-primary text-white text-sm font-bold shadow-lg hover:bg-primary-hover">Solicitar Actualización</button>
+                           </div>
+                      </form>
+                  </div>
               )}
           </div>
       </div>
