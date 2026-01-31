@@ -34,10 +34,35 @@ const MasterDashboard: React.FC = () => {
         const startOfPeriod = timeRange === 'month'
             ? new Date(now.getFullYear(), now.getMonth(), 1)
             : new Date(now.getFullYear(), 0, 1);
+        
+        // Normalizar inicio del periodo a las 00:00:00 para comparación estricta
+        startOfPeriod.setHours(0, 0, 0, 0);
 
         return students.filter(s => {
-            // joinDate viene como string (ej: "2023-08-15" o ISO), Date.parse lo maneja
-            const joinDate = new Date(s.joinDate); 
+            if (!s.joinDate) return false;
+
+            let joinDate = new Date(s.joinDate);
+
+            // Corrección Robustez: Si el formato es DD/MM/YYYY (común en español) y falla el parser estándar
+            // o da una fecha incorrecta (ej: interpreta 02/05 como Feb 5 en lugar de May 2), forzamos parse manual si hay barras.
+            if ((isNaN(joinDate.getTime()) || s.joinDate.includes('/'))) {
+                const parts = s.joinDate.split('/');
+                if (parts.length === 3) {
+                    // Intentamos asumir DD/MM/YYYY si el parsing directo falló o es ambiguo
+                    const d = parseInt(parts[0]);
+                    const m = parseInt(parts[1]) - 1; // Mes es base 0
+                    const y = parseInt(parts[2]);
+                    
+                    const fixedDate = new Date(y, m, d);
+                    if (!isNaN(fixedDate.getTime())) {
+                        joinDate = fixedDate;
+                    }
+                }
+            }
+
+            // Normalizar fecha de registro para comparación justa
+            joinDate.setHours(0, 0, 0, 0);
+
             return joinDate >= startOfPeriod;
         }).length;
     }, [students, timeRange]);
@@ -150,20 +175,20 @@ const MasterDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* KPI 2: Alumnos Activos */}
+                {/* KPI 2: Alumnos Totales (Inscritos) */}
                 <div 
                     className="col-span-12 md:col-span-6 lg:col-span-3 bg-white p-6 rounded-2xl shadow-soft border border-gray-100 flex flex-col justify-between h-36 cursor-pointer group transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:border-gray-200"
                     onClick={() => navigate('/master/students')}
                 >
                     <div className="flex justify-between items-start">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest group-hover:text-red-600 transition-colors">Alumnos Activos</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest group-hover:text-red-600 transition-colors">Alumnos Inscritos</span>
                         <div className="size-8 rounded-lg bg-gray-50 text-gray-400 flex items-center justify-center group-hover:bg-red-50 group-hover:text-red-600 transition-all duration-300 group-hover:scale-110">
                             <span className="material-symbols-outlined text-lg">groups</span>
                         </div>
                     </div>
                     <div>
                         <span className="text-4xl font-black text-slate-900 tracking-tighter">
-                            {stats.activeStudents}
+                            {students.length}
                         </span>
                     </div>
                 </div>

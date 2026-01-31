@@ -5,8 +5,8 @@ export const getStatusLabel = (status: StudentStatus): string => {
     switch (status) {
         case 'active': return 'Activo';
         case 'inactive': return 'Inactivo';
-        case 'debtor': return 'Con Adeudo';
-        case 'exam_ready': return 'Listo para Examen';
+        case 'debtor': return 'Adeudo';
+        case 'exam_ready': return 'Examen listo';
         default: return 'Desconocido';
     }
 };

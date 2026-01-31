@@ -12,6 +12,7 @@ import EmergencyCard from '../../components/ui/EmergencyCard';
 import { PulseService } from '../../services/pulseService';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import Avatar from '../../components/ui/Avatar';
+import { getStatusLabel } from '../../utils/textUtils';
 
 // Fix for type errors with motion components
 const MotionDiv = motion.div as any;
@@ -80,14 +81,27 @@ const StudentsList: React.FC = () => {
       show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
   };
 
-  // Filter Students
+  // Filter Students (Lógica mejorada y robusta)
   const filteredStudents = useMemo(() => {
+      // Helper para normalizar texto: quita acentos, pasa a minúsculas y elimina espacios extra
+      const normalize = (text: string | undefined | null) => {
+          return (text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      };
+
+      const term = normalize(searchTerm);
+
       return students.filter(student => {
-        const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                              student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              student.guardian.fullName.toLowerCase().includes(searchTerm.toLowerCase());
+        // Búsqueda en múltiples campos con protección contra nulos
+        const matchName = normalize(student.name).includes(term);
+        const matchEmail = normalize(student.email).includes(term);
+        const matchGuardian = normalize(student.guardian?.fullName).includes(term);
+        const matchPhone = normalize(student.cellPhone).includes(term); // También buscar por teléfono
+
+        const matchesSearch = matchName || matchEmail || matchGuardian || matchPhone;
+        
         const matchesStatus = filterStatus === 'all' || student.status === filterStatus;
         const matchesRank = filterRank === 'all' || student.rankId === filterRank;
+        
         return matchesSearch && matchesStatus && matchesRank;
       });
   }, [students, searchTerm, filterStatus, filterRank]);
@@ -129,7 +143,7 @@ const StudentsList: React.FC = () => {
           Tutor: s.guardian.fullName,
           Tutor_Tel: s.guardian.phones.main,
           Rango: s.rank,
-          Estado: s.status,
+          Estado: getStatusLabel(s.status),
           Balance: s.balance
       }));
       exportToCSV(dataToExport, 'Listado_Alumnos_Completo');
@@ -218,7 +232,8 @@ const StudentsList: React.FC = () => {
               totalAttendance: 0,
               joinDate: new Date().toLocaleDateString(),
               classesId: [],
-              attendanceHistory: []
+              attendanceHistory: [],
+              status: formData.status // Ensure status from form is used
           });
       }
       setShowModal(false);
@@ -276,7 +291,7 @@ const StudentsList: React.FC = () => {
                     <span className="absolute left-3 top-2.5 text-gray-400 material-symbols-outlined">search</span>
                     <input 
                         type="text" 
-                        placeholder="Buscar por nombre, email o tutor..." 
+                        placeholder="Buscar por nombre, email, tutor o celular..." 
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/20"
@@ -294,7 +309,7 @@ const StudentsList: React.FC = () => {
                                 : 'bg-white text-text-secondary border-gray-200 hover:bg-gray-50'
                             }`}
                         >
-                            {status === 'all' ? 'Todos' : status}
+                            {status === 'all' ? 'Todos' : getStatusLabel(status as StudentStatus)}
                         </button>
                     ))}
                 </div>
@@ -312,7 +327,9 @@ const StudentsList: React.FC = () => {
                     <MotionDiv variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredStudents.map((student) => (
                             <MotionDiv key={student.id} variants={itemVariants} className="bg-white p-6 rounded-[1.5rem] shadow-card border border-gray-100 flex flex-col gap-4 group hover:-translate-y-1 transition-all relative overflow-hidden" onClick={(e: React.MouseEvent) => handleViewDetails(student, e)}>
-                                <div className={`absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(student.status)}`}>{student.status}</div>
+                                <div className={`absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(student.status)}`}>
+                                    {getStatusLabel(student.status)}
+                                </div>
                                 <div className="flex gap-4 items-center">
                                     <Avatar src={student.avatarUrl} name={student.name} className="size-16 rounded-2xl shadow-sm text-xl" />
                                     <div>
@@ -368,7 +385,7 @@ const StudentsList: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(student.status)}`}>
-                                                    {student.status}
+                                                    {getStatusLabel(student.status)}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-right">
@@ -551,7 +568,7 @@ const StudentsList: React.FC = () => {
                               <div className="flex items-center gap-2 mt-2">
                                   <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-white text-xs font-bold">{reactiveViewingStudent.rank}</span>
                                   <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase border border-white/20 ${reactiveViewingStudent.status === 'active' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                                      {reactiveViewingStudent.status}
+                                      {getStatusLabel(reactiveViewingStudent.status)}
                                   </span>
                               </div>
                           </div>
