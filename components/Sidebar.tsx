@@ -46,91 +46,85 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
   return (
     <>
       <div 
-        className={`fixed inset-0 bg-gray-900/20 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-gray-900/10 backdrop-blur-[2px] z-40 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
       <aside 
         className={`
           fixed md:static inset-y-0 left-0 z-50
-          flex flex-col w-72 h-full bg-white
-          transform transition-transform duration-300 ease-out border-r border-transparent
-          ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          flex flex-col w-72 h-full
+          bg-[#F9FAFB] /* Structured Minimalism: Gray Surface */
+          transform transition-transform duration-300 ease-out 
+          ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}
+          /* No border-r. The contrast between #F9FAFB and #FFFFFF (content) creates the structure. */
         `}
       >
-        <div className="flex flex-col h-full px-4 py-6 justify-between overflow-y-auto">
-          <div className="flex flex-col gap-8">
-            
-            {/* BRANDING IKC MANAGEMENT - ENTERPRISE BOLD */}
-            <div className="flex items-center justify-between px-4 mt-2">
-                <div className="flex flex-col">
-                    <h1 className="text-4xl font-black tracking-tighter text-primary leading-none">
-                        IKC
-                    </h1>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1 ml-0.5">
-                        Management
-                    </span>
-                </div>
-                <button 
-                  onClick={onClose} 
-                  className="md:hidden text-gray-400 hover:text-gray-900 bg-gray-50 rounded-full p-1"
-                >
-                  <span className="material-symbols-outlined text-lg">close</span>
-                </button>
+        {/* LOGO SECTION */}
+        <div className="px-8 pt-10 pb-8 flex items-center justify-between">
+            <div className="flex flex-col justify-center leading-none">
+                <span className="text-3xl font-black text-red-600 tracking-tight">IKC</span>
+                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.25em] mt-1">Management</span>
             </div>
+            
+            <button 
+                onClick={onClose} 
+                className="md:hidden text-slate-400 hover:text-slate-600 p-1"
+            >
+                <span className="material-symbols-outlined">close</span>
+            </button>
+        </div>
 
-            {/* NAVIGATION */}
-            <nav className="flex flex-col gap-1.5">
-              {links.map((link) => {
-                const isActive = location.pathname.startsWith(link.path);
-                return (
-                    <Link
-                        key={link.path}
-                        to={link.path}
-                        onClick={onClose}
-                        className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all text-sm font-bold ${
-                            isActive
-                                ? 'bg-primary text-white shadow-none' 
-                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-                            }`}
-                    >
-                        <span className={`material-symbols-outlined text-[20px] ${isActive ? 'filled' : ''}`}>
-                            {link.icon}
-                        </span>
-                        <span>
-                            {link.name}
-                        </span>
-                    </Link>
-                );
-              })}
-            </nav>
-          </div>
+        {/* NAVIGATION */}
+        <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-1 no-scrollbar">
+            {links.map((link) => {
+            const isActive = location.pathname.startsWith(link.path);
+            return (
+                <Link
+                    key={link.path}
+                    to={link.path}
+                    onClick={onClose}
+                    className={`flex items-center gap-3.5 px-4 py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all duration-200 group ${
+                        isActive
+                            ? 'bg-white text-slate-900 shadow-sm shadow-gray-200/50' /* Active state pops out as white card */
+                            : 'text-slate-500 hover:bg-gray-100 hover:text-slate-900'
+                        }`}
+                >
+                    <span className={`material-symbols-outlined text-[22px] transition-colors ${isActive ? 'text-red-600 filled' : 'text-slate-400 group-hover:text-slate-600'}`}>
+                        {link.icon}
+                    </span>
+                    <span>
+                        {link.name}
+                    </span>
+                </Link>
+            );
+            })}
+        </nav>
 
-          <div className="pt-4 border-t border-gray-50">
-              <div className="flex items-center gap-3 px-3 mb-2 p-2.5 rounded-2xl bg-gray-50 border border-transparent">
+        {/* FOOTER / USER PROFILE */}
+        <div className="p-5 mt-auto">
+            <div className="flex items-center gap-3 px-3 py-3 mb-2 rounded-2xl bg-white border border-gray-100 shadow-sm cursor-pointer group hover:border-gray-200 transition-all">
                 <Avatar 
                     src={currentUser?.avatarUrl} 
                     name={displayName} 
-                    className="size-9 rounded-full bg-white text-gray-700 text-xs shadow-sm" 
+                    className="size-9 rounded-full text-xs font-bold ring-2 ring-gray-50" 
                 />
                 <div className="flex flex-col overflow-hidden">
-                  <span className="text-xs font-bold text-gray-900 truncate">
-                      {displayName}
-                  </span>
-                  <span className="text-[10px] text-gray-500 truncate font-medium uppercase tracking-wide">
-                      {role === 'master' ? 'Director' : 'Estudiante'}
-                  </span>
+                    <span className="text-sm font-bold text-slate-900 truncate group-hover:text-red-600 transition-colors">
+                        {displayName}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                        {role === 'master' ? 'Administrador' : 'Alumno'}
+                    </span>
                 </div>
-              </div>
+            </div>
 
-              <button 
-                  onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors w-full text-left text-xs font-bold uppercase tracking-wider"
-              >
-                <span className="material-symbols-outlined text-[18px]">logout</span>
+            <button 
+                onClick={handleLogout}
+                className="flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-400 hover:text-red-600 transition-colors w-full rounded-lg hover:bg-red-50 group uppercase tracking-wider justify-center"
+            >
                 <span>Cerrar Sesión</span>
-              </button>
-          </div>
+            </button>
         </div>
       </aside>
     </>
