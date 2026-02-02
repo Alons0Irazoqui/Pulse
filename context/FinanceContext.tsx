@@ -64,9 +64,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const { academySettings, students, batchUpdateStudents } = useAcademy(); 
     const { addToast } = useToast();
 
-    // --- SAFETY REF TO PREVENT INFINITE LOOP ---
-    // This breaks the dependency cycle between FinanceContext render -> batchUpdateStudents -> AcademyContext render -> FinanceContext render
+    // --- SAFETY REFS ---
+    // Prevent infinite loops in useEffects
     const batchUpdateRef = useRef(batchUpdateStudents);
+    const billingCycleRef = useRef(false);
+
     useEffect(() => {
         batchUpdateRef.current = batchUpdateStudents;
     }, [batchUpdateStudents]);
@@ -101,12 +103,40 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         loadFinanceData();
     }, [loadFinanceData]);
 
+    // --- AUTOMATION: MONTHLY BILLING CRON JOB ---
+    useEffect(() => {
+        // Guard Clauses
+        if (isFinanceLoading || !currentUser || currentUser.role !== 'master' || billingCycleRef.current) return;
+        if (students.length === 0) return; // Wait for student list to populate
+
+        const runAutomatedBilling = () => {
+            const today = new Date();
+            const currentDay = today.getDate();
+            const billingDay = academySettings.paymentSettings.billingDay;
+
+            // Trigger Condition: Is it billing day or later?
+            if (currentDay >= billingDay) {
+                // Execute Billing Logic via shared function (silent mode)
+                const createdCount = runBillingCycle(true);
+                if (createdCount > 0) {
+                    addToast(`Facturación automática: ${createdCount} cargos generados.`, 'info');
+                }
+            }
+            // Mark as run to prevent re-execution in this session
+            billingCycleRef.current = true;
+        };
+
+        runAutomatedBilling();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isFinanceLoading, students, records, academySettings, currentUser]); // Dependencies trigger check when data is ready
+
+
     // --- SYNC ENGINE: OVERDUE CHECK, DEBT CALCULATION & EXAM READINESS ---
     useEffect(() => {
         if (isFinanceLoading || students.length === 0) return;
 
         // 1. Check Overdue Status (Run once on records update)
-        const today = getLocalDate();
+        const today = getLocalDate(); // YYYY-MM-DD
         let recordsUpdated = false;
         
         const processedRecords = records.map(r => {
@@ -128,6 +158,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         if (recordsUpdated) {
             setRecords(processedRecords);
+            // We return here to let the state update trigger the next pass for student balances
             return; 
         }
 
@@ -177,7 +208,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             batchUpdateRef.current(studentsToUpdate);
         }
 
-    }, [records, students, isFinanceLoading, academySettings]); // removed batchUpdateStudents dependency to fix blank screen loop
+    }, [records, students, isFinanceLoading, academySettings]); 
 
 
     // --- CALCULATE STATS (Derived - REAL DATA) ---
@@ -263,6 +294,64 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             PulseService.savePayments(records);
         }
     }, [records, currentUser, isFinanceLoading]);
+
+
+    // --- CORE LOGIC: BILLING GENERATOR ---
+    const runBillingCycle = (silent: boolean = false): number => {
+        if (!currentUser?.academyId) return 0;
+
+        const todayStr = getLocalDate(); // YYYY-MM-DD based on local time
+        const [year, month] = todayStr.split('-');
+        const monthContext = `${year}-${month}`; // YYYY-MM
+        const monthName = new Date().toLocaleString('es-ES', { month: 'long' });
+        
+        const activeStudents = students.filter(s => s.status === 'active');
+        const newCharges: TuitionRecord[] = [];
+
+        // Calculation of Due Date based on Late Fee Day Setting
+        // Format: YYYY-MM-{lateFeeDay}
+        const lateFeeDayConfig = academySettings.paymentSettings.lateFeeDay || 10;
+        const dueDayFixed = lateFeeDayConfig.toString().padStart(2, '0');
+        const computedDueDate = `${year}-${month}-${dueDayFixed}`;
+
+        activeStudents.forEach(student => {
+            // Duplicate Check: Check for existing monthly charge for this student in this month context
+            const exists = records.some(r => 
+                r.studentId === student.id && 
+                r.category === 'Mensualidad' && 
+                r.month === monthContext
+            );
+            
+            if (exists) return;
+
+            const charge: TuitionRecord = {
+                id: generateId('bill'),
+                academyId: currentUser.academyId,
+                studentId: student.id,
+                studentName: student.name,
+                concept: `Mensualidad ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`,
+                month: monthContext,
+                category: 'Mensualidad',
+                amount: academySettings.paymentSettings.monthlyTuition,
+                originalAmount: academySettings.paymentSettings.monthlyTuition,
+                penaltyAmount: 0, // Starts at 0. Sync engine applies penalty if dueDate passes.
+                dueDate: computedDueDate,
+                status: 'pending',
+                type: 'charge',
+                paymentDate: null,
+                proofUrl: null,
+                canBePaidInParts: false,
+                description: 'Cuota mensual generada automáticamente'
+            };
+            newCharges.push(charge);
+        });
+
+        if (newCharges.length > 0) {
+            setRecords(prev => [...prev, ...newCharges]);
+        }
+
+        return newCharges.length;
+    };
 
 
     // --- ACTIONS ---
@@ -509,47 +598,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addToast('Registro eliminado', 'info');
     };
 
+    // MANUAL TRIGGER (Uses the same logic as automation)
     const generateMonthlyBilling = () => {
         if (currentUser?.role !== 'master') return;
-        const today = getLocalDate();
-        const [year, month] = today.split('-');
-        const monthContext = `${year}-${month}`;
+        const createdCount = runBillingCycle(false);
         
-        const activeStudents = students.filter(s => s.status === 'active');
-        const newCharges: TuitionRecord[] = [];
-
-        activeStudents.forEach(student => {
-            const exists = records.some(r => r.studentId === student.id && r.month === monthContext && r.category === 'Mensualidad');
-            if (exists) return;
-
-            const billingDay = academySettings.paymentSettings.lateFeeDay || 10;
-            const dueDate = `${monthContext}-${billingDay.toString().padStart(2, '0')}`;
-
-            const charge: TuitionRecord = {
-                id: generateId('bill'),
-                academyId: currentUser.academyId,
-                studentId: student.id,
-                studentName: student.name,
-                concept: `Mensualidad ${new Date().toLocaleString('es-ES', { month: 'long' })}`,
-                month: monthContext,
-                category: 'Mensualidad',
-                amount: academySettings.paymentSettings.monthlyTuition,
-                originalAmount: academySettings.paymentSettings.monthlyTuition,
-                penaltyAmount: 0,
-                dueDate: dueDate,
-                status: 'pending',
-                type: 'charge',
-                paymentDate: null,
-                proofUrl: null,
-                canBePaidInParts: false,
-                description: 'Cuota mensual regular'
-            };
-            newCharges.push(charge);
-        });
-
-        if (newCharges.length > 0) {
-            setRecords(prev => [...prev, ...newCharges]);
-            addToast(`Se generaron ${newCharges.length} cargos de mensualidad.`, 'success');
+        if (createdCount > 0) {
+            addToast(`Se generaron ${createdCount} cargos de mensualidad.`, 'success');
         } else {
             addToast('No hay cargos pendientes por generar para este mes.', 'info');
         }

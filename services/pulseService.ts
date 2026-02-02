@@ -137,8 +137,24 @@ export const PulseService = {
             studentId: userId 
         };
 
-        const initialAmount = Number(academy.paymentSettings?.monthlyTuition) || 0;
+        // --- BILLING LOGIC: FIRST MONTH ---
+        const monthlyTuition = Number(academy.paymentSettings?.monthlyTuition) || 0;
         
+        // Calculate Due Date based on Late Fee Day Setting for the CURRENT month
+        const today = new Date();
+        const year = today.getFullYear();
+        const monthIdx = today.getMonth(); // 0-11
+        const monthName = today.toLocaleString('es-ES', { month: 'long' });
+        const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+        
+        const lateFeeDay = academy.paymentSettings?.lateFeeDay || 10;
+        
+        // Format: YYYY-MM-DD
+        const monthPad = String(monthIdx + 1).padStart(2, '0');
+        const dayPad = String(lateFeeDay).padStart(2, '0');
+        const calculatedDueDate = `${year}-${monthPad}-${dayPad}`;
+        const monthContext = `${year}-${monthPad}`;
+
         // Create Student Profile (Data)
         const newStudent: Student = {
             id: userId,
@@ -170,32 +186,35 @@ export const PulseService = {
             rankId: academy.ranks[0].id,
             rankColor: 'white',
             stripes: 0,
-            status: initialAmount > 0 ? 'debtor' : 'active', 
+            status: monthlyTuition > 0 ? 'debtor' : 'active', 
             program: 'Adults',
             attendance: 0,
             totalAttendance: 0,
             joinDate: new Date().toLocaleDateString(),
-            balance: initialAmount,
+            balance: monthlyTuition, // Starts with first month debt
             classesId: [],
             attendanceHistory: [],
             avatarUrl: data.avatarUrl || ''
         };
 
         // Create the initial CHARGE record
-        if (initialAmount > 0) {
+        if (monthlyTuition > 0) {
             const initialCharge: TuitionRecord = {
                 id: uuid(),
                 academyId: academy.id,
                 studentId: userId,
                 studentName: data.name,
-                amount: initialAmount,
-                originalAmount: initialAmount,
+                amount: monthlyTuition,
+                originalAmount: monthlyTuition,
                 penaltyAmount: 0,
-                dueDate: new Date().toISOString().split('T')[0],
+                // Critical: Due date is based on the academy's specific cut-off day for this month.
+                // If today is past this date, the system will mark it as Overdue on next sync.
+                dueDate: calculatedDueDate, 
+                month: monthContext,
                 status: 'charged',
                 type: 'charge', 
-                description: 'Mensualidad (Inscripción)',
-                concept: 'Mensualidad (Inscripción)',
+                description: `Mensualidad correspondiente a ${capitalizedMonth}`,
+                concept: `Mensualidad ${capitalizedMonth}`,
                 category: 'Mensualidad',
                 method: 'System',
                 paymentDate: null,
