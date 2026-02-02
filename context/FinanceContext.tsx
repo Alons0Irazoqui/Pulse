@@ -110,9 +110,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         let recordsUpdated = false;
         
         const processedRecords = records.map(r => {
-            if (r.status === 'pending' && r.dueDate < today) {
+            // Check 'pending' (auto) and 'charged' (manual) records for expiration
+            if ((r.status === 'pending' || r.status === 'charged') && r.dueDate < today) {
                 recordsUpdated = true;
-                const penalty = academySettings.paymentSettings?.lateFeeAmount || 0;
+                
+                // --- CUSTOM PENALTY LOGIC ---
+                // If the record has a specific custom penalty, use it.
+                // Otherwise, fall back to the global academy setting.
+                const penalty = (r.customPenaltyAmount !== undefined && r.customPenaltyAmount > 0)
+                    ? r.customPenaltyAmount
+                    : (academySettings.paymentSettings?.lateFeeAmount || 0);
+
                 return { ...r, status: 'overdue', penaltyAmount: penalty } as TuitionRecord;
             }
             return r;
@@ -280,7 +288,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             method: 'System',
             proofUrl: null,
             canBePaidInParts: data.canBePaidInParts,
-            relatedEventId: data.relatedEventId
+            relatedEventId: data.relatedEventId,
+            customPenaltyAmount: data.customPenaltyAmount || 0 // Save custom penalty
         };
         setRecords(prev => [...prev, newRecord]);
         addToast('Cargo generado exitosamente', 'success');

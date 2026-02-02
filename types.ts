@@ -224,7 +224,9 @@ export interface TuitionRecord {
     
     amount: number; // Current remaining debt
     originalAmount?: number; // Audit trail: initial debt before partial payments
-    penaltyAmount: number; // Late fee
+    
+    penaltyAmount: number; // Applied Late fee
+    customPenaltyAmount?: number; // Config: Specific penalty for this record if overdue
     
     dueDate: string; // ISO String (YYYY-MM-DD)
     paymentDate: string | null; // ISO String (YYYY-MM-DDTHH:mm:ss) - Frozen on upload
@@ -266,6 +268,7 @@ export interface ManualChargeData {
     dueDate: string;
     canBePaidInParts: boolean;
     relatedEventId?: string;
+    customPenaltyAmount?: number;
 }
 
 export interface UserProfile {

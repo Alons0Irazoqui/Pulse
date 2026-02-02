@@ -252,7 +252,7 @@ const AgendaView: React.FC<{
     onEventClick: (event: CalendarEvent) => void;
 }> = ({ events, onEventClick }) => {
     
-    const agendaItems = useMemo(() => {
+    const agendaItems = useMemo<CalendarEvent[]>(() => {
         const today = new Date();
         today.setHours(0,0,0,0);
         
@@ -261,7 +261,7 @@ const AgendaView: React.FC<{
             .sort((a, b) => a.start.getTime() - b.start.getTime());
     }, [events]);
 
-    const grouped = useMemo(() => {
+    const grouped = useMemo<Record<string, CalendarEvent[]>>(() => {
         const groups: Record<string, CalendarEvent[]> = {};
         agendaItems.forEach(evt => {
             const key = format(evt.start, 'yyyy-MM-dd');
@@ -284,7 +284,7 @@ const AgendaView: React.FC<{
                 </div>
             ) : (
                 <div className="relative border-l-2 border-gray-100 ml-4 space-y-12 pb-20">
-                    {Object.entries(grouped).map(([dateStr, items]) => {
+                    {Object.entries(grouped).map(([dateStr, items]: [string, CalendarEvent[]]) => {
                         const dateObj = new Date(dateStr + 'T00:00:00');
                         const isToday = isSameDay(dateObj, new Date());
 

@@ -27,6 +27,7 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
     const [description, setDescription] = useState('');
     
     const [amount, setAmount] = useState<string>('');
+    const [surcharge, setSurcharge] = useState<string>(''); // Nuevo estado para recargo
     const [dueDate, setDueDate] = useState<string>(getLocalDate());
     const [canBePaidInParts, setCanBePaidInParts] = useState(false);
 
@@ -81,7 +82,8 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
             amount: parseFloat(amount),
             dueDate: dueDate,
             canBePaidInParts,
-            relatedEventId: categoryGroup === 'event' ? selectedEventId : undefined
+            relatedEventId: categoryGroup === 'event' ? selectedEventId : undefined,
+            customPenaltyAmount: surcharge ? parseFloat(surcharge) : 0 // Integración del recargo
         });
 
         handleClose();
@@ -91,6 +93,7 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
         setStudentId('');
         setCategoryGroup('event');
         setAmount('');
+        setSurcharge(''); // Reset recargo
         setCustomTitle('');
         setDescription('');
         setCanBePaidInParts(false);
@@ -224,6 +227,25 @@ const CreateChargeModal: React.FC<CreateChargeModalProps> = ({ isOpen, onClose }
                                             placeholder="0.00"
                                         />
                                     </div>
+                                </div>
+
+                                {/* Nuevo Input de Recargo */}
+                                <div className="space-y-2">
+                                    <label className="block text-xs font-medium text-gray-500 ml-1">Recargo por Vencimiento ($)</label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                        <input 
+                                            type="number"
+                                            min="0"
+                                            value={surcharge}
+                                            onChange={(e) => setSurcharge(e.target.value)}
+                                            className={`${inputClasses} !pl-8 !bg-white`}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 ml-1 font-medium">
+                                        Se aplicará automáticamente si pasa la fecha límite.
+                                    </p>
                                 </div>
 
                                 <div className="space-y-2">

@@ -44,6 +44,15 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
       return baseCalculation;
   }, [record, totalPaid]);
 
+  // --- LOGICA DE DESGLOSE VISUAL ---
+  const penaltyVal = useMemo(() => {
+      return (record.customPenaltyAmount && record.customPenaltyAmount > 0)
+          ? record.customPenaltyAmount
+          : (record.penaltyAmount || 0);
+  }, [record]);
+
+  const baseVal = originalTotal - penaltyVal;
+
   const remainingDebt = record.amount + (record.penaltyAmount || 0);
 
   const getStatusConfig = (status: string) => {
@@ -89,6 +98,13 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               <h2 className="text-2xl font-black text-slate-900 mt-2 leading-tight">
                 {record.concept}
               </h2>
+              {/* Badge de Recargo en Header */}
+              {penaltyVal > 0 && (
+                  <div className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100 uppercase tracking-wide">
+                      <span className="material-symbols-outlined text-[12px] filled">info</span>
+                      Incluye recargo de: {formatMoney(penaltyVal)}
+                  </div>
+              )}
             </div>
           </div>
           
@@ -100,12 +116,23 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
         <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-white">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            
+            {/* COSTO ORIGINAL CARD - ACTUALIZADA CON DESGLOSE */}
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-28">
                <div className="flex items-center gap-2 text-gray-400 mb-1">
                   <span className="material-symbols-outlined text-lg">receipt_long</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider">Costo Orig.</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider">
+                      {penaltyVal > 0 ? 'Base + Recargo' : 'Costo Orig.'}
+                  </span>
                </div>
-               <span className="text-2xl font-bold text-slate-900 tabular-nums">{formatMoney(originalTotal)}</span>
+               <div className="flex flex-col">
+                   <span className="text-2xl font-bold text-slate-900 tabular-nums leading-none">{formatMoney(originalTotal)}</span>
+                   {penaltyVal > 0 && (
+                       <p className="text-[10px] text-gray-400 font-medium mt-1">
+                           {formatMoney(baseVal)} + {formatMoney(penaltyVal)}
+                       </p>
+                   )}
+               </div>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-28">

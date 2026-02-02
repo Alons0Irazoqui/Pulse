@@ -19,7 +19,7 @@ export const generateReceipt = (
         return;
     }
 
-    // --- 1. LOGIC ENGINE (PRESERVED) ---
+    // --- 1. LOGIC ENGINE ---
 
     let history: PaymentHistoryItem[] = [];
     let currentPaymentAmount = 0;
@@ -28,6 +28,13 @@ export const generateReceipt = (
     // Calculate Total Cost (Original + Penalty)
     const baseAmount = record.originalAmount !== undefined ? record.originalAmount : record.amount;
     const totalCost = baseAmount + (record.penaltyAmount || 0);
+
+    // --- DISPLAY LOGIC: DETAILED BREAKDOWN ---
+    const displayedPenalty = (record.customPenaltyAmount && record.customPenaltyAmount > 0)
+        ? record.customPenaltyAmount
+        : (record.penaltyAmount || 0);
+
+    const displayBase = totalCost - displayedPenalty;
 
     if (options && options.currentPaymentAmount !== undefined) {
         // CONTEXT 1: JUST PAID
@@ -72,12 +79,11 @@ export const generateReceipt = (
     const totalPaid = previousPaid + currentPaymentAmount;
     const remainingBalance = Math.max(0, totalCost - totalPaid);
 
-    // --- 2. DISPLAY LOGIC (UPDATED DESIGN VARIABLES) ---
+    // --- 2. DISPLAY LOGIC ---
 
     const isLiquidation = remainingBalance < 0.01;
     
     const statusLabel = isLiquidation ? 'COMPLETADO' : 'PARCIAL';
-    const statusColor = isLiquidation ? '#10b981' : '#f59e0b'; 
     const statusBg = isLiquidation ? '#ecfdf5' : '#fffbeb';
     const statusBorder = isLiquidation ? '#059669' : '#d97706';
 
@@ -89,12 +95,10 @@ export const generateReceipt = (
     const safeConcept = record.concept.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
     const fileName = `Recibo_${safeConcept}`;
 
-    // Helper to format currency
     const formatMoney = (amount: number) => {
         return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
     };
 
-    // History Rows Generation
     const historyRows = history.map(h => `
         <tr class="item-row">
             <td style="color: #6b7280;">${new Date(h.date).toLocaleDateString('es-MX')}</td>
@@ -103,7 +107,7 @@ export const generateReceipt = (
         </tr>
     `).join('');
 
-    // --- 3. NEW HTML STRUCTURE (CORPORATE STYLE) ---
+    // --- 3. HTML STRUCTURE ---
 
     const html = `
     <!DOCTYPE html>
@@ -116,7 +120,7 @@ export const generateReceipt = (
             
             body {
                 font-family: 'Inter', sans-serif;
-                background-color: #525659; /* PDF Viewer Background */
+                background-color: #525659;
                 margin: 0;
                 padding: 40px 0;
                 -webkit-print-color-adjust: exact;
@@ -124,7 +128,7 @@ export const generateReceipt = (
 
             .page {
                 background: white;
-                width: 210mm; /* A4 width */
+                width: 210mm;
                 min-height: 297mm;
                 margin: 0 auto;
                 padding: 40px 50px;
@@ -166,7 +170,7 @@ export const generateReceipt = (
             .brand-section .subtitle {
                 margin-top: 4px;
                 font-size: 12px;
-                color: #f97316; /* Orange Brand Color */
+                color: #f97316;
                 font-weight: 600;
                 text-transform: uppercase;
                 letter-spacing: 1px;
@@ -255,8 +259,8 @@ export const generateReceipt = (
 
             .concept-detail {
                 font-size: 12px;
-                color: #6b7280;
-                font-weight: 400;
+                color: #ef4444;
+                font-weight: 500;
                 margin-top: 4px;
             }
 
@@ -371,13 +375,13 @@ export const generateReceipt = (
             <!-- INFO -->
             <div class="info-grid">
                 <div class="info-block">
-                    <h3>Recibido De</h3>
-                    <p style="font-size: 16px; font-weight: 700;">${record.studentName}</p>
-                    <p style="margin-top: 2px; color: #6b7280; font-size: 12px;">ID: ${record.studentId}</p>
+                    <h3>Recibimos de</h3>
+                    <p>${record.studentName}</p>
+                    <p style="margin-top: 4px; font-size: 12px; color: #6b7280;">ID: ${record.studentId}</p>
                 </div>
                 <div class="info-block text-right">
-                    <h3>Método de Pago Actual</h3>
-                    <p>${history.length > 0 ? history[history.length-1].method : (record.method || 'No especificado')}</p>
+                    <h3>Total Global</h3>
+                    <p style="font-size: 20px; font-weight: 800;">${formatMoney(totalCost)}</p>
                 </div>
             </div>
 
@@ -385,69 +389,62 @@ export const generateReceipt = (
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 60%">Concepto / Descripción</th>
-                        <th class="text-right">Categoría</th>
-                        <th class="text-right">Importe Total</th>
+                        <th width="70%">Concepto</th>
+                        <th width="30%" class="text-right">Importe Total</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr class="main-row">
                         <td>
                             ${record.concept}
-                            <div class="concept-detail">${record.description || 'Sin descripción adicional'}</div>
+                            ${displayedPenalty > 0 ? `
+                                <div class="concept-detail">
+                                    (Precio Base: ${formatMoney(displayBase)} + Recargo: ${formatMoney(displayedPenalty)})
+                                </div>
+                            ` : ''}
                         </td>
-                        <td class="text-right" style="font-size: 13px; font-weight: 500; color: #6b7280;">
-                            ${record.category || 'General'}
-                        </td>
-                        <td class="text-right">
-                            ${formatMoney(totalCost)}
-                        </td>
+                        <td class="text-right">${formatMoney(totalCost)}</td>
                     </tr>
                 </tbody>
             </table>
 
-            <!-- SUMMARY CALCULATION -->
+            <!-- SUMMARY -->
             <div class="summary-section">
                 <div class="summary-table">
                     <div class="summary-row">
                         <span>Costo Original</span>
-                        <span>${formatMoney(baseAmount)}</span>
+                        <span>${formatMoney(displayBase)}</span>
                     </div>
-                    ${record.penaltyAmount > 0 ? `
-                    <div class="summary-row" style="color: #ef4444;">
-                        <span>(+) Recargos</span>
-                        <span>${formatMoney(record.penaltyAmount)}</span>
-                    </div>
+                    ${displayedPenalty > 0 ? `
+                        <div class="summary-row">
+                            <span>(+) Recargos</span>
+                            <span>${formatMoney(displayedPenalty)}</span>
+                        </div>
                     ` : ''}
-                    
-                    ${previousPaid > 0 ? `
-                    <div class="summary-row">
-                        <span>(-) Abonos Previos</span>
-                        <span>${formatMoney(previousPaid)}</span>
-                    </div>
-                    ` : ''}
-
-                    <div class="summary-row paid">
-                        <span>(-) Pago Recibido</span>
-                        <span>${formatMoney(currentPaymentAmount)}</span>
-                    </div>
-
                     <div class="summary-row total">
-                        <span>Total Restante</span>
-                        <span class="balance">${formatMoney(remainingBalance)}</span>
+                        <span>Total a Pagar</span>
+                        <span>${formatMoney(totalCost)}</span>
+                    </div>
+                    <div class="summary-row paid">
+                        <span>(-) Pagado Total</span>
+                        <span>${formatMoney(totalPaid)}</span>
+                    </div>
+                    <div class="summary-row balance">
+                        <span>Saldo Pendiente</span>
+                        <span>${formatMoney(remainingBalance)}</span>
                     </div>
                 </div>
             </div>
 
-            <!-- PAYMENT HISTORY -->
+            <!-- HISTORY -->
             <div class="history-section">
                 <div class="history-title">Historial de Transacciones</div>
                 <table>
                     <thead>
                         <tr>
-                            <th>Fecha</th>
-                            <th>Forma de Pago</th>
-                            <th class="text-right">Monto Aplicado</th>
+                            <th width="30%">Fecha</th>
+                            <th width="40%">Método</th>
+                            <th width="30%" class="text-right">Monto</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -458,8 +455,8 @@ export const generateReceipt = (
 
             <!-- FOOTER -->
             <div class="footer">
-                <p>Gracias por tu pago. Si tienes dudas, contacta a la administración.</p>
-                <p style="margin-top: 5px;"><strong>${academy.name}</strong> | Comprobante Digital Generado el ${new Date().toLocaleString()}</p>
+                <p>Gracias por tu pago. Este comprobante es un documento interno de <strong>${academy.name}</strong>.</p>
+                <p style="margin-top: 5px;">Cualquier duda contactar a administración.</p>
             </div>
 
         </div>
