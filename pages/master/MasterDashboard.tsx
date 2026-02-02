@@ -74,7 +74,8 @@ const MasterDashboard: React.FC = () => {
 
     // 5. Datos Donut (Grados con Colores Estáticos)
     const studentsByRank = useMemo(() => {
-        const activeStudents = students.filter(s => s.status === 'active');
+        // FIX: Include all students except 'inactive' (active, debtor, exam_ready)
+        const activeStudents = students.filter(s => s.status !== 'inactive');
         const distribution: Record<string, number> = {};
 
         activeStudents.forEach(s => {
@@ -313,7 +314,11 @@ const MasterDashboard: React.FC = () => {
                             </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col">
-                            <span className="text-4xl font-black text-slate-900 animate-in zoom-in duration-700">{stats.activeStudents}</span>
+                            {/* We show activeStudents count from logic but stats.activeStudents is what we have in context.
+                                Since we modified logic here, let's sum up the values to be consistent with the chart */}
+                            <span className="text-4xl font-black text-slate-900 animate-in zoom-in duration-700">
+                                {studentsByRank.reduce((acc, curr) => acc + curr.value, 0)}
+                            </span>
                             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Total</span>
                         </div>
                     </div>

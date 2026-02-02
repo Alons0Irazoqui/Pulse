@@ -1,4 +1,3 @@
-
 import React, { ErrorInfo, ReactNode } from 'react';
 
 interface ErrorBoundaryProps {
@@ -11,24 +10,24 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public state: ErrorBoundaryState = {
+  state: ErrorBoundaryState = {
     hasError: false,
     error: null
   };
 
-  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
   }
 
-  public handleRetry = () => {
+  handleRetry = () => {
     this.setState({ hasError: false, error: null });
   };
 
-  public render() {
+  render() {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-6">
