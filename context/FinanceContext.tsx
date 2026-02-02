@@ -1,16 +1,24 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { TuitionRecord, ManualChargeData, ChargeCategory } from '../types';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { TuitionRecord, ManualChargeData, ChargeCategory, Student, TuitionStatus } from '../types';
 import { PulseService } from '../services/pulseService';
 import { useAuth } from './AuthContext';
-import { useAcademy } from './AcademyContext';
+import { useAcademy } from './AcademyContext'; // Need academy settings for billing
 import { useToast } from './ToastContext';
+import { getLocalDate } from '../utils/dateUtils';
 
-// Helper to generate IDs
-const generateId = (prefix: string = 'tx') => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
+// Helper for ID generation
+const generateId = (prefix: string = 'id') => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return `${prefix}-${crypto.randomUUID()}`;
+    }
     return `${prefix}-${Date.now()}`;
 };
+
+interface RevenueData {
+    name: string;
+    total: number;
+}
 
 interface FinanceStats {
     totalRevenue: number;
@@ -21,64 +29,236 @@ interface FinanceStats {
 
 interface FinanceContextType {
     records: TuitionRecord[];
+    monthlyRevenueData: RevenueData[];
+    rollingRevenueData: RevenueData[];
     stats: FinanceStats;
-    monthlyRevenueData: { name: string; total: number }[];
-    rollingRevenueData: { name: string; total: number }[];
     isFinanceLoading: boolean;
+
+    // Actions
     refreshFinance: () => void;
-    
-    createRecord: (record: TuitionRecord) => void;
     createManualCharge: (data: ManualChargeData) => void;
-    updateRecordAmount: (id: string, amount: number) => void;
-    deleteRecord: (id: string) => void;
-    
-    approvePayment: (id: string, amount?: number) => void;
-    rejectPayment: (id: string) => void;
-    
-    registerBatchPayment: (recordIds: string[], file: File, method: 'Transferencia' | 'Efectivo', totalAmount: number, details: any[]) => void;
-    approveBatchPayment: (batchId: string, amount?: number) => void;
+    createRecord: (record: TuitionRecord) => void; 
+    approvePayment: (recordId: string, amountPaid?: number) => void;
+    rejectPayment: (recordId: string) => void;
+    approveBatchPayment: (batchId: string, totalAmountPaid: number) => void;
     rejectBatchPayment: (batchId: string) => void;
-    
-    uploadProof: (recordId: string, file: File) => void;
-    
+    registerBatchPayment: (
+        recordIds: string[], 
+        file: File | null, 
+        method: 'Transferencia' | 'Efectivo',
+        totalAmount: number,
+        details: { description: string; amount: number }[]
+    ) => void;
+    updateRecordAmount: (recordId: string, newAmount: number) => void;
+    deleteRecord: (recordId: string) => void;
     generateMonthlyBilling: () => void;
     purgeStudentDebts: (studentId: string) => void;
     getStudentPendingDebts: (studentId: string) => TuitionRecord[];
+    uploadProof: (recordId: string, file: File) => void; 
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { currentUser } = useAuth();
-    const { students, academySettings } = useAcademy();
+    const { academySettings, students, batchUpdateStudents } = useAcademy(); 
     const { addToast } = useToast();
-    
+
+    // --- SAFETY REF TO PREVENT INFINITE LOOP ---
+    // This breaks the dependency cycle between FinanceContext render -> batchUpdateStudents -> AcademyContext render -> FinanceContext render
+    const batchUpdateRef = useRef(batchUpdateStudents);
+    useEffect(() => {
+        batchUpdateRef.current = batchUpdateStudents;
+    }, [batchUpdateStudents]);
+
     const [records, setRecords] = useState<TuitionRecord[]>([]);
     const [isFinanceLoading, setIsFinanceLoading] = useState(true);
     
-    const [stats, setStats] = useState<FinanceStats>({ totalRevenue: 0, pendingCollection: 0, overdueAmount: 0, activeStudents: 0 });
-    const [monthlyRevenueData, setMonthlyRevenueData] = useState<{ name: string; total: number }[]>([]);
-    const [rollingRevenueData, setRollingRevenueData] = useState<{ name: string; total: number }[]>([]);
+    // Stats State
+    const [monthlyRevenueData, setMonthlyRevenueData] = useState<RevenueData[]>([]);
+    const [rollingRevenueData, setRollingRevenueData] = useState<RevenueData[]>([]);
+    const [stats, setStats] = useState<FinanceStats>({
+        totalRevenue: 0,
+        pendingCollection: 0,
+        overdueAmount: 0,
+        activeStudents: 0
+    });
 
-    const refreshFinance = useCallback(() => {
+    // --- LOAD DATA ---
+    const loadFinanceData = useCallback(() => {
         if (currentUser?.academyId) {
             setIsFinanceLoading(true);
-            const data = PulseService.getPayments(currentUser.academyId);
-            setRecords(data);
+            const dbRecords = PulseService.getPayments(currentUser.academyId);
+            setRecords(dbRecords);
+            setIsFinanceLoading(false);
+        } else {
+            setRecords([]);
             setIsFinanceLoading(false);
         }
     }, [currentUser]);
 
     useEffect(() => {
-        refreshFinance();
-    }, [refreshFinance]);
+        loadFinanceData();
+    }, [loadFinanceData]);
+
+    // --- CORE LOGIC: BILLING GENERATION (AUTOMATED & MANUAL) ---
+    // Extract logic to reused function
+    const runBillingProcess = useCallback(() => {
+        // Validation: Master Role Only
+        if (!currentUser || currentUser.role !== 'master') return 0;
+
+        const todayDate = new Date();
+        const currentDay = todayDate.getDate(); // 1-31
+        const billingDay = academySettings.paymentSettings.billingDay;
+
+        // Condition: Only run if we passed the billing day
+        if (currentDay >= billingDay) {
+            const dateStr = getLocalDate(); // YYYY-MM-DD
+            const [year, month] = dateStr.split('-');
+            const monthContext = `${year}-${month}`; // YYYY-MM context
+            
+            // Due Date Calculation: Use lateFeeDay configuration
+            const lateFeeDay = academySettings.paymentSettings.lateFeeDay || 10;
+            const dueDate = `${monthContext}-${lateFeeDay.toString().padStart(2, '0')}`;
+
+            const activeStudents = students.filter(s => s.status === 'active');
+            const newCharges: TuitionRecord[] = [];
+
+            activeStudents.forEach(student => {
+                // Verification: Check if "Mensualidad" already exists for this YYYY-MM
+                const exists = records.some(r => 
+                    r.studentId === student.id && 
+                    r.month === monthContext && 
+                    r.category === 'Mensualidad'
+                );
+                
+                if (exists) return;
+
+                // Create Charge
+                const charge: TuitionRecord = {
+                    id: generateId('bill'),
+                    academyId: currentUser.academyId,
+                    studentId: student.id,
+                    studentName: student.name,
+                    concept: `Mensualidad ${todayDate.toLocaleString('es-ES', { month: 'long' })}`,
+                    month: monthContext,
+                    category: 'Mensualidad',
+                    amount: academySettings.paymentSettings.monthlyTuition,
+                    originalAmount: academySettings.paymentSettings.monthlyTuition,
+                    penaltyAmount: 0,
+                    dueDate: dueDate,
+                    status: 'pending',
+                    type: 'charge',
+                    paymentDate: null,
+                    proofUrl: null,
+                    canBePaidInParts: false,
+                    description: 'Cuota mensual regular'
+                };
+                newCharges.push(charge);
+            });
+
+            if (newCharges.length > 0) {
+                setRecords(prev => [...prev, ...newCharges]);
+                return newCharges.length;
+            }
+        }
+        return 0;
+    }, [currentUser, academySettings, students, records]);
+
+    // --- AUTOMATION EFFECT: MONTHLY BILLING ---
+    useEffect(() => {
+        if (!isFinanceLoading && students.length > 0) {
+            const createdCount = runBillingProcess();
+            if (createdCount > 0) {
+                addToast(`Facturación automática: ${createdCount} cargos generados.`, 'info');
+            }
+        }
+    }, [isFinanceLoading, students.length, runBillingProcess]); // Limited dependencies to prevent loops
+
+
+    // --- SYNC ENGINE: OVERDUE CHECK, DEBT CALCULATION & EXAM READINESS ---
+    useEffect(() => {
+        if (isFinanceLoading || students.length === 0) return;
+
+        const today = getLocalDate();
+        let recordsUpdated = false;
+        
+        // 1. Check Overdue Status & Apply Penalties
+        const processedRecords = records.map(r => {
+            // Check 'pending' (auto) and 'charged' (manual) records for expiration
+            if ((r.status === 'pending' || r.status === 'charged') && r.dueDate < today) {
+                recordsUpdated = true;
+                
+                // --- PENALTY LOGIC ---
+                // Priority: Custom Penalty -> Global Academy Setting
+                const penalty = (r.customPenaltyAmount !== undefined && r.customPenaltyAmount > 0)
+                    ? r.customPenaltyAmount
+                    : (academySettings.paymentSettings?.lateFeeAmount || 0);
+
+                return { ...r, status: 'overdue', penaltyAmount: penalty } as TuitionRecord;
+            }
+            return r;
+        });
+
+        if (recordsUpdated) {
+            setRecords(processedRecords);
+            return; // Stop here, next render will handle student status updates
+        }
+
+        // 2. Calculate Student Balances & Update Status Logic
+        const studentsToUpdate: Student[] = [];
+        
+        students.forEach(student => {
+            // A. Calculate Debt
+            const studentRecords = records.filter(r => r.studentId === student.id);
+            const debt = studentRecords.reduce((acc, r) => {
+                if (['pending', 'overdue', 'partial', 'charged'].includes(r.status)) {
+                    return acc + r.amount + r.penaltyAmount;
+                }
+                return acc;
+            }, 0);
+
+            // B. Calculate Exam Readiness
+            const currentRank = academySettings.ranks.find(r => r.id === student.rankId);
+            const requiredAttendance = currentRank ? currentRank.requiredAttendance : 9999;
+            const isAcademicReady = student.attendance >= requiredAttendance;
+            const hasDebt = debt > 0.01;
+
+            let newStatus = student.status;
+
+            // C. Determine Status (Priority Logic)
+            if (student.status !== 'inactive') {
+                if (isAcademicReady) {
+                    newStatus = 'exam_ready';
+                } else {
+                    if (hasDebt) {
+                        newStatus = 'debtor';
+                    } else {
+                        newStatus = 'active';
+                    }
+                }
+            }
+
+            // Detect if update is needed
+            const currentBalance = student.balance || 0;
+            if (Math.abs(currentBalance - debt) > 0.01 || student.status !== newStatus) {
+                studentsToUpdate.push({ ...student, balance: debt, status: newStatus });
+            }
+        });
+
+        if (studentsToUpdate.length > 0) {
+            // SAFE CALL using Ref to prevent loop
+            batchUpdateRef.current(studentsToUpdate);
+        }
+
+    }, [records, students, isFinanceLoading, academySettings]); 
+
 
     // --- CALCULATE STATS (Derived - REAL DATA) ---
     useEffect(() => {
         if (isFinanceLoading) return;
 
-        // 1. Calculate General Stats
-        // Updated: Included 'in_review' so pending collection reflects all unpaid amounts until approved/paid.
+        // 1. Calculate General Stats - Updated to include 'in_review' in pending totals
         const pending = records.filter(r => ['pending', 'partial', 'charged', 'in_review'].includes(r.status));
         const overdue = records.filter(r => r.status === 'overdue');
         
@@ -151,238 +331,306 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     }, [records, isFinanceLoading, students]);
 
+    // --- PERSISTENCE ---
+    useEffect(() => {
+        if (currentUser && !isFinanceLoading) {
+            PulseService.savePayments(records);
+        }
+    }, [records, currentUser, isFinanceLoading]);
+
+
     // --- ACTIONS ---
 
-    const saveAndRefresh = (newRecords: TuitionRecord[]) => {
-        PulseService.savePayments(newRecords);
-        setRecords(newRecords);
+    const createManualCharge = (data: ManualChargeData) => {
+        if (currentUser?.role !== 'master') return;
+        const finalAmount = Number(data.amount);
+        const newRecord: TuitionRecord = {
+            id: generateId('chg'),
+            academyId: currentUser.academyId,
+            studentId: data.studentId,
+            studentName: students.find(s => s.id === data.studentId)?.name || 'Estudiante',
+            concept: data.title,
+            description: data.description,
+            amount: finalAmount, 
+            originalAmount: finalAmount, 
+            penaltyAmount: 0, 
+            dueDate: data.dueDate,
+            paymentDate: null,
+            status: 'charged',
+            type: 'charge',
+            category: data.category,
+            method: 'System',
+            proofUrl: null,
+            canBePaidInParts: data.canBePaidInParts,
+            relatedEventId: data.relatedEventId,
+            customPenaltyAmount: data.customPenaltyAmount || 0 // Save custom penalty
+        };
+        setRecords(prev => [...prev, newRecord]);
+        addToast('Cargo generado exitosamente', 'success');
     };
 
     const createRecord = (record: TuitionRecord) => {
-        const newRecords = [...records, record];
-        saveAndRefresh(newRecords);
+        setRecords(prev => [...prev, record]);
     };
 
-    const createManualCharge = (data: ManualChargeData) => {
-        const student = students.find(s => s.id === data.studentId);
-        if (!student) return;
+    const registerBatchPayment = (
+        recordIds: string[], 
+        file: File | null, 
+        method: 'Transferencia' | 'Efectivo',
+        totalAmount: number,
+        details: { description: string; amount: number }[]
+    ) => {
+        const fakeUrl = file ? URL.createObjectURL(file) : null;
+        const proofType = file?.type;
+        const batchId = generateId('batch');
+        const paymentDate = new Date().toISOString();
 
-        const newRecord: TuitionRecord = {
-            id: generateId('chg'),
-            academyId: currentUser?.academyId || '',
-            studentId: data.studentId,
-            studentName: student.name,
-            concept: data.title,
-            description: data.description,
-            category: data.category,
-            amount: data.amount,
-            originalAmount: data.amount,
-            penaltyAmount: 0,
-            customPenaltyAmount: data.customPenaltyAmount,
-            dueDate: data.dueDate,
-            status: 'charged', // Manual charge is 'charged' (pending)
-            type: 'charge',
-            paymentDate: null,
-            proofUrl: null,
-            canBePaidInParts: data.canBePaidInParts,
-            relatedEventId: data.relatedEventId
-        };
-        createRecord(newRecord);
-        addToast('Cargo generado', 'success');
-    };
-
-    const updateRecordAmount = (id: string, amount: number) => {
-        const newRecords = records.map(r => r.id === id ? { ...r, amount, originalAmount: amount } : r);
-        saveAndRefresh(newRecords);
-    };
-
-    const deleteRecord = (id: string) => {
-        PulseService.deletePayment(id);
-        setRecords(prev => prev.filter(r => r.id !== id));
-        addToast('Registro eliminado', 'success');
-    };
-
-    const approvePayment = (id: string, amount?: number) => {
-        const newRecords = records.map(r => {
-            if (r.id === id) {
-                // If amount specified is less than total debt, it's partial
-                const totalDebt = r.amount + r.penaltyAmount;
-                const paidAmount = amount !== undefined ? amount : totalDebt;
-                
-                if (paidAmount < totalDebt - 0.01) {
-                    // Partial Payment
-                    const newAmount = totalDebt - paidAmount;
-                    return {
-                        ...r,
-                        status: 'partial' as const,
-                        amount: newAmount, // Update remaining amount
-                        penaltyAmount: 0,
-                        paymentDate: new Date().toISOString(),
-                        paymentHistory: [...(r.paymentHistory || []), { date: new Date().toISOString(), amount: paidAmount, method: r.method }]
-                    };
-                } else {
-                    // Full Payment
-                    return { 
-                        ...r, 
-                        status: 'paid' as const, 
-                        amount: 0,
-                        penaltyAmount: 0,
-                        paymentDate: new Date().toISOString(),
-                        paymentHistory: [...(r.paymentHistory || []), { date: new Date().toISOString(), amount: paidAmount, method: r.method }]
-                    };
-                }
-            }
-            return r;
-        });
-        saveAndRefresh(newRecords);
-        addToast('Pago aprobado', 'success');
-    };
-
-    const rejectPayment = (id: string) => {
-        const newRecords = records.map(r => r.id === id ? { ...r, status: 'pending' as const, proofUrl: null } : r);
-        saveAndRefresh(newRecords);
-        addToast('Pago rechazado', 'info');
-    };
-
-    const registerBatchPayment = (recordIds: string[], file: File, method: 'Transferencia' | 'Efectivo', totalAmount: number, details: any[]) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const proofUrl = method === 'Transferencia' ? (reader.result as string) : null;
-            const batchId = generateId('batch');
-            const now = new Date().toISOString();
-
-            const newRecords = records.map(r => {
-                if (recordIds.includes(r.id)) {
-                    return {
-                        ...r,
-                        status: 'in_review' as const,
-                        proofUrl,
-                        proofType: file?.type,
-                        method,
-                        batchPaymentId: batchId,
-                        paymentDate: now,
-                        declaredAmount: totalAmount
-                    };
-                }
-                return r;
-            });
-            saveAndRefresh(newRecords);
-            addToast('Pago registrado para revisión', 'success');
-        };
-        
-        if (file) {
-            reader.readAsDataURL(file);
-        } else {
-            reader.onloadend!({} as any);
-        }
-    };
-
-    const approveBatchPayment = (batchId: string, amount?: number) => {
-        const newRecords = records.map(r => {
-            if (r.batchPaymentId === batchId) {
-                return { 
-                    ...r, 
-                    status: 'paid' as const, 
-                    paymentDate: new Date().toISOString(),
-                    amount: 0,
-                    penaltyAmount: 0,
-                    paymentHistory: [...(r.paymentHistory || []), { date: new Date().toISOString(), amount: r.amount + r.penaltyAmount, method: r.method }] 
+        setRecords(prev => prev.map(r => {
+            if (recordIds.includes(r.id)) {
+                return {
+                    ...r,
+                    status: 'in_review',
+                    paymentDate: paymentDate,
+                    proofUrl: fakeUrl,
+                    proofType: proofType,
+                    method: method,
+                    batchPaymentId: batchId,
+                    declaredAmount: totalAmount,
+                    details: details 
                 };
             }
             return r;
+        }));
+        addToast('Pago registrado y enviado a revisión', 'success');
+    };
+
+    const approvePayment = (recordId: string, amountPaid?: number) => {
+        setRecords(prev => prev.map(r => {
+            if (r.id === recordId) {
+                const currentPenalty = r.penaltyAmount || 0;
+                const totalDebt = r.amount + currentPenalty;
+                const amountToApply = amountPaid !== undefined ? amountPaid : totalDebt;
+                const remaining = Math.max(0, totalDebt - amountToApply);
+                const isPaidFull = remaining < 0.01;
+
+                const newHistoryItem = {
+                    date: new Date().toISOString(),
+                    amount: amountToApply,
+                    method: r.method || 'System'
+                };
+
+                return {
+                    ...r,
+                    status: isPaidFull ? 'paid' : 'partial',
+                    amount: isPaidFull ? 0 : remaining,
+                    originalAmount: isPaidFull ? (r.originalAmount ?? r.amount) + currentPenalty : (r.originalAmount ?? r.amount),
+                    penaltyAmount: 0, 
+                    paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
+                };
+            }
+            return r;
+        }));
+        addToast('Pago aprobado', 'success');
+    };
+
+    const rejectPayment = (recordId: string) => {
+        setRecords(prev => prev.map(r => {
+            if (r.id === recordId) {
+                return {
+                    ...r,
+                    status: (r.dueDate < getLocalDate() ? 'overdue' : 'pending') as TuitionStatus,
+                    paymentDate: null,
+                    proofUrl: null,
+                    batchPaymentId: undefined
+                };
+            }
+            return r;
+        }));
+        addToast('Pago rechazado', 'info');
+    };
+
+    const approveBatchPayment = (batchId: string, totalAmountPaid: number) => {
+        setRecords(prev => {
+            const batchRecords = prev.filter(r => r.batchPaymentId === batchId);
+            batchRecords.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+            
+            let available = totalAmountPaid;
+            
+            const updatedBatch = batchRecords.map(r => {
+                const currentPenalty = r.penaltyAmount || 0;
+                const totalDebt = r.amount + currentPenalty;
+                let paid = 0;
+                
+                if (!r.canBePaidInParts) {
+                    if (available >= totalDebt - 0.01) {
+                        paid = totalDebt;
+                        available -= totalDebt;
+                    }
+                } else {
+                    if (available > 0) {
+                        paid = Math.min(available, totalDebt);
+                        available -= paid;
+                    }
+                }
+
+                const remaining = Math.max(0, totalDebt - paid);
+                const isPaidFull = remaining < 0.01;
+                
+                if (paid > 0) {
+                    const newHistoryItem = {
+                        date: new Date().toISOString(),
+                        amount: paid,
+                        method: r.method || 'Batch'
+                    };
+
+                    return {
+                        ...r,
+                        status: isPaidFull ? 'paid' : 'partial',
+                        amount: isPaidFull ? 0 : remaining,
+                        originalAmount: isPaidFull ? (r.originalAmount ?? r.amount) + currentPenalty : (r.originalAmount ?? r.amount),
+                        penaltyAmount: 0, 
+                        paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
+                    } as TuitionRecord;
+                } 
+                
+                if (paid === 0) {
+                     return {
+                        ...r,
+                        status: (r.dueDate < getLocalDate() ? 'overdue' : 'pending') as TuitionStatus,
+                    };
+                }
+
+                return r;
+            });
+
+            return prev.map(r => {
+                const updated = updatedBatch.find(u => u.id === r.id);
+                return updated || r;
+            });
         });
-        saveAndRefresh(newRecords);
         addToast('Lote de pagos aprobado', 'success');
     };
 
     const rejectBatchPayment = (batchId: string) => {
-        const newRecords = records.map(r => {
+        setRecords(prev => prev.map(r => {
             if (r.batchPaymentId === batchId) {
-                return { ...r, status: 'pending' as const, proofUrl: null, batchPaymentId: undefined };
-            }
-            return r;
-        });
-        saveAndRefresh(newRecords);
-        addToast('Lote rechazado', 'info');
-    };
-
-    const uploadProof = (recordId: string, file: File) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const newRecords = records.map(r => r.id === recordId ? { 
-                ...r, 
-                status: 'in_review' as const, 
-                proofUrl: reader.result as string, 
-                proofType: file.type,
-                paymentDate: new Date().toISOString() 
-            } : r);
-            saveAndRefresh(newRecords);
-            addToast('Comprobante subido', 'success');
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const generateMonthlyBilling = () => {
-        const activeStudents = students.filter(s => s.status === 'active' || s.status === 'debtor');
-        const month = new Date().toLocaleString('es-ES', { month: 'long' });
-        const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
-        const year = new Date().getFullYear();
-        const monthKey = `${year}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-        
-        const billingDay = academySettings.paymentSettings.billingDay || 1;
-        const dueDate = `${year}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(billingDay).padStart(2, '0')}`;
-
-        const newCharges: TuitionRecord[] = [];
-
-        activeStudents.forEach(s => {
-            const exists = records.some(r => r.studentId === s.id && r.category === 'Mensualidad' && r.month === monthKey);
-            if (!exists) {
-                newCharges.push({
-                    id: generateId('auto'),
-                    academyId: currentUser?.academyId || '',
-                    studentId: s.id,
-                    studentName: s.name,
-                    concept: `Mensualidad ${capitalizedMonth}`,
-                    description: `Cuota correspondiente a ${capitalizedMonth} ${year}`,
-                    category: 'Mensualidad',
-                    amount: academySettings.paymentSettings.monthlyTuition,
-                    originalAmount: academySettings.paymentSettings.monthlyTuition,
-                    penaltyAmount: 0,
-                    dueDate: dueDate,
-                    month: monthKey,
-                    status: 'charged',
-                    type: 'charge',
+                return {
+                    ...r,
+                    status: (r.dueDate < getLocalDate() ? 'overdue' : 'pending') as TuitionStatus,
                     paymentDate: null,
                     proofUrl: null,
-                    canBePaidInParts: false
-                });
+                    batchPaymentId: undefined
+                };
             }
-        });
+            return r;
+        }));
+        addToast('Lote de pagos rechazado', 'info');
+    };
 
-        if (newCharges.length > 0) {
-            const updated = [...records, ...newCharges];
-            saveAndRefresh(updated);
-            addToast(`Se generaron ${newCharges.length} cargos de mensualidad.`, 'success');
+    const updateRecordAmount = (recordId: string, newTotal: number) => {
+        setRecords(prev => {
+            const targetRecord = prev.find(r => r.id === recordId);
+            if (!targetRecord) return prev;
+
+            const currentTotal = targetRecord.amount + (targetRecord.penaltyAmount || 0);
+            const delta = currentTotal - newTotal;
+            const batchId = targetRecord.batchPaymentId;
+
+            return prev.map(r => {
+                const isTarget = r.id === recordId;
+                const isBatchSibling = batchId && r.batchPaymentId === batchId;
+
+                if (!isTarget && !isBatchSibling) return r;
+
+                let updatedDeclared = r.declaredAmount;
+                if (r.declaredAmount !== undefined) {
+                    updatedDeclared = r.declaredAmount - delta;
+                }
+
+                if (isTarget) {
+                    const updatedRecord = { 
+                        ...r, 
+                        amount: newTotal,
+                        penaltyAmount: 0, 
+                        originalAmount: newTotal, 
+                        declaredAmount: updatedDeclared
+                    };
+
+                    if (newTotal <= 0) {
+                        updatedRecord.status = 'paid';
+                        updatedRecord.paymentDate = updatedRecord.paymentDate || new Date().toISOString();
+                        updatedRecord.amount = 0; 
+                        updatedRecord.penaltyAmount = 0; 
+                    } 
+                    return updatedRecord;
+                }
+
+                if (isBatchSibling) {
+                    return {
+                        ...r,
+                        declaredAmount: updatedDeclared
+                    };
+                }
+                return r;
+            });
+        });
+        addToast('Monto de deuda actualizado.', 'success');
+    };
+
+    const deleteRecord = (recordId: string) => {
+        setRecords(prev => prev.filter(r => r.id !== recordId));
+        PulseService.deletePayment(recordId);
+        addToast('Registro eliminado', 'info');
+    };
+
+    // Public method that can be triggered manually, but essentially re-runs the core logic
+    const generateMonthlyBilling = () => {
+        const count = runBillingProcess();
+        if (count === 0) {
+            addToast('No hay cargos pendientes por generar para este mes o aún no es la fecha de corte.', 'info');
         } else {
-            addToast('Todos los alumnos activos ya tienen su cargo del mes.', 'info');
+            addToast(`Se generaron ${count} cargos de mensualidad.`, 'success');
         }
     };
 
     const purgeStudentDebts = (studentId: string) => {
-        const newRecords = records.filter(r => r.studentId !== studentId || r.status === 'paid');
-        saveAndRefresh(newRecords);
+        setRecords(prev => prev.filter(r => {
+            if (r.studentId === studentId) {
+                return r.status === 'paid';
+            }
+            return true;
+        }));
     };
 
     const getStudentPendingDebts = (studentId: string) => {
         return records.filter(r => r.studentId === studentId && (r.status === 'pending' || r.status === 'overdue' || r.status === 'partial' || r.status === 'charged'));
     };
 
+    const uploadProof = (recordId: string, file: File) => {
+        registerBatchPayment([recordId], file, 'Transferencia', 0, []); 
+    };
+
     return (
         <FinanceContext.Provider value={{
-            records, stats, monthlyRevenueData, rollingRevenueData, isFinanceLoading, refreshFinance,
-            createRecord, createManualCharge, updateRecordAmount, deleteRecord,
-            approvePayment, rejectPayment, registerBatchPayment, approveBatchPayment, rejectBatchPayment,
-            uploadProof, generateMonthlyBilling, purgeStudentDebts, getStudentPendingDebts
+            records,
+            monthlyRevenueData,
+            rollingRevenueData,
+            stats,
+            isFinanceLoading,
+            refreshFinance: loadFinanceData,
+            createManualCharge,
+            createRecord,
+            approvePayment,
+            rejectPayment,
+            approveBatchPayment,
+            rejectBatchPayment,
+            registerBatchPayment,
+            updateRecordAmount,
+            deleteRecord,
+            generateMonthlyBilling,
+            purgeStudentDebts,
+            getStudentPendingDebts,
+            uploadProof
         }}>
             {children}
         </FinanceContext.Provider>
@@ -391,6 +639,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
 export const useFinance = () => {
     const context = useContext(FinanceContext);
-    if (!context) throw new Error('useFinance must be used within a FinanceProvider');
+    if (context === undefined) {
+        throw new Error('useFinance must be used within a FinanceProvider');
+    }
     return context;
 };

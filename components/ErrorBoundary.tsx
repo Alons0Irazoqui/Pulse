@@ -1,3 +1,4 @@
+
 import React, { ErrorInfo, ReactNode } from 'react';
 
 interface ErrorBoundaryProps {
@@ -10,10 +11,13 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = {
-    hasError: false,
-    error: null
-  };
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null
+    };
+  }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
@@ -25,39 +29,36 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   handleRetry = () => {
     this.setState({ hasError: false, error: null });
+    window.location.reload();
   };
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-6">
+        <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-6 font-sans">
           <div className="bg-white rounded-3xl shadow-xl p-10 max-w-lg w-full text-center border border-gray-100">
             <div className="size-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="material-symbols-outlined text-4xl">error_outline</span>
             </div>
             <h1 className="text-2xl font-black text-gray-900 mb-2">Algo salió mal</h1>
-            <p className="text-gray-500 mb-8">
-              Ha ocurrido un error inesperado. Hemos registrado el problema. Por favor intenta recargar la página.
+            <p className="text-gray-500 mb-8 text-sm">
+              Ha ocurrido un error inesperado al cargar la aplicación.
             </p>
+            {this.state.error && (
+                <div className="bg-gray-50 p-4 rounded-xl text-left mb-8 overflow-auto max-h-32 border border-gray-200">
+                    <p className="font-mono text-xs text-red-600 break-words">
+                        {this.state.error.toString()}
+                    </p>
+                </div>
+            )}
             <div className="flex gap-4 justify-center">
                 <button 
-                    onClick={() => window.location.reload()} 
-                    className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all shadow-lg active:scale-95"
+                    onClick={this.handleRetry} 
+                    className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-all shadow-lg active:scale-95 w-full"
                 >
                     Recargar Aplicación
                 </button>
-                <button 
-                    onClick={this.handleRetry} 
-                    className="bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all active:scale-95"
-                >
-                    Intentar de nuevo
-                </button>
             </div>
-            {this.state.error && (
-                <div className="mt-8 p-4 bg-gray-50 rounded-xl text-left overflow-auto max-h-32 border border-gray-100">
-                    <p className="font-mono text-xs text-red-500 break-words">{this.state.error.toString()}</p>
-                </div>
-            )}
           </div>
         </div>
       );

@@ -15,7 +15,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 // --- TYPES ---
 type ViewType = 'year' | 'month' | 'week' | 'day' | 'agenda';
 
-// --- COMPONENT: INFINITE MONTH GRID (Google Style) - KEPT INTACT ---
+// --- COMPONENT: INFINITE MONTH GRID (Full Width Scroll) ---
 const InfiniteMonthGrid: React.FC<{ 
     date: Date; 
     events: CalendarEvent[]; 
@@ -34,18 +34,18 @@ const InfiniteMonthGrid: React.FC<{
 
     return (
         <div className="flex flex-col h-full animate-in fade-in duration-500 overflow-hidden">
-            {/* Headers */}
-            <div className="grid grid-cols-7 mb-2 px-4 pt-4 shrink-0">
+            {/* Headers Fixed */}
+            <div className="grid grid-cols-7 py-3 shrink-0 bg-white border-b border-gray-100 z-10 shadow-sm">
                 {weekDays.map(day => (
-                    <div key={day} className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    <div key={day} className="text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                         {day}
                     </div>
                 ))}
             </div>
 
-            {/* Grid */}
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
-                <div className="grid grid-cols-7 auto-rows-fr gap-1 h-full min-h-[600px]">
+            {/* Scrollable Grid Area */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <div className="grid grid-cols-7 auto-rows-fr bg-gray-50 gap-px border-b border-gray-100 min-h-[600px]">
                     {days.map((day) => {
                         const dayEvents = events
                             .filter(e => isSameDay(e.start, day))
@@ -59,37 +59,37 @@ const InfiniteMonthGrid: React.FC<{
                                 key={day.toISOString()} 
                                 onClick={() => onDayClick(day, dayEvents)}
                                 className={`
-                                    min-h-[100px] p-2 rounded-lg transition-all cursor-pointer group flex flex-col items-center
-                                    ${isCurrentMonth ? 'hover:bg-gray-50' : 'bg-gray-50/20 opacity-40'}
+                                    min-h-[120px] p-2 cursor-pointer transition-colors hover:bg-blue-50/30 flex flex-col items-center gap-1
+                                    ${isCurrentMonth ? 'bg-white' : 'bg-gray-50/50'}
                                 `}
                             >
                                 {/* Day Number */}
                                 <div className={`
-                                    size-7 flex items-center justify-center rounded-full text-xs font-bold transition-all mb-1
+                                    size-7 flex items-center justify-center rounded-full text-xs font-bold transition-all
                                     ${isToday 
-                                        ? 'bg-red-600 text-white' 
+                                        ? 'bg-red-600 text-white shadow-md' 
                                         : isCurrentMonth ? 'text-gray-700' : 'text-gray-300'}
                                 `}>
                                     {format(day, 'd')}
                                 </div>
 
                                 {/* Events List (Pills) */}
-                                <div className="w-full flex flex-col gap-1 overflow-hidden">
+                                <div className="w-full flex flex-col gap-1 mt-1">
                                     {dayEvents.slice(0, 3).map(evt => (
                                         <div 
                                             key={evt.id}
                                             className={`
-                                                w-full px-1.5 py-0.5 rounded text-[9px] font-bold truncate transition-transform hover:scale-[1.02] text-center
+                                                w-full px-2 py-1 rounded-md text-[9px] font-bold truncate transition-transform hover:scale-[1.02] shadow-sm border-l-2
                                                 ${evt.status === 'cancelled' 
-                                                    ? 'bg-gray-100 text-gray-400 line-through' 
-                                                    : 'bg-red-50 text-red-700'}
+                                                    ? 'bg-gray-100 text-gray-400 line-through border-gray-300' 
+                                                    : 'bg-white text-gray-700 border-red-500 hover:bg-red-50'}
                                             `}
                                         >
                                             {evt.title}
                                         </div>
                                     ))}
                                     {dayEvents.length > 3 && (
-                                        <div className="text-[9px] font-bold text-gray-400 text-center">
+                                        <div className="text-[9px] font-bold text-gray-400 text-center bg-gray-50 rounded py-0.5">
                                             + {dayEvents.length - 3} más
                                         </div>
                                     )}
@@ -103,7 +103,7 @@ const InfiniteMonthGrid: React.FC<{
     );
 };
 
-// --- COMPONENT: CLEAN WEEK VIEW (No Time Grid) ---
+// --- COMPONENT: CLEAN WEEK VIEW (Sticky Headers) ---
 const CleanWeekView: React.FC<{
     date: Date;
     events: CalendarEvent[];
@@ -120,9 +120,9 @@ const CleanWeekView: React.FC<{
     }, [date]);
 
     return (
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-4 md:gap-0 h-full">
-                {weekDays.map((day, index) => {
+        <div className="flex-1 overflow-y-auto bg-white custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-7 min-h-full divide-y md:divide-y-0 md:divide-x divide-gray-100">
+                {weekDays.map((day) => {
                     const dayEvents = events
                         .filter(e => isSameDay(e.start, day))
                         .sort((a, b) => a.start.getTime() - b.start.getTime());
@@ -130,38 +130,43 @@ const CleanWeekView: React.FC<{
                     const isToday = isSameDay(day, new Date());
 
                     return (
-                        <div key={day.toISOString()} className={`flex flex-col gap-3 md:border-r border-gray-100 last:border-0 md:px-2 min-h-[150px] ${isToday ? 'bg-red-50/10 rounded-xl' : ''}`}>
-                            {/* Header Day */}
-                            <div className={`text-center py-2 border-b-2 ${isToday ? 'border-red-500' : 'border-transparent'}`}>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{format(day, 'EEE', { locale: es })}</p>
-                                <p className={`text-xl font-black ${isToday ? 'text-red-600' : 'text-gray-900'}`}>{format(day, 'd')}</p>
+                        <div key={day.toISOString()} className="flex flex-col relative bg-white">
+                            {/* Sticky Header */}
+                            <div className={`sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-50 py-3 text-center transition-colors ${isToday ? 'bg-red-50/30' : ''}`}>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{format(day, 'EEE', { locale: es })}</p>
+                                <div className={`mx-auto size-8 flex items-center justify-center rounded-full mt-1 ${isToday ? 'bg-red-600 text-white shadow-md' : 'text-gray-900 font-black'}`}>
+                                    <span className="text-lg leading-none">{format(day, 'd')}</span>
+                                </div>
                             </div>
 
                             {/* Events Stack */}
-                            <div className="flex flex-col gap-2">
+                            <div className="flex flex-col gap-3 p-3 flex-1 min-h-[100px]">
                                 {dayEvents.length > 0 ? (
                                     dayEvents.map(evt => (
                                         <div 
                                             key={evt.id}
                                             onClick={() => onEventClick(evt)}
                                             className={`
-                                                p-3 rounded-xl border-l-4 cursor-pointer transition-all hover:shadow-md group
+                                                p-3 rounded-lg border-l-[3px] cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 group active:scale-95
                                                 ${evt.status === 'cancelled' 
                                                     ? 'bg-gray-50 border-gray-300 opacity-60' 
-                                                    : 'bg-white border-red-500 shadow-sm'}
+                                                    : 'bg-white border-red-500 shadow-sm ring-1 ring-gray-100'}
                                             `}
                                         >
-                                            <p className={`text-xs font-bold ${evt.status === 'cancelled' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                                            <p className={`text-xs font-bold leading-tight ${evt.status === 'cancelled' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
                                                 {evt.title}
                                             </p>
-                                            <p className="text-[10px] text-gray-500 font-medium mt-1">
-                                                {format(evt.start, 'HH:mm')}
-                                            </p>
+                                            <div className="flex items-center gap-1 mt-1.5">
+                                                <span className="material-symbols-outlined text-[10px] text-gray-400">schedule</span>
+                                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">
+                                                    {format(evt.start, 'HH:mm')}
+                                                </p>
+                                            </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="hidden md:flex flex-col items-center justify-center h-20 opacity-20">
-                                        <span className="material-symbols-outlined text-gray-400">remove</span>
+                                    <div className="hidden md:flex flex-1 flex-col items-center justify-center opacity-10">
+                                        <div className="h-full w-px bg-gray-100 border-l border-dashed border-gray-300"></div>
                                     </div>
                                 )}
                             </div>
@@ -173,7 +178,7 @@ const CleanWeekView: React.FC<{
     );
 };
 
-// --- COMPONENT: CLEAN DAY VIEW (Focus List) ---
+// --- COMPONENT: CLEAN DAY VIEW (Full Width) ---
 const CleanDayView: React.FC<{
     date: Date;
     events: CalendarEvent[];
@@ -187,66 +192,74 @@ const CleanDayView: React.FC<{
     }, [date, events]);
 
     return (
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 max-w-3xl mx-auto w-full animate-in fade-in zoom-in-95 duration-300">
-            <h3 className="text-2xl font-black text-gray-900 mb-6 capitalize border-l-4 border-red-600 pl-4">
-                {format(date, 'EEEE d, MMMM', { locale: es })}
-            </h3>
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
+            <div className="max-w-3xl mx-auto w-full p-6 md:p-10 animate-in fade-in zoom-in-95 duration-300">
+                <h3 className="text-3xl font-black text-gray-900 mb-8 capitalize flex items-center gap-3">
+                    <span className="w-1.5 h-8 bg-red-600 rounded-full"></span>
+                    {format(date, 'EEEE d, MMMM', { locale: es })}
+                </h3>
 
-            {dayEvents.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                    <div className="size-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                        <span className="material-symbols-outlined text-4xl opacity-30">self_improvement</span>
+                {dayEvents.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-gray-400 border-2 border-dashed border-gray-100 rounded-3xl bg-gray-50/50">
+                        <div className="size-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
+                            <span className="material-symbols-outlined text-4xl opacity-30 text-gray-400">self_improvement</span>
+                        </div>
+                        <p className="text-lg font-bold text-gray-500">Día libre</p>
+                        <p className="text-sm opacity-60">No hay sesiones programadas.</p>
                     </div>
-                    <p className="text-lg font-medium">Día libre de entrenamiento</p>
-                    <p className="text-sm opacity-60">Aprovecha para descansar o estudiar teoría.</p>
-                </div>
-            ) : (
-                <div className="flex flex-col gap-4">
-                    {dayEvents.map(evt => (
-                        <div 
-                            key={evt.id}
-                            onClick={() => onEventClick(evt)}
-                            className={`
-                                flex items-center gap-6 p-6 rounded-2xl border transition-all cursor-pointer hover:shadow-lg hover:-translate-y-1
-                                ${evt.status === 'cancelled' 
-                                    ? 'bg-gray-50 border-gray-200 opacity-60 grayscale' 
-                                    : 'bg-white border-gray-100'}
-                            `}
-                        >
-                            <div className="flex flex-col items-center min-w-[60px]">
-                                <span className="text-lg font-black text-gray-900">{format(evt.start, 'HH:mm')}</span>
-                                <span className="text-xs font-bold text-gray-400">{format(evt.end, 'HH:mm')}</span>
-                            </div>
-                            
-                            <div className="h-10 w-1 bg-red-100 rounded-full"></div>
+                ) : (
+                    <div className="relative border-l border-gray-100 ml-4 space-y-8 py-2">
+                        {dayEvents.map(evt => (
+                            <div 
+                                key={evt.id}
+                                onClick={() => onEventClick(evt)}
+                                className="relative pl-8 group cursor-pointer"
+                            >
+                                {/* Timeline Dot */}
+                                <div className={`absolute -left-[5px] top-4 size-2.5 rounded-full border-2 border-white shadow-sm ring-1 ring-gray-100 transition-colors ${evt.status === 'cancelled' ? 'bg-gray-300' : 'bg-red-600 group-hover:scale-125'}`}></div>
+                                
+                                <div className={`
+                                    flex items-center gap-6 p-6 rounded-2xl border transition-all hover:shadow-lg hover:-translate-y-1 bg-white
+                                    ${evt.status === 'cancelled' 
+                                        ? 'border-gray-100 opacity-60 grayscale bg-gray-50' 
+                                        : 'border-gray-100 hover:border-red-100'}
+                                `}>
+                                    <div className="flex flex-col items-center min-w-[60px] text-center">
+                                        <span className="text-lg font-black text-gray-900 leading-none">{format(evt.start, 'HH:mm')}</span>
+                                        <span className="text-xs font-bold text-gray-400 mt-1">{format(evt.end, 'HH:mm')}</span>
+                                    </div>
+                                    
+                                    <div className="w-px h-10 bg-gray-100"></div>
 
-                            <div className="flex-1">
-                                <h4 className={`text-xl font-bold ${evt.status === 'cancelled' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
-                                    {evt.title}
-                                </h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-sm text-gray-500 font-medium flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-sm">person</span>
-                                        {evt.instructor}
-                                    </span>
-                                    {evt.status === 'cancelled' && (
-                                        <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Cancelada</span>
-                                    )}
+                                    <div className="flex-1">
+                                        <h4 className={`text-xl font-bold ${evt.status === 'cancelled' ? 'text-gray-500 line-through' : 'text-gray-900 group-hover:text-red-700 transition-colors'}`}>
+                                            {evt.title}
+                                        </h4>
+                                        <div className="flex items-center gap-3 mt-1.5">
+                                            <span className="text-sm text-gray-500 font-medium flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded-md">
+                                                <span className="material-symbols-outlined text-sm">person</span>
+                                                {evt.instructor}
+                                            </span>
+                                            {evt.status === 'cancelled' && (
+                                                <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase border border-red-100">Cancelada</span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="size-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-red-50 group-hover:text-red-600 transition-colors">
+                                        <span className="material-symbols-outlined">chevron_right</span>
+                                    </div>
                                 </div>
                             </div>
-
-                            <div className="size-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-red-50 group-hover:text-red-600 transition-colors">
-                                <span className="material-symbols-outlined">chevron_right</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
 
-// --- COMPONENT: AGENDA VIEW (Timeline List) ---
+// --- COMPONENT: AGENDA VIEW (Edge-to-Edge Scroll) ---
 const AgendaView: React.FC<{
     events: CalendarEvent[];
     onEventClick: (event: CalendarEvent) => void;
@@ -272,56 +285,62 @@ const AgendaView: React.FC<{
     }, [agendaItems]);
 
     return (
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 max-w-4xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h3 className="text-xl font-bold text-gray-400 mb-8 uppercase tracking-widest flex items-center gap-2">
-                <span className="material-symbols-outlined">upcoming</span>
-                Próximos Eventos
-            </h3>
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
+            <div className="p-6 md:p-10 max-w-4xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <h3 className="text-xs font-black text-gray-400 mb-8 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg">upcoming</span>
+                    Agenda Próxima
+                </h3>
 
-            {Object.keys(grouped).length === 0 ? (
-                <div className="text-center py-20 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-                    <p className="text-gray-500 font-medium">No tienes eventos próximos en tu agenda.</p>
-                </div>
-            ) : (
-                <div className="relative border-l-2 border-gray-100 ml-4 space-y-12 pb-20">
-                    {Object.entries(grouped).map(([dateStr, items]: [string, CalendarEvent[]]) => {
-                        const dateObj = new Date(dateStr + 'T00:00:00');
-                        const isToday = isSameDay(dateObj, new Date());
+                {Object.keys(grouped).length === 0 ? (
+                    <div className="text-center py-20 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                        <p className="text-gray-500 font-medium">No tienes eventos próximos en tu agenda.</p>
+                    </div>
+                ) : (
+                    <div className="relative border-l-2 border-gray-100 ml-3 md:ml-6 space-y-10 pb-20">
+                        {Object.entries(grouped).map(([dateStr, items]: [string, CalendarEvent[]]) => {
+                            const dateObj = new Date(dateStr + 'T00:00:00');
+                            const isToday = isSameDay(dateObj, new Date());
 
-                        return (
-                            <div key={dateStr} className="relative pl-8">
-                                {/* Date Bubble */}
-                                <div className={`absolute -left-[9px] top-0 size-4 rounded-full border-4 border-white shadow-sm ${isToday ? 'bg-red-600' : 'bg-gray-300'}`}></div>
-                                
-                                <h4 className={`text-lg font-bold mb-4 capitalize ${isToday ? 'text-red-600' : 'text-gray-800'}`}>
-                                    {isToday ? 'Hoy, ' : ''}{format(dateObj, 'EEEE d MMMM', { locale: es })}
-                                </h4>
+                            return (
+                                <div key={dateStr} className="relative pl-6 md:pl-10">
+                                    {/* Date Bubble */}
+                                    <div className={`absolute -left-[9px] top-1 size-4 rounded-full border-4 border-white shadow-sm z-10 ${isToday ? 'bg-red-600' : 'bg-gray-300'}`}></div>
+                                    
+                                    <h4 className={`text-lg font-bold mb-4 capitalize flex items-center gap-2 ${isToday ? 'text-red-600' : 'text-gray-800'}`}>
+                                        {isToday && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider">Hoy</span>}
+                                        {format(dateObj, 'EEEE d MMMM', { locale: es })}
+                                    </h4>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {items.map(evt => (
-                                        <div 
-                                            key={evt.id}
-                                            onClick={() => onEventClick(evt)}
-                                            className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-red-100 transition-all cursor-pointer group"
-                                        >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 px-2 py-1 rounded">
-                                                    {format(evt.start, 'HH:mm')}
-                                                </span>
-                                                {evt.type === 'exam' && <span className="material-symbols-outlined text-yellow-500 text-sm">stars</span>}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {items.map(evt => (
+                                            <div 
+                                                key={evt.id}
+                                                onClick={() => onEventClick(evt)}
+                                                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-red-100 transition-all cursor-pointer group active:scale-[0.98]"
+                                            >
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                                        {format(evt.start, 'HH:mm')}
+                                                    </span>
+                                                    {evt.type === 'exam' && <span className="material-symbols-outlined text-yellow-500 text-lg">stars</span>}
+                                                </div>
+                                                <h5 className="font-bold text-gray-900 text-lg mb-1 group-hover:text-red-700 transition-colors leading-tight">
+                                                    {evt.title}
+                                                </h5>
+                                                <p className="text-xs text-gray-500 font-medium flex items-center gap-1 mt-2">
+                                                    <span className="material-symbols-outlined text-[14px]">person</span>
+                                                    {evt.instructor}
+                                                </p>
                                             </div>
-                                            <h5 className="font-bold text-gray-900 text-lg mb-1 group-hover:text-red-700 transition-colors">
-                                                {evt.title}
-                                            </h5>
-                                            <p className="text-sm text-gray-500">{evt.instructor}</p>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -343,17 +362,17 @@ const DayAgendaDrawer: React.FC<{
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/10 backdrop-blur-[1px] z-[50]"
+                        className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[50]"
                     />
                     
                     <motion.div 
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="fixed inset-y-0 right-0 z-[60] w-full max-w-md bg-white shadow-2xl border-l border-gray-100 flex flex-col"
+                        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                        className="fixed inset-y-0 right-0 z-[60] w-full max-w-md bg-white shadow-2xl flex flex-col"
                     >
-                        <div className="p-8 border-b border-gray-100 flex justify-between items-start bg-white">
+                        <div className="p-8 border-b border-gray-100 flex justify-between items-start bg-white shrink-0">
                             <div>
                                 <h2 className="text-3xl font-black text-gray-900 tracking-tight capitalize">
                                     {format(date, 'EEEE', { locale: es })}
@@ -367,7 +386,7 @@ const DayAgendaDrawer: React.FC<{
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-8 bg-white">
+                        <div className="flex-1 overflow-y-auto p-8 bg-white custom-scrollbar">
                             {events.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-center text-gray-400">
                                     <span className="material-symbols-outlined text-6xl opacity-20 mb-4">event_busy</span>
@@ -481,7 +500,7 @@ const StudentSchedule: React.FC = () => {
     const { scheduleEvents } = useAcademy();
     const { currentUser, students, events } = useStore();
     
-    const [view, setView] = useState<ViewType>('agenda'); // Default to Agenda as requested "Simple overview"
+    const [view, setView] = useState<ViewType>('agenda'); // Default to Agenda
     const [date, setDate] = useState(new Date());
     
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -554,7 +573,7 @@ const StudentSchedule: React.FC = () => {
         <div className="w-full h-full bg-white flex flex-col font-sans overflow-hidden">
             
             {/* --- IMMERSIVE HEADER --- */}
-            <div className="flex flex-col md:flex-row justify-between items-center px-6 py-4 border-b border-gray-100 bg-white shrink-0 gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-center px-6 py-4 border-b border-gray-100 bg-white shrink-0 gap-4 z-20">
                 <div className="flex items-center gap-6 w-full md:w-auto">
                     <h1 className="text-3xl font-black tracking-tight text-gray-900 capitalize min-w-[200px]">
                         {headerTitle}
@@ -600,25 +619,25 @@ const StudentSchedule: React.FC = () => {
                 </div>
             </div>
 
-            {/* --- MAIN CANVAS CONTENT --- */}
+            {/* --- MAIN CANVAS CONTENT (Scroll Container) --- */}
             <div className="flex-1 relative bg-white overflow-hidden flex flex-col">
                 
-                {/* 1. VIEW: AGENDA (NEW) */}
+                {/* 1. VIEW: AGENDA (Scrolls Internally) */}
                 {view === 'agenda' && (
                     <AgendaView events={myEvents} onEventClick={handleEventClick} />
                 )}
 
-                {/* 2. VIEW: WEEK (NEW CLEAN) */}
+                {/* 2. VIEW: WEEK (Scrolls Internally) */}
                 {view === 'week' && (
                     <CleanWeekView date={date} events={myEvents} onEventClick={handleEventClick} />
                 )}
 
-                {/* 3. VIEW: DAY (NEW CLEAN) */}
+                {/* 3. VIEW: DAY (Scrolls Internally) */}
                 {view === 'day' && (
                     <CleanDayView date={date} events={myEvents} onEventClick={handleEventClick} />
                 )}
 
-                {/* 4. VIEW: MONTH (EXISTING) */}
+                {/* 4. VIEW: MONTH (Scrolls Internally) */}
                 {view === 'month' && (
                     <InfiniteMonthGrid 
                         date={date} 
@@ -627,9 +646,9 @@ const StudentSchedule: React.FC = () => {
                     />
                 )}
 
-                {/* 5. VIEW: YEAR (EXISTING) */}
+                {/* 5. VIEW: YEAR (Scrolls Internally) */}
                 {view === 'year' && (
-                    <div className="h-full overflow-y-auto p-6">
+                    <div className="h-full overflow-y-auto p-6 custom-scrollbar">
                         <YearView 
                             date={date} 
                             events={myEvents} 

@@ -25,11 +25,10 @@ export const generateReceipt = (
     let currentPaymentAmount = 0;
     let previousPaid = 0;
     
-    // Calculate Total Cost (Original + Penalty)
     const baseAmount = record.originalAmount !== undefined ? record.originalAmount : record.amount;
     const totalCost = baseAmount + (record.penaltyAmount || 0);
 
-    // --- DISPLAY LOGIC: DETAILED BREAKDOWN ---
+    // Visual breakdown
     const displayedPenalty = (record.customPenaltyAmount && record.customPenaltyAmount > 0)
         ? record.customPenaltyAmount
         : (record.penaltyAmount || 0);
@@ -37,7 +36,7 @@ export const generateReceipt = (
     const displayBase = totalCost - displayedPenalty;
 
     if (options && options.currentPaymentAmount !== undefined) {
-        // CONTEXT 1: JUST PAID
+        // Just Paid Context
         currentPaymentAmount = options.currentPaymentAmount;
         const prevHistory = options.paymentHistory || []; 
         previousPaid = prevHistory.reduce((sum, h) => sum + h.amount, 0);
@@ -51,7 +50,7 @@ export const generateReceipt = (
             }
         ];
     } else {
-        // CONTEXT 2: HISTORICAL VIEW
+        // History Context
         history = (record.paymentHistory || []).slice().sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
         if (history.length > 0) {
@@ -142,15 +141,8 @@ export const generateReceipt = (
                 .page { width: 100%; height: 100%; box-shadow: none; margin: 0; padding: 30px 40px; }
             }
 
-            /* UTILS */
             .text-right { text-align: right; }
-            .text-uppercase { text-transform: uppercase; }
-            .font-bold { font-weight: 700; }
-            .text-sm { font-size: 12px; }
-            .text-xs { font-size: 10px; }
-            .text-gray { color: #6b7280; }
             
-            /* HEADER */
             .header {
                 display: flex;
                 justify-content: space-between;
@@ -186,7 +178,6 @@ export const generateReceipt = (
                 color: #9ca3af;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                margin-bottom: 2px;
             }
 
             .meta-value {
@@ -196,7 +187,6 @@ export const generateReceipt = (
                 margin-bottom: 12px;
             }
 
-            /* STATUS BADGE */
             .status-badge {
                 display: inline-block;
                 padding: 6px 16px;
@@ -212,7 +202,6 @@ export const generateReceipt = (
                 margin-top: 10px;
             }
 
-            /* INFO GRID */
             .info-grid {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
@@ -226,18 +215,21 @@ export const generateReceipt = (
                 color: #9ca3af;
                 margin-bottom: 8px;
                 font-weight: 700;
-                letter-spacing: 0.5px;
             }
 
             .info-block p {
                 margin: 0;
                 font-size: 14px;
                 color: #1f2937;
-                line-height: 1.5;
                 font-weight: 500;
             }
 
-            /* TABLE STYLES */
+            .concept-detail {
+                font-size: 12px;
+                color: #6b7280;
+                margin-top: 4px;
+            }
+
             table { width: 100%; border-collapse: collapse; }
             th {
                 text-align: left;
@@ -257,23 +249,13 @@ export const generateReceipt = (
                 border-bottom: 1px solid #f3f4f6;
             }
 
-            .concept-detail {
-                font-size: 12px;
-                color: #ef4444;
-                font-weight: 500;
-                margin-top: 4px;
-            }
-
-            /* SUMMARY SECTION */
             .summary-section {
                 display: flex;
                 justify-content: flex-end;
                 margin-top: 20px;
             }
 
-            .summary-table {
-                width: 300px;
-            }
+            .summary-table { width: 300px; }
 
             .summary-row {
                 display: flex;
@@ -292,20 +274,10 @@ export const generateReceipt = (
                 color: #111827;
             }
 
-            .summary-row.paid {
-                color: #10b981;
-                font-weight: 600;
-            }
+            .summary-row.paid { color: #10b981; font-weight: 600; }
+            .summary-row.balance { color: ${remainingBalance > 0 ? '#ef4444' : '#9ca3af'}; font-weight: 700; }
 
-            .summary-row.balance {
-                color: ${remainingBalance > 0 ? '#ef4444' : '#9ca3af'};
-                font-weight: 700;
-            }
-
-            /* HISTORY SECTION */
-            .history-section {
-                margin-top: 60px;
-            }
+            .history-section { margin-top: 60px; }
             .history-title {
                 font-size: 11px;
                 font-weight: 700;
@@ -322,7 +294,6 @@ export const generateReceipt = (
                 border-bottom: 1px dashed #f3f4f6;
             }
 
-            /* FOOTER */
             .footer {
                 position: absolute;
                 bottom: 40px;
@@ -332,21 +303,12 @@ export const generateReceipt = (
                 border-top: 1px solid #f3f4f6;
                 padding-top: 20px;
             }
-            .footer p {
-                margin: 0;
-                font-size: 11px;
-                color: #9ca3af;
-            }
-            .footer strong {
-                color: #1f2937;
-            }
-
+            .footer p { margin: 0; font-size: 11px; color: #9ca3af; }
+            .footer strong { color: #1f2937; }
         </style>
     </head>
     <body>
         <div class="page">
-            
-            <!-- HEADER -->
             <div class="header">
                 <div class="brand-section">
                     <h1>${academy.name || 'Academy Pro'}</h1>
@@ -356,117 +318,98 @@ export const generateReceipt = (
                         Emitido por: ${user?.name || 'Administración'}
                     </div>
                 </div>
-                
                 <div class="receipt-meta">
                     <div class="meta-group">
                         <div class="meta-label">Folio</div>
                         <div class="meta-value">#${record.id.split('-').pop()?.toUpperCase() || 'REF'}</div>
                     </div>
                     <div class="meta-group">
-                        <div class="meta-label">Fecha de Emisión</div>
+                        <div class="meta-label">Fecha</div>
                         <div class="meta-value">${displayDate}</div>
                     </div>
-                    <div class="status-badge">
-                        ${statusLabel}
-                    </div>
+                    <div class="status-badge">${statusLabel}</div>
                 </div>
             </div>
 
-            <!-- INFO -->
             <div class="info-grid">
                 <div class="info-block">
-                    <h3>Recibimos de</h3>
+                    <h3>Alumno</h3>
                     <p>${record.studentName}</p>
-                    <p style="margin-top: 4px; font-size: 12px; color: #6b7280;">ID: ${record.studentId}</p>
                 </div>
-                <div class="info-block text-right">
-                    <h3>Total Global</h3>
-                    <p style="font-size: 20px; font-weight: 800;">${formatMoney(totalCost)}</p>
+                <div class="info-block">
+                    <h3>Concepto</h3>
+                    <p>${record.concept}</p>
+                    <div class="concept-detail">${record.description || ''}</div>
                 </div>
             </div>
 
-            <!-- MAIN CONCEPT -->
             <table>
                 <thead>
                     <tr>
-                        <th width="70%">Concepto</th>
-                        <th width="30%" class="text-right">Importe Total</th>
+                        <th style="width: 20%;">Fecha</th>
+                        <th style="width: 20%;">Método</th>
+                        <th class="text-right">Monto</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr class="main-row">
-                        <td>
-                            ${record.concept}
-                            ${displayedPenalty > 0 ? `
-                                <div class="concept-detail">
-                                    (Precio Base: ${formatMoney(displayBase)} + Recargo: ${formatMoney(displayedPenalty)})
-                                </div>
-                            ` : ''}
-                        </td>
+                        <td>${displayDate}</td>
+                        <td>${record.method || 'Sistema'}</td>
                         <td class="text-right">${formatMoney(totalCost)}</td>
                     </tr>
                 </tbody>
             </table>
 
-            <!-- SUMMARY -->
             <div class="summary-section">
                 <div class="summary-table">
                     <div class="summary-row">
-                        <span>Costo Original</span>
+                        <span>Subtotal</span>
                         <span>${formatMoney(displayBase)}</span>
                     </div>
                     ${displayedPenalty > 0 ? `
-                        <div class="summary-row">
-                            <span>(+) Recargos</span>
-                            <span>${formatMoney(displayedPenalty)}</span>
-                        </div>
+                    <div class="summary-row">
+                        <span>Recargos</span>
+                        <span>${formatMoney(displayedPenalty)}</span>
+                    </div>
                     ` : ''}
                     <div class="summary-row total">
-                        <span>Total a Pagar</span>
+                        <span>Total</span>
                         <span>${formatMoney(totalCost)}</span>
                     </div>
                     <div class="summary-row paid">
-                        <span>(-) Pagado Total</span>
+                        <span>Pagado</span>
                         <span>${formatMoney(totalPaid)}</span>
                     </div>
                     <div class="summary-row balance">
-                        <span>Saldo Pendiente</span>
+                        <span>Pendiente</span>
                         <span>${formatMoney(remainingBalance)}</span>
                     </div>
                 </div>
             </div>
 
-            <!-- HISTORY -->
+            ${history.length > 1 ? `
             <div class="history-section">
-                <div class="history-title">Historial de Transacciones</div>
+                <div class="history-title">Historial de Pagos</div>
                 <table>
-                    <thead>
-                        <tr>
-                            <th width="30%">Fecha</th>
-                            <th width="40%">Método</th>
-                            <th width="30%" class="text-right">Monto</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${historyRows}
-                    </tbody>
+                    ${historyRows}
                 </table>
             </div>
+            ` : ''}
 
-            <!-- FOOTER -->
             <div class="footer">
-                <p>Gracias por tu pago. Este comprobante es un documento interno de <strong>${academy.name}</strong>.</p>
-                <p style="margin-top: 5px;">Cualquier duda contactar a administración.</p>
+                <p>Gracias por tu pago. Este documento sirve como comprobante oficial.</p>
+                <p><strong>${academy.name}</strong></p>
             </div>
-
         </div>
-        <script>
-            window.onload = function() { window.print(); }
-        </script>
     </body>
     </html>
     `;
 
     printWindow.document.write(html);
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 500);
 };

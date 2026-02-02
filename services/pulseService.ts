@@ -137,24 +137,8 @@ export const PulseService = {
             studentId: userId 
         };
 
-        // --- BILLING LOGIC: FIRST MONTH ---
-        const monthlyTuition = Number(academy.paymentSettings?.monthlyTuition) || 0;
+        const initialAmount = Number(academy.paymentSettings?.monthlyTuition) || 0;
         
-        // Calculate Due Date based on Late Fee Day Setting for the CURRENT month
-        const today = new Date();
-        const year = today.getFullYear();
-        const monthIdx = today.getMonth(); // 0-11
-        const monthName = today.toLocaleString('es-ES', { month: 'long' });
-        const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-        
-        const lateFeeDay = academy.paymentSettings?.lateFeeDay || 10;
-        
-        // Format: YYYY-MM-DD
-        const monthPad = String(monthIdx + 1).padStart(2, '0');
-        const dayPad = String(lateFeeDay).padStart(2, '0');
-        const calculatedDueDate = `${year}-${monthPad}-${dayPad}`;
-        const monthContext = `${year}-${monthPad}`;
-
         // Create Student Profile (Data)
         const newStudent: Student = {
             id: userId,
@@ -186,35 +170,48 @@ export const PulseService = {
             rankId: academy.ranks[0].id,
             rankColor: 'white',
             stripes: 0,
-            status: monthlyTuition > 0 ? 'debtor' : 'active', 
+            status: initialAmount > 0 ? 'debtor' : 'active', 
             program: 'Adults',
             attendance: 0,
             totalAttendance: 0,
             joinDate: new Date().toLocaleDateString(),
-            balance: monthlyTuition, // Starts with first month debt
+            balance: initialAmount,
             classesId: [],
             attendanceHistory: [],
             avatarUrl: data.avatarUrl || ''
         };
 
-        // Create the initial CHARGE record
-        if (monthlyTuition > 0) {
+        // Create the initial CHARGE record if tuition is > 0
+        if (initialAmount > 0) {
+            const today = new Date();
+            
+            // 1. Generate Concept Name: Mensualidad [Month]
+            const monthName = today.toLocaleString('es-ES', { month: 'long' });
+            const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+            const concept = `Mensualidad ${capitalizedMonth}`;
+
+            // 2. Calculate Due Date based on Academy Settings (lateFeeDay)
+            // Logic: Use current year and month, but fix the day to lateFeeDay.
+            // If today is past lateFeeDay, the system will naturally mark it as overdue later.
+            const lateFeeDay = academy.paymentSettings?.lateFeeDay || 10;
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(lateFeeDay).padStart(2, '0');
+            const dueDate = `${year}-${month}-${day}`;
+
             const initialCharge: TuitionRecord = {
                 id: uuid(),
                 academyId: academy.id,
                 studentId: userId,
                 studentName: data.name,
-                amount: monthlyTuition,
-                originalAmount: monthlyTuition,
+                amount: initialAmount,
+                originalAmount: initialAmount,
                 penaltyAmount: 0,
-                // Critical: Due date is based on the academy's specific cut-off day for this month.
-                // If today is past this date, the system will mark it as Overdue on next sync.
-                dueDate: calculatedDueDate, 
-                month: monthContext,
-                status: 'charged',
+                dueDate: dueDate,
+                status: 'pending', // Default to pending, FinanceContext will update to 'overdue' if date passed
                 type: 'charge', 
-                description: `Mensualidad correspondiente a ${capitalizedMonth}`,
-                concept: `Mensualidad ${capitalizedMonth}`,
+                description: 'Cuota mensual regular',
+                concept: concept,
                 category: 'Mensualidad',
                 method: 'System',
                 paymentDate: null,
