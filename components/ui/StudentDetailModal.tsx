@@ -1,9 +1,11 @@
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Student, TuitionRecord } from '../../types';
-import { formatDateDisplay } from '../../utils/dateUtils';
 import { useAcademy } from '../../context/AcademyContext';
+import { useStore } from '../../context/StoreContext';
+import { useConfirmation } from '../../context/ConfirmationContext';
+import { formatDateDisplay } from '../../utils/dateUtils';
 import Avatar from './Avatar';
 
 interface StudentDetailModalProps {
@@ -11,7 +13,6 @@ interface StudentDetailModalProps {
     student: Student | null;
     onClose: () => void;
     onEdit: (student: Student) => void;
-    onMessage: (studentId: string) => void;
     financialRecords: TuitionRecord[];
 }
 
@@ -20,242 +21,222 @@ const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
     student,
     onClose,
     onEdit,
-    onMessage,
     financialRecords
 }) => {
     const { academySettings } = useAcademy();
+    const { deleteStudent, purgeStudentDebts } = useStore();
+    const { confirm } = useConfirmation();
 
     if (!student) return null;
 
-    // --- Lógica Académica ---
+    // --- LÓGICA DE PROGRESO ---
     const currentRankConfig = academySettings.ranks.find(r => r.id === student.rankId) || academySettings.ranks[0];
-    const nextRankConfig = academySettings.ranks.find(r => r.order === currentRankConfig.order + 1);
-    const requiredAttendance = currentRankConfig.requiredAttendance || 30; // Fallback
+    const requiredAttendance = currentRankConfig.requiredAttendance || 30;
     const progressPercent = Math.min((student.attendance / requiredAttendance) * 100, 100);
 
-    // --- Lógica Financiera ---
-    const lastMovements = financialRecords.slice(0, 3);
-    const hasDebt = student.balance > 0;
+    const hasDebt = student.balance > 0.01;
+
+    const handleDelete = () => {
+        confirm({
+            title: 'Eliminar Alumno',
+            message: '¿Estás seguro? Se eliminará TOTALMENTE el registro del alumno, incluyendo credenciales, clases, eventos y deudas pendientes.',
+            type: 'danger',
+            confirmText: 'Eliminar permanentemente',
+            onConfirm: () => {
+                deleteStudent(student.id);
+                purgeStudentDebts(student.id);
+                onClose();
+            }
+        });
+    };
 
     return (
         <AnimatePresence>
             {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 30 }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
-                    className="fixed inset-0 z-50 bg-[#F9FAFB] overflow-y-auto"
+                    exit={{ opacity: 0, y: 20 }}
+                    className="fixed inset-0 z-[100] bg-[#F9FAFB] overflow-y-auto font-sans"
                 >
-                    {/* --- HEADER HERO --- */}
-                    <header className="bg-white border-b border-gray-200 sticky top-0 z-20 px-8 py-6 flex justify-between items-center shadow-sm">
-                        <div className="flex items-center gap-6">
+                    {/* --- STICKY HEADER --- */}
+                    <header className="sticky top-0 z-20 bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center shadow-sm">
+                        <div className="flex items-center gap-4">
                             <Avatar 
                                 src={student.avatarUrl} 
                                 name={student.name} 
-                                className="h-16 w-16 rounded-2xl shadow-sm text-2xl font-black" 
+                                className="size-12 rounded-full object-cover shadow-sm font-bold text-lg" 
                             />
-                            <div className="flex flex-col">
-                                <div className="flex items-center gap-3">
-                                    <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
-                                        {student.name}
-                                    </h1>
-                                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border border-slate-200">
-                                        {student.rank}
-                                    </span>
-                                </div>
-                                <p className="text-slate-400 text-sm font-medium mt-1">
-                                    Alumno desde: <span className="text-slate-600">{student.joinDate}</span>
-                                </p>
+                            <div className="flex items-center">
+                                <h1 className="text-2xl font-bold text-gray-900 leading-tight">
+                                    {student.name}
+                                </h1>
+                                <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ml-4 border border-gray-200">
+                                    {student.rank}
+                                </span>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-4">
                             <button 
                                 onClick={() => onEdit(student)}
-                                className="px-5 py-2.5 border-2 border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 text-sm"
+                                className="px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all text-sm flex items-center gap-2"
                             >
                                 <span className="material-symbols-outlined text-lg">edit</span>
                                 Editar Perfil
                             </button>
                             <button 
+                                onClick={handleDelete}
+                                className="text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl transition-all text-sm font-bold flex items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-lg">delete</span>
+                                Eliminar Alumno
+                            </button>
+                            <div className="w-px h-8 bg-gray-200 mx-2"></div>
+                            <button 
                                 onClick={onClose}
-                                className="p-2.5 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+                                className="size-10 rounded-full hover:bg-gray-100 text-gray-500 transition-all flex items-center justify-center border border-gray-100"
                             >
                                 <span className="material-symbols-outlined text-2xl">close</span>
                             </button>
                         </div>
                     </header>
 
-                    {/* --- DASHBOARD CONTENT --- */}
-                    <main className="max-w-7xl mx-auto p-8">
-                        <div className="grid grid-cols-12 gap-8">
+                    {/* --- MAIN CONTENT (CENTERED) --- */}
+                    <main className="max-w-7xl mx-auto p-8 animate-in fade-in duration-500 delay-150">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                             
-                            {/* SIDEBAR: Personal & Contact (Cols 1-4) */}
-                            <aside className="col-span-12 lg:col-span-4 space-y-6">
-                                <section className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
-                                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Información Detallada</h3>
+                            {/* SECCIÓN 1: PROGRESO ACADÉMICO (Col 1-8) */}
+                            <section className="lg:col-span-8 bg-white p-8 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+                                <div>
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Estatus de Entrenamiento</h3>
+                                    <h2 className="text-xl font-bold text-gray-900">Progreso de Grado Actual</h2>
                                     
-                                    <div className="space-y-6">
-                                        <InfoItem icon="cake" label="Edad y Nacimiento">
-                                            <p className="font-bold text-slate-900">{student.age} años <span className="text-slate-400 font-medium ml-1">({student.birthDate})</span></p>
-                                        </InfoItem>
-
-                                        <InfoItem icon="supervisor_account" label="Responsable (Tutor)">
-                                            <p className="font-bold text-slate-900">{student.guardian.fullName}</p>
-                                            <p className="text-xs text-slate-400 font-medium">{student.guardian.relationship}</p>
-                                        </InfoItem>
-
-                                        <InfoItem icon="smartphone" label="Teléfonos de Contacto">
-                                            <div className="flex flex-col gap-1">
-                                                <a href={`tel:${student.cellPhone}`} className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-2">
-                                                    {student.cellPhone} <span className="text-[10px] bg-blue-50 px-1.5 rounded">Alumno</span>
-                                                </a>
-                                                <a href={`tel:${student.guardian.phones.main}`} className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-2">
-                                                    {student.guardian.phones.main} <span className="text-[10px] bg-slate-50 text-slate-500 px-1.5 rounded">Tutor</span>
-                                                </a>
-                                            </div>
-                                        </InfoItem>
-
-                                        <InfoItem icon="location_on" label="Dirección de Domicilio">
-                                            <p className="text-sm font-bold text-slate-700 leading-relaxed">
-                                                {student.guardian.address.street} {student.guardian.address.exteriorNumber}, {student.guardian.address.colony}
-                                                <br />
-                                                <span className="text-slate-400">CP {student.guardian.address.zipCode}</span>
-                                            </p>
-                                        </InfoItem>
-                                    </div>
-
-                                    <button 
-                                        onClick={() => onMessage(student.id)}
-                                        className="w-full mt-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200"
-                                    >
-                                        Enviar Mensaje
-                                    </button>
-                                </section>
-                            </aside>
-
-                            {/* MAIN PANEL: Metrics & Progress (Cols 5-12) */}
-                            <div className="col-span-12 lg:col-span-8 space-y-8">
-                                
-                                {/* CARD 1: FINANZAS (FINTECH STYLE) */}
-                                <section className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm relative overflow-hidden">
-                                    <div className="flex justify-between items-start mb-10">
-                                        <div>
-                                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Estado de Cuenta</h3>
-                                            <div className="flex items-baseline gap-2">
-                                                <span className={`text-6xl font-black tracking-tighter tabular-nums ${hasDebt ? 'text-red-600' : 'text-slate-900'}`}>
-                                                    ${student.balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                                                </span>
-                                                <span className="text-slate-400 font-bold text-sm uppercase">MXN</span>
-                                            </div>
-                                        </div>
-                                        <div className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${hasDebt ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                            {hasDebt ? 'Pago Pendiente' : 'Al Corriente'}
-                                        </div>
-                                    </div>
-
-                                    {/* Mini Activity Table */}
-                                    <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-100">
-                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Última Actividad</h4>
-                                        <div className="space-y-3">
-                                            {lastMovements.length > 0 ? (
-                                                lastMovements.map(record => (
-                                                    <div key={record.id} className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-100 shadow-sm transition-all hover:scale-[1.01]">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className={`h-10 w-10 rounded-full flex items-center justify-center ${record.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                                                                <span className="material-symbols-outlined text-xl">
-                                                                    {record.status === 'paid' ? 'check_circle' : 'hourglass_top'}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-sm font-bold text-slate-900">{record.concept}</p>
-                                                                <p className="text-[10px] font-bold text-slate-400 uppercase">{formatDateDisplay(record.dueDate)}</p>
-                                                            </div>
-                                                        </div>
-                                                        <span className="text-sm font-black text-slate-900 tabular-nums">${record.amount}</span>
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <p className="text-xs text-slate-400 italic text-center py-4">No hay movimientos financieros recientes.</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </section>
-
-                                {/* CARD 2: PROGRESO ACADÉMICO */}
-                                <section className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
-                                    <div className="flex justify-between items-end mb-8">
-                                        <div>
-                                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Evaluación de Desempeño</h3>
-                                            <h2 className="text-2xl font-black text-slate-900 leading-none">Progreso de Grado</h2>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="font-mono text-xs font-bold text-blue-600 uppercase tracking-widest">
-                                                {student.attendance} de {requiredAttendance} Clases
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Modern Progress Bar */}
-                                    <div className="relative mb-10">
-                                        <div className="h-8 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner border border-slate-200/50">
+                                    <div className="relative mt-6">
+                                        <div className="h-8 w-full bg-gray-100 rounded-full overflow-hidden shadow-inner border border-gray-200/50">
                                             <motion.div 
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${progressPercent}%` }}
                                                 transition={{ duration: 1, ease: "easeOut" }}
-                                                className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 rounded-full"
+                                                className="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full"
                                             />
                                         </div>
-                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                            <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest mix-blend-overlay">
-                                                {Math.round(progressPercent)}% Completado
-                                            </span>
+                                    </div>
+
+                                    <div className="flex justify-between items-end mt-4">
+                                        <div className="flex flex-col">
+                                            <span className="text-4xl font-black text-gray-900 tracking-tight">{student.attendance}</span>
+                                            <span className="text-xs font-bold text-gray-400 uppercase">Clases Asistidas</span>
+                                        </div>
+                                        <div className="text-right flex flex-col">
+                                            <span className="text-2xl font-bold text-gray-300">/ {requiredAttendance}</span>
+                                            <span className="text-xs font-bold text-gray-400 uppercase">Requeridas</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="mt-8 pt-6 border-t border-gray-50 grid grid-cols-3 gap-4 text-center">
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase">Total Histórico</p>
+                                        <p className="text-lg font-bold text-gray-900">{student.totalAttendance} asistencias</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase">Grados (Stripes)</p>
+                                        <p className="text-lg font-bold text-gray-900">{student.stripes} marcas</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase">Fecha Ingreso</p>
+                                        <p className="text-lg font-bold text-gray-900">{student.joinDate}</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* SECCIÓN 2: FINANZAS (Col 9-12) */}
+                            <section className="lg:col-span-4 bg-white p-8 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center items-center text-center">
+                                <span className="material-symbols-outlined text-4xl text-gray-300 mb-2">account_balance_wallet</span>
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Saldo Pendiente</h3>
+                                <div className={`text-5xl font-black tracking-tighter tabular-nums mb-4 ${hasDebt ? 'text-red-600' : 'text-gray-900'}`}>
+                                    ${student.balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                </div>
+                                <div className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border mb-6 ${hasDebt ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
+                                    {hasDebt ? 'Pago Requerido' : 'Cuenta al Corriente'}
+                                </div>
+                                <button className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider hover:underline transition-all">
+                                    Ver historial de pagos
+                                </button>
+                            </section>
+
+                            {/* SECCIÓN 3: EXPEDIENTE COMPLETO (Col 1-12) */}
+                            <section className="lg:col-span-12 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                                <div className="px-8 py-5 border-b border-gray-100 bg-gray-50/50">
+                                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-gray-400 text-lg">inventory_2</span>
+                                        Información Personal y Contacto
+                                    </h3>
+                                </div>
+                                
+                                <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-12">
+                                    
+                                    {/* Columna A: Alumno */}
+                                    <div className="space-y-6">
+                                        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Datos del Alumno</h4>
+                                        <DataField label="Fecha de Nacimiento" value={formatDateDisplay(student.birthDate, { day: 'numeric', month: 'long', year: 'numeric' })} />
+                                        <DataField label="Edad Actual" value={`${student.age} años`} />
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-bold text-gray-400 uppercase">Celular Directo</p>
+                                            <a href={`tel:${student.cellPhone}`} className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">
+                                                <span className="material-symbols-outlined text-base">smartphone</span>
+                                                {student.cellPhone}
+                                            </a>
+                                        </div>
+                                        <DataField label="Email" value={student.email} />
+                                    </div>
+
+                                    {/* Columna B: Dirección */}
+                                    <div className="space-y-6">
+                                        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Domicilio</h4>
+                                        <DataField label="Calle" value={student.guardian.address.street} />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <DataField label="No. Exterior" value={student.guardian.address.exteriorNumber} />
+                                            <DataField label="No. Interior" value={student.guardian.address.interiorNumber || '-'} />
+                                        </div>
+                                        <DataField label="Colonia" value={student.guardian.address.colony} />
+                                        <DataField label="Código Postal" value={student.guardian.address.zipCode} />
+                                    </div>
+
+                                    {/* Columna C: Tutor */}
+                                    <div className="space-y-6">
+                                        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Responsable / Tutor</h4>
+                                        <DataField label="Nombre del Tutor" value={student.guardian.fullName} />
+                                        <DataField label="Parentesco" value={student.guardian.relationship} />
+                                        <DataField label="Email del Tutor" value={student.guardian.email || '-'} />
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <DataField label="Teléfono Principal" value={student.guardian.phones.main} />
+                                            {student.guardian.phones.secondary && (
+                                                <DataField label="Teléfono Secundario" value={student.guardian.phones.secondary} />
+                                            )}
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-100">
-                                            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">Siguiente Objetivo</h4>
-                                            <p className="text-lg font-bold text-blue-900">
-                                                {nextRankConfig ? nextRankConfig.name : 'Maestría'}
-                                            </p>
-                                            <p className="text-xs text-blue-700 mt-1 font-medium">
-                                                Te faltan {Math.max(requiredAttendance - student.attendance, 0)} clases para postular al examen.
-                                            </p>
-                                        </div>
+                                </div>
+                            </section>
 
-                                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex flex-col justify-between">
-                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Histórico</h4>
-                                            <div className="flex items-center gap-4">
-                                                <span className="text-4xl font-black text-slate-900 leading-none">{student.totalAttendance}</span>
-                                                <span className="text-xs font-bold text-slate-400 leading-tight uppercase">Sesiones de<br/>Entrenamiento</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </section>
-
-                            </div>
                         </div>
                     </main>
+                    
+                    {/* Espaciador inferior */}
+                    <div className="h-20"></div>
                 </motion.div>
             )}
         </AnimatePresence>
     );
 };
 
-// Helper Sub-component for Sidebar rows
-const InfoItem: React.FC<{ icon: string; label: string; children: React.ReactNode }> = ({ icon, label, children }) => (
-    <div className="flex items-start gap-4">
-        <div className="h-10 w-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 shrink-0 border border-slate-100">
-            <span className="material-symbols-outlined text-[20px]">{icon}</span>
-        </div>
-        <div className="min-w-0">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-            <div className="text-sm">
-                {children}
-            </div>
-        </div>
+// --- COMPONENTE INTERNO PARA CAMPOS DE DATOS ---
+const DataField: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+    <div className="flex flex-col">
+        <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{label}</label>
+        <p className="text-sm font-semibold text-gray-900 mt-1">{value || '-'}</p>
     </div>
 );
 
