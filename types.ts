@@ -106,6 +106,10 @@ export interface Student {
     cellPhone: string;
     avatarUrl?: string;
     
+    // Physical Data
+    weight?: number;
+    height?: number;
+    
     // Guardian / Responsible Party
     guardian: GuardianProfile;
 

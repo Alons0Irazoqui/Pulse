@@ -300,6 +300,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onConfirm,
                                 }`}
                                 placeholder="0.00"
                             />
+                            
+                            {/* HELPER ALERTS IN RED */}
+                            {isPartialEnabled && !isAmountValid && (
+                                <p className="text-[11px] text-red-600 font-bold mt-2 ml-1 animate-in slide-in-from-top-1 fade-in">
+                                    {finalAmount < mandatorySum 
+                                        ? `La cantidad mínima obligatoria a cubrir es $${mandatorySum.toFixed(2)}`
+                                        : `La cantidad no puede exceder el total adeudado de $${totalDebtSum.toFixed(2)}`
+                                    }
+                                </p>
+                            )}
                         </div>
                     </div>
 

@@ -55,6 +55,7 @@ interface FinanceContextType {
     purgeStudentDebts: (studentId: string) => void;
     getStudentPendingDebts: (studentId: string) => TuitionRecord[];
     uploadProof: (recordId: string, file: File) => void; 
+    markAsPaidByMaster: (recordId: string, amount: number, method: 'Efectivo' | 'Transferencia' | 'Tarjeta', note?: string) => void;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -102,22 +103,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, [loadFinanceData]);
 
     // --- CORE LOGIC: BILLING GENERATION (AUTOMATED & MANUAL) ---
-    // Extract logic to reused function
     const runBillingProcess = useCallback(() => {
-        // Validation: Master Role Only
         if (!currentUser || currentUser.role !== 'master') return 0;
 
         const todayDate = new Date();
-        const currentDay = todayDate.getDate(); // 1-31
+        const currentDay = todayDate.getDate();
         const billingDay = academySettings.paymentSettings.billingDay;
 
-        // Condition: Only run if we passed the billing day
         if (currentDay >= billingDay) {
-            const dateStr = getLocalDate(); // YYYY-MM-DD
+            const dateStr = getLocalDate();
             const [year, month] = dateStr.split('-');
-            const monthContext = `${year}-${month}`; // YYYY-MM context
+            const monthContext = `${year}-${month}`;
             
-            // Due Date Calculation: Use lateFeeDay configuration
             const lateFeeDay = academySettings.paymentSettings.lateFeeDay || 10;
             const dueDate = `${monthContext}-${lateFeeDay.toString().padStart(2, '0')}`;
 
@@ -125,7 +122,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const newCharges: TuitionRecord[] = [];
 
             activeStudents.forEach(student => {
-                // Verification: Check if "Mensualidad" already exists for this YYYY-MM
                 const exists = records.some(r => 
                     r.studentId === student.id && 
                     r.month === monthContext && 
@@ -134,7 +130,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 
                 if (exists) return;
 
-                // Create Charge
                 const charge: TuitionRecord = {
                     id: generateId('bill'),
                     academyId: currentUser.academyId,
@@ -173,7 +168,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 addToast(`Facturación automática: ${createdCount} cargos generados.`, 'info');
             }
         }
-    }, [isFinanceLoading, students.length, runBillingProcess]); // Limited dependencies to prevent loops
+    }, [isFinanceLoading, students.length, runBillingProcess]);
 
 
     // --- SYNC ENGINE: OVERDUE CHECK, DEBT CALCULATION & EXAM READINESS ---
@@ -183,14 +178,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const today = getLocalDate();
         let recordsUpdated = false;
         
-        // 1. Check Overdue Status & Apply Penalties
         const processedRecords = records.map(r => {
-            // Check 'pending' (auto) and 'charged' (manual) records for expiration
             if ((r.status === 'pending' || r.status === 'charged') && r.dueDate < today) {
                 recordsUpdated = true;
-                
-                // --- PENALTY LOGIC ---
-                // Priority: Custom Penalty -> Global Academy Setting
                 const penalty = (r.customPenaltyAmount !== undefined && r.customPenaltyAmount > 0)
                     ? r.customPenaltyAmount
                     : (academySettings.paymentSettings?.lateFeeAmount || 0);
@@ -202,14 +192,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         if (recordsUpdated) {
             setRecords(processedRecords);
-            return; // Stop here, next render will handle student status updates
+            return;
         }
 
-        // 2. Calculate Student Balances & Update Status Logic
         const studentsToUpdate: Student[] = [];
         
         students.forEach(student => {
-            // A. Calculate Debt
             const studentRecords = records.filter(r => r.studentId === student.id);
             const debt = studentRecords.reduce((acc, r) => {
                 if (['pending', 'overdue', 'partial', 'charged'].includes(r.status)) {
@@ -218,7 +206,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 return acc;
             }, 0);
 
-            // B. Calculate Exam Readiness
             const currentRank = academySettings.ranks.find(r => r.id === student.rankId);
             const requiredAttendance = currentRank ? currentRank.requiredAttendance : 9999;
             const isAcademicReady = student.attendance >= requiredAttendance;
@@ -226,7 +213,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             let newStatus = student.status;
 
-            // C. Determine Status (Priority Logic)
             if (student.status !== 'inactive') {
                 if (isAcademicReady) {
                     newStatus = 'exam_ready';
@@ -239,7 +225,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 }
             }
 
-            // Detect if update is needed
             const currentBalance = student.balance || 0;
             if (Math.abs(currentBalance - debt) > 0.01 || student.status !== newStatus) {
                 studentsToUpdate.push({ ...student, balance: debt, status: newStatus });
@@ -247,18 +232,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
 
         if (studentsToUpdate.length > 0) {
-            // SAFE CALL using Ref to prevent loop
             batchUpdateRef.current(studentsToUpdate);
         }
 
     }, [records, students, isFinanceLoading, academySettings]); 
 
 
-    // --- CALCULATE STATS (Derived - REAL DATA) ---
+    // --- CALCULATE STATS ---
     useEffect(() => {
         if (isFinanceLoading) return;
 
-        // 1. Calculate General Stats - Updated to include 'in_review' in pending totals
         const pending = records.filter(r => ['pending', 'partial', 'charged', 'in_review'].includes(r.status));
         const overdue = records.filter(r => r.status === 'overdue');
         
@@ -278,7 +261,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             activeStudents: students.filter(s => s.status === 'active').length
         });
 
-        // 2. Generate Real Chart Data
         const generateRealChartData = () => {
             const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
             const now = new Date();
@@ -363,7 +345,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             proofUrl: null,
             canBePaidInParts: data.canBePaidInParts,
             relatedEventId: data.relatedEventId,
-            customPenaltyAmount: data.customPenaltyAmount || 0 // Save custom penalty
+            customPenaltyAmount: data.customPenaltyAmount || 0 
         };
         setRecords(prev => [...prev, newRecord]);
         addToast('Cargo generado exitosamente', 'success');
@@ -583,7 +565,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addToast('Registro eliminado', 'info');
     };
 
-    // Public method that can be triggered manually, but essentially re-runs the core logic
     const generateMonthlyBilling = () => {
         const count = runBillingProcess();
         if (count === 0) {
@@ -610,6 +591,41 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         registerBatchPayment([recordId], file, 'Transferencia', 0, []); 
     };
 
+    const markAsPaidByMaster = (recordId: string, amount: number, method: 'Efectivo' | 'Transferencia' | 'Tarjeta', note?: string) => {
+        if (currentUser?.role !== 'master') return;
+        
+        setRecords(prev => prev.map(r => {
+            if (r.id === recordId) {
+                const currentPenalty = r.penaltyAmount || 0;
+                const totalDebt = r.amount + currentPenalty;
+                const amountToApply = amount;
+                const remaining = Math.max(0, totalDebt - amountToApply);
+                const isPaidFull = remaining < 0.01;
+                const now = new Date().toISOString();
+
+                const newHistoryItem = {
+                    date: now,
+                    amount: amountToApply,
+                    method: method
+                };
+
+                return {
+                    ...r,
+                    status: isPaidFull ? 'paid' : 'partial',
+                    amount: isPaidFull ? 0 : remaining,
+                    originalAmount: isPaidFull ? (r.originalAmount ?? r.amount) + currentPenalty : (r.originalAmount ?? r.amount),
+                    penaltyAmount: 0, 
+                    paymentDate: now,
+                    method: method,
+                    description: note || r.description,
+                    paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
+                } as TuitionRecord;
+            }
+            return r;
+        }));
+        addToast('Movimiento marcado como pagado exitosamente.', 'success');
+    };
+
     return (
         <FinanceContext.Provider value={{
             records,
@@ -630,7 +646,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             generateMonthlyBilling,
             purgeStudentDebts,
             getStudentPendingDebts,
-            uploadProof
+            uploadProof,
+            markAsPaidByMaster
         }}>
             {children}
         </FinanceContext.Provider>

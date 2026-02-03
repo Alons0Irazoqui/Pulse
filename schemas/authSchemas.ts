@@ -15,6 +15,10 @@ export const studentRegistrationSchema = z.object({
   cellPhone: z.string().regex(phoneRegex, "El celular debe tener al menos 10 dígitos"),
   avatarUrl: z.string().optional(),
   
+  // Physical Data
+  weight: z.coerce.number().min(5, "Mínimo 5kg").max(300, "Máximo 300kg").optional(),
+  height: z.coerce.number().min(40, "Mínimo 40cm").max(250, "Máximo 250cm").optional(),
+  
   // Guardian Data
   guardianName: z.string().min(3, "El nombre del tutor es obligatorio"),
   guardianEmail: z.string().email("Correo del tutor inválido"),

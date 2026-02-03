@@ -85,7 +85,7 @@ const StudentRegistration: React.FC = () => {
   const nextStep = async () => {
     let fieldsToValidate: (keyof StudentRegistrationForm)[] = [];
     if (currentStep === 1) fieldsToValidate = ['academyCode', 'email', 'password', 'confirmPassword'];
-    else if (currentStep === 2) fieldsToValidate = ['name', 'age', 'birthDate', 'cellPhone'];
+    else if (currentStep === 2) fieldsToValidate = ['name', 'age', 'birthDate', 'cellPhone', 'weight', 'height'];
 
     const isStepValid = await trigger(fieldsToValidate);
     
@@ -176,8 +176,14 @@ const StudentRegistration: React.FC = () => {
                     </div>
                     <InputField register={register} errors={errors} label="Nombre Completo" name="name" placeholder="Nombre y Apellidos" />
                     <InputField register={register} errors={errors} label="Celular" name="cellPhone" type="tel" placeholder="10 dígitos" />
-                    <InputField register={register} errors={errors} label="Edad" name="age" type="number" placeholder="Años" cols={2} />
-                    <InputField register={register} errors={errors} label="Fecha Nacimiento" name="birthDate" type="date" cols={2} />
+                    
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <InputField register={register} errors={errors} label="Edad" name="age" type="number" placeholder="Años" cols={2} />
+                        <InputField register={register} errors={errors} label="Peso (kg)" name="weight" type="number" placeholder="0" cols={2} />
+                        <InputField register={register} errors={errors} label="Estatura (cm)" name="height" type="number" placeholder="0" cols={2} />
+                    </div>
+                    
+                    <InputField register={register} errors={errors} label="Fecha Nacimiento" name="birthDate" type="date" />
                 </div>
             )}
 

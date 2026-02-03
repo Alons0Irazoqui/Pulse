@@ -48,6 +48,8 @@ const StudentsList: React.FC = () => {
       cellPhone: '',
       age: undefined,
       birthDate: '',
+      weight: undefined,
+      height: undefined,
       rank: 'White Belt', 
       status: 'active', 
       program: 'Adults', 
@@ -144,7 +146,9 @@ const StudentsList: React.FC = () => {
           Tutor_Tel: s.guardian.phones.main,
           Rango: s.rank,
           Estado: getStatusLabel(s.status),
-          Balance: s.balance
+          Balance: s.balance,
+          Peso_kg: s.weight || '-',
+          Estatura_cm: s.height || '-'
       }));
       exportToCSV(dataToExport, 'Listado_Alumnos_Completo');
       addToast('Archivo CSV generado', 'success');
@@ -439,6 +443,16 @@ const StudentsList: React.FC = () => {
                                       <input type="number" value={formData.age || ''} onChange={e => setFormData({...formData, age: parseInt(e.target.value)})} className="mt-1 block w-full rounded-xl border-gray-300 p-2.5 text-sm focus:border-primary focus:ring-primary" />
                                   </label>
                               </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                  <label className="block">
+                                      <span className="text-xs font-bold text-text-secondary uppercase">Peso (kg)</span>
+                                      <input type="number" step="0.1" value={formData.weight || ''} onChange={e => setFormData({...formData, weight: parseFloat(e.target.value)})} className="mt-1 block w-full rounded-xl border-gray-300 p-2.5 text-sm focus:border-primary focus:ring-primary" placeholder="0.0" />
+                                  </label>
+                                  <label className="block">
+                                      <span className="text-xs font-bold text-text-secondary uppercase">Estatura (cm)</span>
+                                      <input type="number" value={formData.height || ''} onChange={e => setFormData({...formData, height: parseInt(e.target.value)})} className="mt-1 block w-full rounded-xl border-gray-300 p-2.5 text-sm focus:border-primary focus:ring-primary" placeholder="0" />
+                                  </label>
+                              </div>
                               <label className="block">
                                   <span className="text-xs font-bold text-text-secondary uppercase">Email *</span>
                                   <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="mt-1 block w-full rounded-xl border-gray-300 p-2.5 text-sm focus:border-primary focus:ring-primary" />
@@ -607,14 +621,29 @@ const StudentsList: React.FC = () => {
                                           </div>
                                           <div className="flex items-center gap-4 text-sm bg-gray-50 p-3 rounded-xl border border-gray-100">
                                               <div className="size-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm"><span className="material-symbols-outlined text-[20px]">cake</span></div>
-                                              <div className="flex gap-6">
+                                              <div className="grid grid-cols-2 gap-8 flex-1">
                                                   <div>
                                                       <p className="text-xs text-text-secondary">Edad</p>
                                                       <p className="font-semibold text-text-main">{reactiveViewingStudent.age} años</p>
                                                   </div>
                                                   <div>
-                                                      <p className="text-xs text-text-secondary">Fecha Nacimiento</p>
+                                                      <p className="text-xs text-text-secondary">Nacimiento</p>
                                                       <p className="font-semibold text-text-main">{reactiveViewingStudent.birthDate}</p>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                          
+                                          {/* Fisico */}
+                                          <div className="flex items-center gap-4 text-sm bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                              <div className="size-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm"><span className="material-symbols-outlined text-[20px]">monitor_weight</span></div>
+                                              <div className="grid grid-cols-2 gap-8 flex-1">
+                                                  <div>
+                                                      <p className="text-xs text-text-secondary">Peso</p>
+                                                      <p className="font-semibold text-text-main">{reactiveViewingStudent.weight ? `${reactiveViewingStudent.weight} kg` : 'No registrado'}</p>
+                                                  </div>
+                                                  <div>
+                                                      <p className="text-xs text-text-secondary">Estatura</p>
+                                                      <p className="font-semibold text-text-main">{reactiveViewingStudent.height ? `${reactiveViewingStudent.height} cm` : 'No registrada'}</p>
                                                   </div>
                                               </div>
                                           </div>

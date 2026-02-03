@@ -99,6 +99,8 @@ export const PulseService = {
         age: number;
         birthDate: string;
         avatarUrl?: string;
+        weight?: number;
+        height?: number;
         guardianName: string;
         guardianEmail: string;
         guardianRelationship: 'Padre' | 'Madre' | 'Tutor Legal' | 'Familiar' | 'Otro';
@@ -149,6 +151,8 @@ export const PulseService = {
             cellPhone: data.cellPhone,
             age: data.age, 
             birthDate: data.birthDate,
+            weight: data.weight,
+            height: data.height,
             guardian: {
                 fullName: data.guardianName,
                 email: data.guardianEmail,
