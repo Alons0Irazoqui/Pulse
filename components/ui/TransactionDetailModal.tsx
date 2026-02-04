@@ -42,7 +42,6 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   const [manualMethod, setManualMethod] = useState<'Efectivo' | 'Transferencia' | 'Tarjeta'>('Efectivo');
   const [manualNote, setManualNote] = useState('');
   
-  // Estado para ajuste de beca (Monto total del movimiento)
   const [isAdjustingTotal, setIsAdjustingTotal] = useState(false);
   const [adjustedTotal, setAdjustedTotal] = useState<string>('');
 
@@ -51,7 +50,6 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     return record.amount + (record.penaltyAmount || 0);
   }, [record]);
 
-  // Reset local state when modal closes or record changes
   React.useEffect(() => {
     if (isOpen && record) {
         setIsPayingManual(false);
@@ -65,18 +63,23 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
   if (!isOpen || !record) return null;
 
-  const totalPaid = paymentHistory.reduce((acc, curr) => acc + curr.amount, 0);
+  // --- LOGIC IMPLEMENTATION (RECONSTRUCTION METHOD) ---
   
-  // Logic Fix: Calculation for visual breakdown using Historical Penalty if paid
-  const penalty = record.status === 'paid' ? (record.customPenaltyAmount || 0) : (record.penaltyAmount || 0);
+  // 1. Total Paid History
+  const totalPaid = (paymentHistory || []).reduce((acc, curr) => acc + curr.amount, 0);
   
-  // Total real value of the transaction. If paid, rely on originalAmount + 0 (since it was merged) or totalPaid logic.
-  // Generally: OriginalTotal = (originalAmount ?? amount) + (IF PAID ? 0 : currentPenalty).
-  // But since we want to show breakdown: Base + Penalty.
-  // Base = Total - Penalty.
-  
-  const originalTotal = (record.originalAmount ?? record.amount) + (record.status === 'paid' ? 0 : penalty);
-  const base = originalTotal - penalty;
+  // 2. Current Debt
+  const currentDebt = record.amount + (record.penaltyAmount || 0);
+
+  // 3. Grand Total (Reconstructed Total Value of Transaction)
+  const grandTotal = totalPaid + currentDebt;
+
+  // 4. Base Amount (Use originalAmount if available, else assume current Grand Total is base)
+  const baseAmount = record.originalAmount !== undefined ? record.originalAmount : grandTotal;
+
+  // 5. Implied Penalty (Difference between what it costs now vs original base)
+  let impliedPenalty = grandTotal - baseAmount;
+  if (impliedPenalty < 0.01) impliedPenalty = 0;
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -153,28 +156,37 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                   {record.category || 'General'}
                 </span>
               </div>
-              <h2 className="text-2xl font-black text-slate-900 mt-2 leading-tight">
-                {record.concept}
-              </h2>
+              <div className="flex items-baseline gap-2 mt-2">
+                  <h2 className="text-2xl font-black text-slate-900 leading-tight">
+                    {record.concept}
+                  </h2>
+                  {impliedPenalty > 0 && (
+                      <span className="text-xs font-bold text-gray-400 hidden md:inline-block">
+                          (Base + Recargo)
+                      </span>
+                  )}
+              </div>
             </div>
           </div>
           
+          {/* Header Costo Global Logic - Consistent with Abonos */}
           <div className="hidden md:block text-right">
-             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Global</p>
-             {penalty > 0 ? (
+             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Costo Total</p>
+             {impliedPenalty > 0 ? (
                  <div className="flex flex-col items-end gap-0.5">
                      <div className="flex items-center gap-2 text-xs font-medium text-gray-400">
                         <span>Base:</span>
-                        <span className="tabular-nums">{formatMoney(base)}</span>
+                        <span className="tabular-nums">{formatMoney(baseAmount)}</span>
                      </div>
                      <div className="flex items-center gap-2 text-xs font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
                         <span>+ Recargo:</span>
-                        <span className="tabular-nums">{formatMoney(penalty)}</span>
+                        <span className="tabular-nums">{formatMoney(impliedPenalty)}</span>
                      </div>
-                     <p className="text-3xl font-black text-slate-900 tabular-nums mt-1">{formatMoney(originalTotal)}</p>
+                     <div className="border-t border-gray-100 w-full my-0.5"></div>
+                     <p className="text-3xl font-black text-slate-900 tabular-nums mt-1">{formatMoney(grandTotal)}</p>
                  </div>
              ) : (
-                 <p className="text-3xl font-black text-slate-900 tabular-nums">{formatMoney(originalTotal)}</p>
+                 <p className="text-3xl font-black text-slate-900 tabular-nums">{formatMoney(grandTotal)}</p>
              )}
           </div>
         </div>
@@ -299,38 +311,35 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           ) : (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                {/* Costo Global - Con desglose inteligente */}
+                {/* Costo Global - Card Version with Breakdown */}
                 <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-auto min-h-[7rem]">
                   <div className="flex items-center gap-2 text-gray-400 mb-1">
                       <span className="material-symbols-outlined text-lg">receipt_long</span>
                       <span className="text-[10px] font-bold uppercase tracking-wider">Costo Global</span>
                   </div>
                   
-                  {penalty > 0 ? (
-                    <div className="flex flex-col w-full gap-1 mt-auto animate-in fade-in slide-in-from-bottom-1">
-                        <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
-                            <span>Base</span>
-                            <span className="tabular-nums">{formatMoney(base)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs text-red-600 font-bold bg-red-50/50 px-2 py-0.5 rounded">
-                            <span>+ Recargo</span>
-                            <span className="tabular-nums">{formatMoney(penalty)}</span>
-                        </div>
-                        <div className="border-t border-gray-100 my-1.5"></div>
-                        <div className="flex justify-between items-end">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
-                            <span className="text-2xl font-black text-slate-900 tabular-nums leading-none">{formatMoney(originalTotal)}</span>
-                        </div>
-                    </div>
+                  {impliedPenalty > 0 ? (
+                      <div className="flex flex-col gap-0.5">
+                          <div className="flex justify-between text-[10px] text-gray-400 font-medium">
+                              <span>Base:</span>
+                              <span>{formatMoney(baseAmount)}</span>
+                          </div>
+                          <div className="flex justify-between text-[10px] text-red-500 font-bold">
+                              <span>+ Recargo:</span>
+                              <span>{formatMoney(impliedPenalty)}</span>
+                          </div>
+                          <div className="border-t border-gray-100 my-1"></div>
+                          <span className="text-xl font-bold text-slate-900 tabular-nums">{formatMoney(grandTotal)}</span>
+                      </div>
                   ) : (
-                    <span className="text-2xl font-bold text-slate-900 tabular-nums mt-auto">{formatMoney(originalTotal)}</span>
+                      <span className="text-2xl font-bold text-slate-900 tabular-nums mt-auto">{formatMoney(grandTotal)}</span>
                   )}
                 </div>
 
                 <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-auto min-h-[7rem]">
                   <div className="flex items-center gap-2 text-emerald-600 mb-1">
                       <span className="material-symbols-outlined text-lg">payments</span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Pagado</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Total Abonado</span>
                   </div>
                   <span className="text-2xl font-bold text-emerald-700 tabular-nums mt-auto">{formatMoney(totalPaid)}</span>
                 </div>
@@ -338,7 +347,7 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-auto min-h-[7rem]">
                   <div className="flex items-center gap-2 text-slate-600 mb-1">
                       <span className="material-symbols-outlined text-lg">pie_chart</span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Pendiente</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Restante</span>
                   </div>
                   <span className="text-2xl font-bold text-slate-900 tabular-nums mt-auto">{formatMoney(remainingDebt)}</span>
                 </div>
@@ -387,7 +396,7 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                             </div>
                             <div className="text-right">
                                 <span className="text-lg font-bold text-slate-900 tabular-nums">{formatMoney(item.amount)}</span>
-                                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">Aplicado</p>
+                                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">Abonado</p>
                             </div>
                         </div>
                       </div>
