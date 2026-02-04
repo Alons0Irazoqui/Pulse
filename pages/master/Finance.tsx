@@ -490,7 +490,7 @@ const Finance: React.FC = () => {
                                             ) : (
                                                 <div className="flex flex-col items-end">
                                                     <span className={`font-bold text-sm tabular-nums tracking-tight ${isPaid ? 'text-emerald-700' : 'text-slate-900'}`}>
-                                                        ${totalOriginalAmount.toFixed(2)}
+                                                        ${((mainRecord.originalAmount ?? mainRecord.amount) + (mainRecord.penaltyAmount || 0)).toFixed(2)}
                                                     </span>
                                                     {isPartial && !isPaid && (
                                                         <div className="mt-1 flex flex-col items-end gap-0.5">
