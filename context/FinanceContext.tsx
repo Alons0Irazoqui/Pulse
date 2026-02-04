@@ -402,7 +402,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     status: isPaidFull ? 'paid' : 'partial',
                     amount: isPaidFull ? 0 : remaining,
                     originalAmount: isPaidFull ? (r.originalAmount ?? r.amount) + currentPenalty : (r.originalAmount ?? r.amount),
+                    // IMPORTANT: When marking as paid, penaltyAmount becomes 0 (no debt).
+                    // We preserve the currentPenalty into customPenaltyAmount so we know this record HAD a penalty.
                     penaltyAmount: 0, 
+                    customPenaltyAmount: currentPenalty > 0 ? currentPenalty : r.customPenaltyAmount,
                     paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
                 };
             }
@@ -494,6 +497,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                         amount: isPaidFull ? 0 : remaining,
                         originalAmount: isPaidFull ? (r.originalAmount ?? r.amount) + currentPenalty : (r.originalAmount ?? r.amount),
                         penaltyAmount: 0, 
+                        // Preserve penalty info
+                        customPenaltyAmount: currentPenalty > 0 ? currentPenalty : r.customPenaltyAmount,
                         paymentHistory: [...(r.paymentHistory || []), newHistoryItem]
                     } as TuitionRecord;
                 } 
@@ -636,7 +641,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     status: isPaidFull ? 'paid' : 'partial',
                     amount: isPaidFull ? 0 : remaining,
                     originalAmount: isPaidFull ? (r.originalAmount ?? r.amount) + currentPenalty : (r.originalAmount ?? r.amount),
+                    // IMPORTANT: Preserve penalty info in customPenaltyAmount when wiping active penaltyAmount
                     penaltyAmount: 0, 
+                    customPenaltyAmount: currentPenalty > 0 ? currentPenalty : r.customPenaltyAmount,
                     paymentDate: now,
                     method: method,
                     description: note || r.description,

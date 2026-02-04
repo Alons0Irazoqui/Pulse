@@ -1,3 +1,4 @@
+
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { TuitionRecord, AcademySettings, UserProfile } from '../types';
@@ -42,30 +43,35 @@ export const generateReceipt = (
     const history = record.paymentHistory || [];
     const totalPaid = history.reduce((sum, p) => sum + p.amount, 0);
     
-    // 2. Recargo Actual
-    const penaltyAmount = record.penaltyAmount || 0;
+    // 2. Penalty Recovery Logic
+    // If the record is paid, the penaltyAmount property is 0. We must check customPenaltyAmount 
+    // where we stored the penalty history during approval.
+    const historicalPenalty = record.status === 'paid' ? (record.customPenaltyAmount || 0) : (record.penaltyAmount || 0);
 
-    // 3. Deuda Pendiente Actual (Base + Recargo si aplica)
-    const currentDebt = record.amount + penaltyAmount;
+    // 3. Deuda Pendiente Actual (Solo si no está pagado)
+    const currentDebt = record.status === 'paid' ? 0 : (record.amount + historicalPenalty);
 
     // 4. Gran Total Histórico (Valor Real de la Transacción)
-    // Se calcula sumando lo que se debe actualmente + lo que ya se pagó.
-    // Esto asegura que el total siempre sea consistente independientemente del estado.
-    const grandTotal = currentDebt + totalPaid;
+    // If paid, granTotal is mostly totalPaid. If not paid, currentDebt. 
+    // Specifically: Original (likely includes penalty if it was overdue) -> No, we want Base + Penalty.
+    // record.originalAmount usually holds the total including penalty if paid.
+    // Safe calc: Base (inferred) + Penalty.
+    const grandTotal = (record.originalAmount ?? record.amount) + (record.status === 'paid' ? 0 : historicalPenalty); 
+    // Note: When paid, originalAmount is updated to include penalty. When unpaid, it might not be.
+    // Let's rely on totalPaid logic if paid.
+    const finalTotal = record.status === 'paid' ? totalPaid : grandTotal;
 
     // 5. Monto Base Original (Sin Recargo)
-    // Se deriva restando el recargo al gran total. Esto soluciona el error visual
-    // donde el monto original aparecía ya sumado con el recargo.
-    const baseAmount = grandTotal - penaltyAmount;
+    const baseAmount = finalTotal - historicalPenalty;
 
     // 6. Validación de Estado
-    const balanceDue = Math.max(0, grandTotal - totalPaid); // Debería ser igual a currentDebt
-    const isFullyPaid = balanceDue < 0.01;
+    const balanceDue = record.status === 'paid' ? 0 : Math.max(0, grandTotal - totalPaid);
+    const isFullyPaid = record.status === 'paid' || balanceDue < 0.01;
 
     // 7. Configuración de Texto de Concepto
     let conceptDisplay = record.concept;
-    if (penaltyAmount > 0) {
-        conceptDisplay += ` (Base: ${formatMoney(baseAmount)} + Recargo: ${formatMoney(penaltyAmount)})`;
+    if (historicalPenalty > 0) {
+        conceptDisplay += ` (Base: ${formatMoney(baseAmount)} + Recargo: ${formatMoney(historicalPenalty)})`;
     }
 
     doc.setFont('helvetica');
@@ -155,8 +161,8 @@ export const generateReceipt = (
         ]
     ];
 
-    if (penaltyAmount > 0) {
-        tableBody.push([{ content: 'Recargo por pago tardío', styles: { textColor: [220, 38, 38] } }, '1', formatMoney(penaltyAmount)]);
+    if (historicalPenalty > 0) {
+        tableBody.push([{ content: 'Recargo por pago tardío', styles: { textColor: [220, 38, 38] } }, '1', formatMoney(historicalPenalty)]);
     }
 
     autoTable(doc, {
@@ -205,8 +211,8 @@ export const generateReceipt = (
 
     // Desglose explícito calculado
     drawSummaryLine('Monto original:', formatMoney(baseAmount));
-    if (penaltyAmount > 0) {
-        drawSummaryLine('Recargo aplicado:', `+${formatMoney(penaltyAmount)}`);
+    if (historicalPenalty > 0) {
+        drawSummaryLine('Recargo aplicado:', `+${formatMoney(historicalPenalty)}`);
     }
     
     // Subtotal antes de pagos
@@ -216,7 +222,7 @@ export const generateReceipt = (
     finalY += 4;
     
     // Total generado (Base + Recargo)
-    drawSummaryLine('Cargo total generado:', formatMoney(grandTotal), false, true);
+    drawSummaryLine('Cargo total generado:', formatMoney(finalTotal), false, true);
     drawSummaryLine('Abono registrado:', `-${formatMoney(totalPaid)}`);
     
     // Separador final

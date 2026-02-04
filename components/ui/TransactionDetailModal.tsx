@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { TuitionRecord, PaymentHistoryItem } from '../../types';
 import { formatDateDisplay } from '../../utils/dateUtils';
@@ -66,11 +67,15 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
   const totalPaid = paymentHistory.reduce((acc, curr) => acc + curr.amount, 0);
   
-  // Logic Fix: Calculation for visual breakdown
-  const penalty = record.penaltyAmount || 0;
-  // Total real value of the transaction (Original Base + Penalty)
-  const originalTotal = (record.originalAmount ?? record.amount) + penalty;
-  // Base value derived
+  // Logic Fix: Calculation for visual breakdown using Historical Penalty if paid
+  const penalty = record.status === 'paid' ? (record.customPenaltyAmount || 0) : (record.penaltyAmount || 0);
+  
+  // Total real value of the transaction. If paid, rely on originalAmount + 0 (since it was merged) or totalPaid logic.
+  // Generally: OriginalTotal = (originalAmount ?? amount) + (IF PAID ? 0 : currentPenalty).
+  // But since we want to show breakdown: Base + Penalty.
+  // Base = Total - Penalty.
+  
+  const originalTotal = (record.originalAmount ?? record.amount) + (record.status === 'paid' ? 0 : penalty);
   const base = originalTotal - penalty;
 
   const getStatusConfig = (status: string) => {
