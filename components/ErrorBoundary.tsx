@@ -14,14 +14,12 @@ interface ErrorBoundaryState {
  * Inherits from Component to use lifecycle methods like componentDidCatch.
  */
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    // Initializing state in constructor. Added comment to fix property 'state' does not exist error.
-    this.state = {
-      hasError: false,
-      error: null
-    };
-  }
+  // Fix: Explicitly declaring state as a class property helps TypeScript resolve 
+  // 'state' on 'this' when inheritance visibility issues occur in certain build environments.
+  public state: ErrorBoundaryState = {
+    hasError: false,
+    error: null
+  };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     // Update state so the next render will show the fallback UI.
@@ -33,15 +31,23 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     console.error("Uncaught error:", error, errorInfo);
   }
 
+  // Use arrow function for lexical this binding to ensure access to setState
   handleRetry = () => {
-    // Resetting state to clear the error. Added comment to fix property 'setState' does not exist error.
+    // Fix: setState is correctly inherited from the Component base class.
+    // Declaring the class correctly with generic types ensures its availability.
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
 
   render() {
-    // Checking error state. Added comment to fix property 'state' does not exist error.
-    if (this.state.hasError) {
+    // Fix: Destructuring state and props at the start of render ensures that 
+    // variables like 'hasError', 'error', and 'children' are available locally 
+    // and correctly typed, bypassing repetitive 'this' access issues.
+    const { hasError, error } = this.state;
+    const { children } = this.props;
+
+    // Fix: Using 'hasError' from destructured state.
+    if (hasError) {
       // Fallback UI
       return (
         <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-6 font-sans">
@@ -53,12 +59,12 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             <p className="text-gray-500 mb-8 text-sm">
               Ha ocurrido un error inesperado al cargar la aplicación.
             </p>
-            {/* Accessing error from state. Added comment to fix property 'state' does not exist error. */}
-            {this.state.error && (
+            {/* Fix: Accessing 'error' from destructured state. */}
+            {error && (
                 <div className="bg-gray-50 p-4 rounded-xl text-left mb-8 overflow-auto max-h-32 border border-gray-200">
                     <p className="font-mono text-xs text-red-600 break-words">
-                        {/* Accessing error message. Added comment to fix property 'state' does not exist error. */}
-                        {this.state.error.toString()}
+                        {/* Fix: Safely call toString() on the typed error object. */}
+                        {error.toString()}
                     </p>
                 </div>
             )}
@@ -75,8 +81,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       );
     }
 
-    // Accessing children from props. Added comment to fix property 'props' does not exist error.
-    return this.props.children;
+    // Fix: Access 'children' from destructured props.
+    return children || null;
   }
 }
 
