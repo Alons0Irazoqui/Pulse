@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 
 interface ErrorBoundaryProps {
   children?: ReactNode;
@@ -13,7 +13,8 @@ interface ErrorBoundaryState {
  * ErrorBoundary class to catch rendering errors in child components.
  * Inherits from Component to use lifecycle methods like componentDidCatch.
  */
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Explicitly extending React.Component to ensure props and setState are correctly inherited and recognized by TypeScript
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // Fix: Explicitly declaring state as a class property helps TypeScript resolve 
   // 'state' on 'this' when inheritance visibility issues occur in certain build environments.
   public state: ErrorBoundaryState = {
@@ -33,7 +34,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   // Use arrow function for lexical this binding to ensure access to setState
   handleRetry = () => {
-    // Fix: setState is correctly inherited from the Component base class.
+    // Fix: setState is correctly inherited from the React.Component base class.
     // Declaring the class correctly with generic types ensures its availability.
     this.setState({ hasError: false, error: null });
     window.location.reload();
@@ -44,6 +45,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     // variables like 'hasError', 'error', and 'children' are available locally 
     // and correctly typed, bypassing repetitive 'this' access issues.
     const { hasError, error } = this.state;
+    // Fix: Accessing props via this.props which is inherited from React.Component
     const { children } = this.props;
 
     // Fix: Using 'hasError' from destructured state.

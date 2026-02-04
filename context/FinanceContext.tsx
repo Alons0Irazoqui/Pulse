@@ -66,7 +66,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const { addToast } = useToast();
 
     // --- SAFETY REF TO PREVENT INFINITE LOOP ---
-    // This breaks the dependency cycle between FinanceContext render -> batchUpdateStudents -> AcademyContext render -> FinanceContext render
     const batchUpdateRef = useRef(batchUpdateStudents);
     useEffect(() => {
         batchUpdateRef.current = batchUpdateStudents;
@@ -170,8 +169,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     }, [isFinanceLoading, students.length, runBillingProcess]);
 
-
-    // --- SYNC ENGINE: OVERDUE CHECK, DEBT CALCULATION & EXAM READINESS ---
+    // --- SYNC ENGINE: OVERDUE CHECK, DEBT CALCULATION ---
     useEffect(() => {
         if (isFinanceLoading || students.length === 0) return;
 
@@ -236,7 +234,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
 
     }, [records, students, isFinanceLoading, academySettings]); 
-
 
     // --- CALCULATE STATS ---
     useEffect(() => {
@@ -319,7 +316,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             PulseService.savePayments(records);
         }
     }, [records, currentUser, isFinanceLoading]);
-
 
     // --- ACTIONS ---
 
@@ -433,22 +429,42 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const approveBatchPayment = (batchId: string, totalAmountPaid: number) => {
         setRecords(prev => {
+            // Obtener registros vinculados al lote
             const batchRecords = prev.filter(r => r.batchPaymentId === batchId);
-            batchRecords.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+            
+            // --- REGLA DE NEGOCIO: ORDENAMIENTO POR PRIORIDAD ---
+            batchRecords.sort((a, b) => {
+                // Prioridad 1: Mensualidad (Prioridad Absoluta)
+                const isAMensualidad = a.category === 'Mensualidad' || a.concept.toLowerCase().includes('mensualidad');
+                const isBMensualidad = b.category === 'Mensualidad' || b.concept.toLowerCase().includes('mensualidad');
+                
+                if (isAMensualidad && !isBMensualidad) return -1;
+                if (!isAMensualidad && isBMensualidad) return 1;
+
+                // Prioridad 2: No permiten pagos parciales (Liquidación obligatoria)
+                if (a.canBePaidInParts === false && b.canBePaidInParts !== false) return -1;
+                if (a.canBePaidInParts !== false && b.canBePaidInParts === false) return 1;
+
+                // Prioridad 3: Fecha de vencimiento (FIFO - El más antiguo primero)
+                return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+            });
             
             let available = totalAmountPaid;
             
+            // Procesar registros en el nuevo orden de prioridad
             const updatedBatch = batchRecords.map(r => {
                 const currentPenalty = r.penaltyAmount || 0;
                 const totalDebt = r.amount + currentPenalty;
                 let paid = 0;
                 
                 if (!r.canBePaidInParts) {
+                    // Si no permite partes, solo se paga si hay saldo suficiente para el 100%
                     if (available >= totalDebt - 0.01) {
                         paid = totalDebt;
                         available -= totalDebt;
                     }
                 } else {
+                    // Si permite partes, toma lo que haya disponible hasta cubrir la deuda
                     if (available > 0) {
                         paid = Math.min(available, totalDebt);
                         available -= paid;
@@ -475,22 +491,21 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     } as TuitionRecord;
                 } 
                 
-                if (paid === 0) {
-                     return {
-                        ...r,
-                        status: (r.dueDate < getLocalDate() ? 'overdue' : 'pending') as TuitionStatus,
-                    };
-                }
-
-                return r;
+                // Si no se alcanzó a cubrir nada, vuelve a su estado anterior según fecha
+                return {
+                    ...r,
+                    status: (r.dueDate < getLocalDate() ? 'overdue' : 'pending') as TuitionStatus,
+                    batchPaymentId: undefined // Desvincular del lote si no recibió pago
+                };
             });
 
+            // Reinyectar registros actualizados en la lista global
             return prev.map(r => {
                 const updated = updatedBatch.find(u => u.id === r.id);
                 return updated || r;
             });
         });
-        addToast('Lote de pagos aprobado', 'success');
+        addToast('Lote de pagos aprobado con éxito según prioridades.', 'success');
     };
 
     const rejectBatchPayment = (batchId: string) => {
