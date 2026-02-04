@@ -62,6 +62,12 @@ export const generateReceipt = (
     const balanceDue = Math.max(0, grandTotal - totalPaid); // Debería ser igual a currentDebt
     const isFullyPaid = balanceDue < 0.01;
 
+    // 7. Configuración de Texto de Concepto
+    let conceptDisplay = record.concept;
+    if (penaltyAmount > 0) {
+        conceptDisplay += ` (Base: ${formatMoney(baseAmount)} + Recargo: ${formatMoney(penaltyAmount)})`;
+    }
+
     doc.setFont('helvetica');
 
     // --- 1. ENCABEZADO CENTRADO ---
@@ -129,7 +135,8 @@ export const generateReceipt = (
     };
 
     drawInfoRow('Alumno', record.studentName || 'No registrado', margin, currentY);
-    drawInfoRow('Concepto', record.concept, centerX, currentY, 'center');
+    // Usamos conceptDisplay que incluye el desglose visual si hay recargo
+    drawInfoRow('Concepto', conceptDisplay, centerX, currentY, 'center');
     drawInfoRow('Fecha Emisión', new Date().toLocaleDateString('es-MX'), pageWidth - margin, currentY, 'right');
 
     currentY += 18;

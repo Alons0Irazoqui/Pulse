@@ -65,10 +65,12 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   if (!isOpen || !record) return null;
 
   const totalPaid = paymentHistory.reduce((acc, curr) => acc + curr.amount, 0);
-  const originalTotal = (record.originalAmount ?? record.amount) + (record.penaltyAmount || 0);
   
-  // Cálculos para desglose visual
+  // Logic Fix: Calculation for visual breakdown
   const penalty = record.penaltyAmount || 0;
+  // Total real value of the transaction (Original Base + Penalty)
+  const originalTotal = (record.originalAmount ?? record.amount) + penalty;
+  // Base value derived
   const base = originalTotal - penalty;
 
   const getStatusConfig = (status: string) => {
@@ -153,8 +155,22 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           </div>
           
           <div className="hidden md:block text-right">
-             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Global</p>
-             <p className="text-3xl font-black text-slate-900 tabular-nums">{formatMoney(originalTotal)}</p>
+             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Global</p>
+             {penalty > 0 ? (
+                 <div className="flex flex-col items-end gap-0.5">
+                     <div className="flex items-center gap-2 text-xs font-medium text-gray-400">
+                        <span>Base:</span>
+                        <span className="tabular-nums">{formatMoney(base)}</span>
+                     </div>
+                     <div className="flex items-center gap-2 text-xs font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
+                        <span>+ Recargo:</span>
+                        <span className="tabular-nums">{formatMoney(penalty)}</span>
+                     </div>
+                     <p className="text-3xl font-black text-slate-900 tabular-nums mt-1">{formatMoney(originalTotal)}</p>
+                 </div>
+             ) : (
+                 <p className="text-3xl font-black text-slate-900 tabular-nums">{formatMoney(originalTotal)}</p>
+             )}
           </div>
         </div>
 
@@ -286,18 +302,19 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                   </div>
                   
                   {penalty > 0 ? (
-                    <div className="flex flex-col w-full gap-1 mt-auto">
+                    <div className="flex flex-col w-full gap-1 mt-auto animate-in fade-in slide-in-from-bottom-1">
                         <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
                             <span>Base</span>
-                            <span>{formatMoney(base)}</span>
+                            <span className="tabular-nums">{formatMoney(base)}</span>
                         </div>
-                        <div className="flex justify-between items-center text-xs text-red-600 font-bold bg-red-50/50 px-1.5 py-0.5 rounded">
-                            <span>Recargo</span>
-                            <span>+{formatMoney(penalty)}</span>
+                        <div className="flex justify-between items-center text-xs text-red-600 font-bold bg-red-50/50 px-2 py-0.5 rounded">
+                            <span>+ Recargo</span>
+                            <span className="tabular-nums">{formatMoney(penalty)}</span>
                         </div>
-                        <div className="border-t border-gray-100 my-1"></div>
-                        <div className="text-right">
-                            <span className="text-xl font-black text-slate-900 tabular-nums leading-none">{formatMoney(originalTotal)}</span>
+                        <div className="border-t border-gray-100 my-1.5"></div>
+                        <div className="flex justify-between items-end">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
+                            <span className="text-2xl font-black text-slate-900 tabular-nums leading-none">{formatMoney(originalTotal)}</span>
                         </div>
                     </div>
                   ) : (
