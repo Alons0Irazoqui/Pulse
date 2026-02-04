@@ -13,11 +13,9 @@ interface ErrorBoundaryState {
  * ErrorBoundary class to catch rendering errors in child components.
  * Inherits from React.Component to use lifecycle methods like componentDidCatch.
  */
-// Using React.Component to ensure base properties like state, setState, and props are correctly inherited and recognized by TypeScript.
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    // Initializing state in the constructor to help TypeScript identify ErrorBoundary as a React component class.
     this.state = {
       hasError: false,
       error: null
@@ -34,15 +32,13 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     console.error("Uncaught error:", error, errorInfo);
   }
 
-  // Defining as an arrow function ensures 'this' is correctly bound to the class instance, allowing access to setState inherited from React.Component.
+  // Handle retry logic
   handleRetry = () => {
-    // Accessing setState from the base class to reset error state.
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
 
   render() {
-    // Accessing state and props directly from 'this' which are guaranteed by inheriting from React.Component.
     const { hasError, error } = this.state;
     const { children } = this.props;
 

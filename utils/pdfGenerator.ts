@@ -1,187 +1,237 @@
-
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { TuitionRecord, AcademySettings, UserProfile, PaymentHistoryItem } from '../types';
+import { TuitionRecord, AcademySettings, UserProfile } from '../types';
 
-interface ReceiptOptions {
-    paymentStatus?: string;
-    currentPaymentAmount?: number;
-    paymentHistory?: PaymentHistoryItem[];
-}
-
+/**
+ * Genera un comprobante de pago estilo "Fintech Premium".
+ * Mezcla la estética de Spin, Nu y Stripe.
+ * Idioma: Español.
+ */
 export const generateReceipt = (
     record: TuitionRecord, 
     academy: AcademySettings, 
-    user?: UserProfile | null,
-    options?: ReceiptOptions
+    user?: UserProfile | null
 ) => {
-    // --- 1. ENGINE FINANCIERO (Lógica Contable) ---
-    const baseAmount = record.originalAmount !== undefined ? record.originalAmount : record.amount;
-    const penaltyAmount = record.penaltyAmount || 0;
-    const grandTotal = baseAmount + penaltyAmount;
-    
-    // Historial de abonos para el desglose
-    const history = record.paymentHistory || [];
-    const totalPaid = history.reduce((sum, p) => sum + p.amount, 0);
-    const balanceDue = Math.max(0, grandTotal - totalPaid);
-
-    const formatMoney = (val: number) => `$${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-
-    // --- 2. CONFIGURACIÓN DEL DOCUMENTO ---
     const doc = new jsPDF();
+    const margin = 20;
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
-    const rightAlignX = 190; // Margen derecho estándar
+    const centerX = pageWidth / 2;
+    
+    // Paleta Enterprise
+    const colorRedIKC = [220, 38, 38];      // #DC2626
+    const colorTextMain = [17, 24, 39];     // #111827
+    const colorTextMuted = [107, 114, 128];    // #6B7280
+    
+    // Success Badge Colors (Fintech Soft Style / Glass Effect)
+    const colorSuccessText = [21, 128, 61];    // Verde Oscuro (Green 700)
+    const colorSuccessBG = [220, 252, 231];    // Verde Muy Claro (Green 100)
+    
+    // Pending Badge Colors
+    const colorPendingText = [75, 85, 99];     // Gray 600
+    const colorPendingBG = [243, 244, 246];    // Gray 100
 
-    // Paleta de Colores Corporativa
-    const darkGray = [51, 51, 51];    // #333333
-    const softGray = [119, 119, 119];  // #777777
-    const borderGray = [220, 220, 220]; // #DCDCDC
-    const pureBlack = [0, 0, 0];
-    const dangerRed = [220, 38, 38];   // #DC2626
-    const successGreen = [22, 163, 74]; // #16A34A
+    const formatMoney = (val: number) => `$${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const formatDate = (dateStr: string) => {
+        if (!dateStr) return '---';
+        return new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+    };
+
+    // --- CÁLCULOS FINANCIEROS ROBUSTOS ---
+    // 1. Historial de Pagos
+    const history = record.paymentHistory || [];
+    const totalPaid = history.reduce((sum, p) => sum + p.amount, 0);
+    
+    // 2. Recargo Actual
+    const penaltyAmount = record.penaltyAmount || 0;
+
+    // 3. Deuda Pendiente Actual (Base + Recargo si aplica)
+    const currentDebt = record.amount + penaltyAmount;
+
+    // 4. Gran Total Histórico (Valor Real de la Transacción)
+    // Se calcula sumando lo que se debe actualmente + lo que ya se pagó.
+    // Esto asegura que el total siempre sea consistente independientemente del estado.
+    const grandTotal = currentDebt + totalPaid;
+
+    // 5. Monto Base Original (Sin Recargo)
+    // Se deriva restando el recargo al gran total. Esto soluciona el error visual
+    // donde el monto original aparecía ya sumado con el recargo.
+    const baseAmount = grandTotal - penaltyAmount;
+
+    // 6. Validación de Estado
+    const balanceDue = Math.max(0, grandTotal - totalPaid); // Debería ser igual a currentDebt
+    const isFullyPaid = balanceDue < 0.01;
 
     doc.setFont('helvetica');
 
-    // --- 3. ENCABEZADO (SPLIT DESIGN) ---
-    
-    // Izquierda: Datos Academia
+    // --- 1. ENCABEZADO CENTRADO ---
+    let currentY = 25;
+    doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(academy.name.toUpperCase(), margin, 25);
+    doc.setTextColor(colorRedIKC[0], colorRedIKC[1], colorRedIKC[2]);
+    doc.text(academy.name.toUpperCase(), centerX, currentY, { align: 'center' });
 
-    doc.setFont('helvetica', 'normal');
+    currentY += 10;
     doc.setFontSize(9);
-    doc.setTextColor(softGray[0], softGray[1], softGray[2]);
-    doc.text(academy.code || 'ID ACADEMIA', margin, 31);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(colorTextMuted[0], colorTextMuted[1], colorTextMuted[2]);
+    
+    // FIX: Centrado absoluto.
+    doc.text('COMPROBANTE DIGITAL DE MOVIMIENTO', centerX, currentY, { align: 'center' });
 
-    // Derecha: Metadatos del Recibo
-    doc.setFont('helvetica', 'bold');
+    // --- 2. HERO SECTION (MONTO Y BADGE) ---
+    currentY += 25;
     doc.setFontSize(10);
-    doc.setTextColor(softGray[0], softGray[1], softGray[2]);
-    const labelDoc = 'RECIBO DE PAGO';
-    doc.text(labelDoc, rightAlignX - doc.getTextWidth(labelDoc), 25, { charSpace: 1 });
+    doc.setTextColor(colorTextMuted[0], colorTextMuted[1], colorTextMuted[2]);
+    doc.text('MONTO TOTAL ABONADO', centerX, currentY, { align: 'center' });
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    const folio = `Folio: #${record.id.split('-').pop()?.toUpperCase() || 'REF'}`;
-    const emission = `Emisión: ${new Date().toLocaleDateString('es-MX')}`;
-    doc.text(folio, rightAlignX - doc.getTextWidth(folio), 30);
-    doc.text(emission, rightAlignX - doc.getTextWidth(emission), 34);
+    currentY += 14;
+    doc.setFontSize(40);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(colorTextMain[0], colorTextMain[1], colorTextMain[2]);
+    doc.text(formatMoney(totalPaid), centerX, currentY, { align: 'center' });
 
-    // Línea Divisoria Header
-    doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
-    doc.setLineWidth(0.1);
-    doc.line(margin, 42, rightAlignX, 42);
-
-    // --- 4. BLOQUE DE INFORMACIÓN DEL CLIENTE (COMPACTO) ---
-    const clientBoxY = 48;
-    const boxHeight = 18;
-    
-    doc.setFillColor(250, 250, 250); // #FAFAFA
-    doc.roundedRect(margin, clientBoxY, rightAlignX - margin, boxHeight, 2, 2, 'F');
+    // Badge de Estado (Estilo Soft/Glass)
+    currentY += 12;
+    const statusText = isFullyPaid ? 'PAGO COMPLETADO' : 'PAGO PARCIAL - SALDO PENDIENTE';
+    const bgCol = isFullyPaid ? colorSuccessBG : colorPendingBG;
+    const txtCol = isFullyPaid ? colorSuccessText : colorPendingText;
     
     doc.setFontSize(9);
-    doc.setTextColor(softGray[0], softGray[1], softGray[2]);
-    doc.text('FACTURADO A:', margin + 5, clientBoxY + 7);
-    doc.text('CONCEPTO PRINCIPAL:', margin + 95, clientBoxY + 7);
-
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(record.studentName?.toUpperCase() || 'ALUMNO REGISTRADO', margin + 5, clientBoxY + 13);
-    doc.text(record.concept.toUpperCase(), margin + 95, clientBoxY + 13);
+    const textWidth = doc.getTextWidth(statusText);
+    
+    // Dibujar fondo del badge (rectángulo redondeado suave)
+    doc.setFillColor(bgCol[0], bgCol[1], bgCol[2]);
+    doc.roundedRect(centerX - (textWidth/2) - 6, currentY - 4.5, textWidth + 12, 7.5, 1.5, 1.5, 'F');
+    
+    // Texto del badge
+    doc.setTextColor(txtCol[0], txtCol[1], txtCol[2]);
+    doc.text(statusText, centerX, currentY + 1, { align: 'center' });
 
-    // --- 5. TABLA DE DESGLOSE (ESTILO CLEAN) ---
-    const tableBody = [];
+    // --- 3. SECCIÓN DE INFORMACIÓN ---
+    currentY += 25;
+    doc.setDrawColor(colorRedIKC[0], colorRedIKC[1], colorRedIKC[2]);
+    doc.setLineWidth(0.6);
+    doc.line(centerX - 10, currentY, centerX + 10, currentY); // Línea de acento central
 
-    // Fila 1: Cargo Principal
-    tableBody.push([
-        { content: `${record.concept}\n(Costo del Servicio)`, styles: { fontStyle: 'bold' } },
-        formatDate(record.dueDate),
-        formatMoney(baseAmount)
-    ]);
+    currentY += 12;
+    const drawInfoRow = (label: string, value: string, x: number, y: number, align: 'left' | 'center' | 'right' = 'left') => {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(colorTextMuted[0], colorTextMuted[1], colorTextMuted[2]);
+        doc.text(label.toUpperCase(), x, y, { align });
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(colorTextMain[0], colorTextMain[1], colorTextMain[2]);
+        doc.text(value, x, y + 6, { align });
+    };
 
-    // Fila 2: Recargo (si aplica)
+    drawInfoRow('Alumno', record.studentName || 'No registrado', margin, currentY);
+    drawInfoRow('Concepto', record.concept, centerX, currentY, 'center');
+    drawInfoRow('Fecha Emisión', new Date().toLocaleDateString('es-MX'), pageWidth - margin, currentY, 'right');
+
+    currentY += 18;
+    drawInfoRow('Folio', `#${record.id.split('-').pop()?.toUpperCase()}`, margin, currentY);
+    drawInfoRow('Método de Pago', record.method || 'Transferencia', centerX, currentY, 'center');
+    drawInfoRow('Vencimiento', formatDate(record.dueDate), pageWidth - margin, currentY, 'right');
+
+    // --- 4. TABLA DE DESGLOSE (ESTILO STRIPE) ---
+    currentY += 22;
+    
+    const tableBody: any[][] = [
+        [
+            { content: record.concept, styles: { fontStyle: 'bold' } },
+            '1',
+            formatMoney(baseAmount) // Usamos baseAmount derivado, no originalAmount
+        ]
+    ];
+
     if (penaltyAmount > 0) {
-        tableBody.push([
-            { content: 'Recargo por pago tardío / Mora', styles: { textColor: dangerRed } },
-            formatDate(record.dueDate),
-            { content: formatMoney(penaltyAmount), styles: { textColor: dangerRed } }
-        ]);
+        tableBody.push([{ content: 'Recargo por pago tardío', styles: { textColor: [220, 38, 38] } }, '1', formatMoney(penaltyAmount)]);
     }
 
-    // Filas: Historial de Abonos
-    history.forEach((pay, idx) => {
-        tableBody.push([
-            { content: `(-) Abono #${idx + 1} vía ${pay.method || 'Transferencia'}`, styles: { textColor: softGray, fontSize: 8 } },
-            formatDate(pay.date),
-            { content: `(${formatMoney(pay.amount)})`, styles: { textColor: successGreen, fontStyle: 'bold' } }
-        ]);
-    });
-
     autoTable(doc, {
-        startY: 72,
-        margin: { left: margin, right: pageWidth - rightAlignX },
-        head: [['DESCRIPCIÓN', 'FECHA', 'IMPORTE']],
+        startY: currentY,
+        margin: { left: margin, right: margin },
+        head: [['DESCRIPCIÓN', 'CANTIDAD', 'SUBTOTAL']],
         body: tableBody,
         theme: 'plain',
         headStyles: {
             fillColor: [255, 255, 255],
-            textColor: darkGray,
+            textColor: colorTextMuted,
             fontStyle: 'bold',
-            fontSize: 10,
+            fontSize: 8,
             lineWidth: { bottom: 0.1 },
-            lineColor: borderGray
+            lineColor: [229, 231, 235]
         },
         bodyStyles: {
             fontSize: 9,
-            cellPadding: 4,
-            textColor: darkGray
+            cellPadding: 6,
+            textColor: colorTextMain
         },
         columnStyles: {
-            0: { cellWidth: 'auto' },
-            1: { halign: 'center', cellWidth: 40 },
-            2: { halign: 'right', cellWidth: 40 }
+            2: { halign: 'right' }
         }
     });
 
-    // --- 6. SECCIÓN DE RESUMEN (TOTALES) ---
-    let finalY = (doc as any).lastAutoTable.finalY + 10;
-    const summaryWidth = 70;
-    const summaryX = rightAlignX - summaryWidth;
+    // --- 5. RESUMEN FINAL ---
+    let finalY = (doc as any).lastAutoTable.finalY + 12;
+    
+    // FIX: Se mueve summaryX más a la izquierda (-90) para dar más separación entre texto y número
+    const summaryX = pageWidth - margin - 90; 
 
-    const drawSummaryRow = (label: string, value: string, size = 9, isBold = false, color = darkGray) => {
-        doc.setFontSize(size);
-        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-        doc.setTextColor(color[0], color[1], color[2]);
+    const drawSummaryLine = (label: string, value: string, isTotal = false, isBlack = false) => {
+        doc.setFontSize(isTotal ? 12 : 9);
+        doc.setFont('helvetica', isTotal ? 'bold' : 'normal');
+        
+        // Color del label
+        doc.setTextColor(isTotal || isBlack ? colorTextMain[0] : colorTextMuted[0]);
         doc.text(label, summaryX, finalY);
-        doc.text(value, rightAlignX, finalY, { halign: 'right' });
-        finalY += size === 12 ? 10 : 6;
+        
+        // Color del valor (siempre negro/main según petición)
+        doc.setTextColor(colorTextMain[0]);
+        doc.text(value, pageWidth - margin, finalY, { align: 'right' });
+        finalY += isTotal ? 10 : 7;
     };
 
-    drawSummaryRow('Importe Total:', formatMoney(grandTotal));
-    drawSummaryRow('Total Pagado:', `-${formatMoney(totalPaid)}`);
-
-    // Línea fina antes del saldo
-    doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
-    doc.line(summaryX, finalY - 2, rightAlignX, finalY - 2);
-    finalY += 4;
-
-    const statusLabel = balanceDue === 0 ? 'ESTADO: LIQUIDADO' : 'SALDO PENDIENTE:';
-    const statusColor = balanceDue === 0 ? successGreen : dangerRed;
+    // Desglose explícito calculado
+    drawSummaryLine('Monto original:', formatMoney(baseAmount));
+    if (penaltyAmount > 0) {
+        drawSummaryLine('Recargo aplicado:', `+${formatMoney(penaltyAmount)}`);
+    }
     
-    drawSummaryRow(statusLabel, formatMoney(balanceDue), 12, true, statusColor);
+    // Subtotal antes de pagos
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.1);
+    doc.line(summaryX, finalY - 3, pageWidth - margin, finalY - 3);
+    finalY += 4;
+    
+    // Total generado (Base + Recargo)
+    drawSummaryLine('Cargo total generado:', formatMoney(grandTotal), false, true);
+    drawSummaryLine('Abono registrado:', `-${formatMoney(totalPaid)}`);
+    
+    // Separador final
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.1);
+    doc.line(summaryX, finalY - 3, pageWidth - margin, finalY - 3);
+    finalY += 6;
 
-    // --- 7. PIE DE PÁGINA (ABSOLUTO) ---
-    doc.setFontSize(8);
-    doc.setTextColor(200, 200, 200); // Gris muy claro
-    const footerText = 'Gracias por su preferencia. Documento generado por Pulse / IKC Management.';
-    doc.text(footerText, pageWidth / 2, 280, { halign: 'center' });
+    const balanceLabel = isFullyPaid ? 'ESTADO FINAL:' : 'RESTANTE POR PAGAR:';
+    const balanceValue = isFullyPaid ? 'LIQUIDADO' : formatMoney(balanceDue);
+    
+    // El valor final ahora es negro y tiene más espacio respecto al label
+    drawSummaryLine(balanceLabel, balanceValue, true);
 
-    // --- 8. EJECUCIÓN ---
+    // --- 6. PIE DE PÁGINA LEGAL ---
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(156, 163, 175);
+    const footerText = 'Este documento es un comprobante de operación interna generado por Pulse Management para IKC.';
+    doc.text(footerText, centerX, pageHeight - 15, { align: 'center' });
+
+    // --- GENERAR PDF ---
     const blob = doc.output('blob');
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');

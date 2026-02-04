@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { TuitionRecord, PaymentHistoryItem } from '../../types';
 import { formatDateDisplay } from '../../utils/dateUtils';
@@ -67,6 +66,10 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
   const totalPaid = paymentHistory.reduce((acc, curr) => acc + curr.amount, 0);
   const originalTotal = (record.originalAmount ?? record.amount) + (record.penaltyAmount || 0);
+  
+  // Cálculos para desglose visual
+  const penalty = record.penaltyAmount || 0;
+  const base = originalTotal - penalty;
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -275,36 +278,55 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           ) : (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-28">
+                {/* Costo Global - Con desglose inteligente */}
+                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-auto min-h-[7rem]">
                   <div className="flex items-center gap-2 text-gray-400 mb-1">
                       <span className="material-symbols-outlined text-lg">receipt_long</span>
                       <span className="text-[10px] font-bold uppercase tracking-wider">Costo Global</span>
                   </div>
-                  <span className="text-2xl font-bold text-slate-900 tabular-nums">{formatMoney(originalTotal)}</span>
+                  
+                  {penalty > 0 ? (
+                    <div className="flex flex-col w-full gap-1 mt-auto">
+                        <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
+                            <span>Base</span>
+                            <span>{formatMoney(base)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-red-600 font-bold bg-red-50/50 px-1.5 py-0.5 rounded">
+                            <span>Recargo</span>
+                            <span>+{formatMoney(penalty)}</span>
+                        </div>
+                        <div className="border-t border-gray-100 my-1"></div>
+                        <div className="text-right">
+                            <span className="text-xl font-black text-slate-900 tabular-nums leading-none">{formatMoney(originalTotal)}</span>
+                        </div>
+                    </div>
+                  ) : (
+                    <span className="text-2xl font-bold text-slate-900 tabular-nums mt-auto">{formatMoney(originalTotal)}</span>
+                  )}
                 </div>
 
-                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-28">
+                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-auto min-h-[7rem]">
                   <div className="flex items-center gap-2 text-emerald-600 mb-1">
                       <span className="material-symbols-outlined text-lg">payments</span>
                       <span className="text-[10px] font-bold uppercase tracking-wider">Pagado</span>
                   </div>
-                  <span className="text-2xl font-bold text-emerald-700 tabular-nums">{formatMoney(totalPaid)}</span>
+                  <span className="text-2xl font-bold text-emerald-700 tabular-nums mt-auto">{formatMoney(totalPaid)}</span>
                 </div>
 
-                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-28">
+                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-auto min-h-[7rem]">
                   <div className="flex items-center gap-2 text-slate-600 mb-1">
                       <span className="material-symbols-outlined text-lg">pie_chart</span>
                       <span className="text-[10px] font-bold uppercase tracking-wider">Pendiente</span>
                   </div>
-                  <span className="text-2xl font-bold text-slate-900 tabular-nums">{formatMoney(remainingDebt)}</span>
+                  <span className="text-2xl font-bold text-slate-900 tabular-nums mt-auto">{formatMoney(remainingDebt)}</span>
                 </div>
 
-                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-28">
+                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-auto min-h-[7rem]">
                   <div className="flex items-center gap-2 text-gray-400 mb-1">
                       <span className="material-symbols-outlined text-lg">event</span>
                       <span className="text-[10px] font-bold uppercase tracking-wider">Vence</span>
                   </div>
-                  <span className="text-xl font-bold text-slate-900 tabular-nums">{formatDateDisplay(record.dueDate)}</span>
+                  <span className="text-xl font-bold text-slate-900 tabular-nums mt-auto">{formatDateDisplay(record.dueDate)}</span>
                 </div>
               </div>
 
