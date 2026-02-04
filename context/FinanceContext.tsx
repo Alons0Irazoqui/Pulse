@@ -429,54 +429,61 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const approveBatchPayment = (batchId: string, totalAmountPaid: number) => {
         setRecords(prev => {
-            // Obtener registros vinculados al lote
+            // Filtrar registros vinculados al lote
             const batchRecords = prev.filter(r => r.batchPaymentId === batchId);
             
-            // --- REGLA DE NEGOCIO: ORDENAMIENTO POR PRIORIDAD ---
+            // --- ALGORITMO DE ORDENAMIENTO 'HEAVY DUTY' ---
             batchRecords.sort((a, b) => {
-                // Prioridad 1: Mensualidad (Prioridad Absoluta)
-                const isAMensualidad = a.category === 'Mensualidad' || a.concept.toLowerCase().includes('mensualidad');
-                const isBMensualidad = b.category === 'Mensualidad' || b.concept.toLowerCase().includes('mensualidad');
+                const getPriority = (r: TuitionRecord) => {
+                    const text = (r.concept + (r.category || '')).toLowerCase();
+                    // Peso 0: Mensualidad / Colegiatura (Prioridad Absoluta)
+                    if (text.includes('mensualidad') || text.includes('colegiatura') || r.category === 'Mensualidad') return 0;
+                    // Peso 1: No permiten pagos parciales
+                    if (r.canBePaidInParts === false) return 1;
+                    // Peso 2: Resto (Abonables)
+                    return 2;
+                };
                 
-                if (isAMensualidad && !isBMensualidad) return -1;
-                if (!isAMensualidad && isBMensualidad) return 1;
-
-                // Prioridad 2: No permiten pagos parciales (Liquidación obligatoria)
-                if (a.canBePaidInParts === false && b.canBePaidInParts !== false) return -1;
-                if (a.canBePaidInParts !== false && b.canBePaidInParts === false) return 1;
-
-                // Prioridad 3: Fecha de vencimiento (FIFO - El más antiguo primero)
+                const pA = getPriority(a);
+                const pB = getPriority(b);
+                
+                if (pA !== pB) return pA - pB;
+                // Si pesan lo mismo, FIFO por fecha de vencimiento
                 return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
             });
             
             let available = totalAmountPaid;
+            const now = new Date().toISOString();
             
-            // Procesar registros en el nuevo orden de prioridad
+            // --- DISTRIBUCIÓN DE FONDOS (WATERFALL) ---
             const updatedBatch = batchRecords.map(r => {
+                const text = (r.concept + (r.category || '')).toLowerCase();
+                const isMandatory = text.includes('mensualidad') || text.includes('colegiatura') || r.category === 'Mensualidad' || r.canBePaidInParts === false;
+                
                 const currentPenalty = r.penaltyAmount || 0;
                 const totalDebt = r.amount + currentPenalty;
                 let paid = 0;
                 
-                if (!r.canBePaidInParts) {
-                    // Si no permite partes, solo se paga si hay saldo suficiente para el 100%
+                if (isMandatory) {
+                    // Lógica para Peso 0 y Peso 1: Solo si alcanza para el 100%
                     if (available >= totalDebt - 0.01) {
                         paid = totalDebt;
                         available -= totalDebt;
                     }
                 } else {
-                    // Si permite partes, toma lo que haya disponible hasta cubrir la deuda
+                    // Lógica para Peso 2: Toma lo que quede disponible
                     if (available > 0) {
                         paid = Math.min(available, totalDebt);
                         available -= paid;
                     }
                 }
 
-                const remaining = Math.max(0, totalDebt - paid);
-                const isPaidFull = remaining < 0.01;
-                
                 if (paid > 0) {
+                    const remaining = Math.max(0, totalDebt - paid);
+                    const isPaidFull = remaining < 0.01;
+                    
                     const newHistoryItem = {
-                        date: new Date().toISOString(),
+                        date: now,
                         amount: paid,
                         method: r.method || 'Batch'
                     };
@@ -491,21 +498,21 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     } as TuitionRecord;
                 } 
                 
-                // Si no se alcanzó a cubrir nada, vuelve a su estado anterior según fecha
+                // Si no recibió fondos (prioridad baja o fondos insuficientes para colegiatura), vuelve a su estado base
                 return {
                     ...r,
                     status: (r.dueDate < getLocalDate() ? 'overdue' : 'pending') as TuitionStatus,
-                    batchPaymentId: undefined // Desvincular del lote si no recibió pago
-                };
+                    batchPaymentId: undefined // Desvincular del lote procesado
+                } as TuitionRecord;
             });
 
-            // Reinyectar registros actualizados en la lista global
+            // Sincronizar cambios con la lista global de registros
             return prev.map(r => {
                 const updated = updatedBatch.find(u => u.id === r.id);
                 return updated || r;
             });
         });
-        addToast('Lote de pagos aprobado con éxito según prioridades.', 'success');
+        addToast('Pago global distribuido con jerarquía estricta.', 'success');
     };
 
     const rejectBatchPayment = (batchId: string) => {

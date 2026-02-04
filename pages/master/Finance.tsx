@@ -234,20 +234,40 @@ const Finance: React.FC = () => {
       
       let available = amountToApprove;
       
-      // Sort by date (oldest first usually paid first)
-      const sortedRecords = [...activeGroup.records].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      // --- REGLA DE NEGOCIO: ORDENAMIENTO POR PRIORIDAD EN LA UI ---
+      const sortedRecords = [...activeGroup.records].sort((a, b) => {
+          const getPriority = (r: TuitionRecord) => {
+              const text = (r.concept + (r.category || '')).toLowerCase();
+              // Prioridad 0: Mensualidades
+              if (text.includes('mensualidad') || text.includes('colegiatura') || r.category === 'Mensualidad') return 0;
+              // Prioridad 1: No permiten pagos parciales
+              if (r.canBePaidInParts === false) return 1;
+              // Prioridad 2: Abonables
+              return 2;
+          };
+          const pA = getPriority(a);
+          const pB = getPriority(b);
+          if (pA !== pB) return pA - pB;
+          // FIFO por fecha a igualdad de peso
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      });
 
       return sortedRecords.map(r => {
+          const text = (r.concept + (r.category || '')).toLowerCase();
+          const isMandatory = text.includes('mensualidad') || text.includes('colegiatura') || r.category === 'Mensualidad' || r.canBePaidInParts === false;
+          
           const currentPenalty = r.penaltyAmount || 0;
           const totalDebt = r.amount + currentPenalty;
           let paid = 0;
           
-          if (!r.canBePaidInParts) {
+          if (isMandatory) {
+              // Lógica de "Todo o nada" visual para prioridades altas
               if (available >= totalDebt - 0.01) {
                   paid = totalDebt;
                   available -= totalDebt;
               }
           } else {
+              // Lógica de abono para prioridades bajas
               if (available > 0) {
                   paid = Math.min(available, totalDebt);
                   available -= paid;
@@ -268,7 +288,6 @@ const Finance: React.FC = () => {
   // -- ACTIONS --
   const handleApprove = () => {
       if (!activeGroup) return;
-      // ... logic preserved
       if (activeGroup.isBatch) approveBatchPayment(activeGroup.id, activeGroup.declaredAmount || activeGroup.totalRemainingDebt);
       else approvePayment(activeGroup.id, activeGroup.totalRemainingDebt);
       setSelectedGroup(null);
@@ -575,7 +594,7 @@ const Finance: React.FC = () => {
                             </div>
 
                             <div>
-                                <h4 className="text-xs font-bold text-gray-400 uppercase mb-4 tracking-wider">Desglose de Aplicación</h4>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase mb-4 tracking-wider">Desglose de Aplicación (Orden de Prioridad)</h4>
                                 <div className="space-y-3">
                                     {previewDistribution.map((item: any) => {
                                         const isMensualidadModal = item.category === 'Mensualidad' || item.concept.toLowerCase().includes('mensualidad');
@@ -587,7 +606,10 @@ const Finance: React.FC = () => {
                                                 
                                                 <div className="flex justify-between items-center pl-3">
                                                     <div className="flex-1">
-                                                        <span className="text-sm font-bold text-slate-900 block">{item.concept}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-bold text-slate-900 block">{item.concept}</span>
+                                                            {isMensualidadModal && <span className="text-[9px] font-black bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded uppercase tracking-tighter">Prioritario</span>}
+                                                        </div>
                                                         <div className="mt-1">
                                                             {isMensualidadModal ? (
                                                                 <DebtAmountEditor 
@@ -600,11 +622,11 @@ const Finance: React.FC = () => {
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className={`font-mono font-bold text-lg tabular-nums ${item._status === 'paid' ? 'text-emerald-700' : 'text-slate-900'}`}>
+                                                        <span className={`font-mono font-bold text-lg tabular-nums ${item._status === 'paid' ? 'text-emerald-700' : item._paid > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
                                                             ${item._paid.toFixed(2)}
                                                         </span>
-                                                        <div className={`text-[10px] font-bold uppercase mt-0.5 tracking-wider ${item._status === 'paid' ? 'text-emerald-600' : 'text-gray-300'}`}>
-                                                            {item._status === 'paid' ? 'Cubierto' : item._status === 'partial' ? 'Abono' : 'Pendiente'}
+                                                        <div className={`text-[10px] font-bold uppercase mt-0.5 tracking-wider ${item._status === 'paid' ? 'text-emerald-600' : item._paid > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
+                                                            {item._status === 'paid' ? 'Cubierto' : item._status === 'partial' ? 'Abono' : 'Sin Saldo'}
                                                         </div>
                                                     </div>
                                                 </div>
