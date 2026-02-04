@@ -18,7 +18,9 @@
     "react-hook-form": "^7.70.0",
     "framer-motion": "11.18.2",
     "date-fns": "^4.1.0",
-    "react-big-calendar": "^1.19.4"
+    "react-big-calendar": "^1.19.4",
+    "jspdf": "2.5.1",
+    "jspdf-autotable": "3.8.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
