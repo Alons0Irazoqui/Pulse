@@ -108,8 +108,10 @@
           color: #9CA3AF !important; 
       }
 
-      /* Focus State: Soft & Elegant */
-      input:focus, select:focus, textarea:focus {
+      /* Focus State: Soft & Elegant - EXCLUDING Checkbox/Radio */
+      input:not([type="checkbox"]):not([type="radio"]):focus, 
+      select:focus, 
+      textarea:focus {
           background-color: #FFFFFF !important;
           border-color: #FEE2E2 !important; /* border-red-100 */
           box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.05) !important; /* ring-4 ring-red-500/5 */
@@ -171,3 +173,4 @@
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>
+    

@@ -109,6 +109,7 @@ export interface Student {
     // Physical Data
     weight?: number;
     height?: number;
+    bloodType?: string; // Added field
     
     // Guardian / Responsible Party
     guardian: GuardianProfile;

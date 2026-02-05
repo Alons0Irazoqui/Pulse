@@ -101,6 +101,7 @@ export const PulseService = {
         avatarUrl?: string;
         weight?: number;
         height?: number;
+        bloodType?: string; // Added prop
         guardianName: string;
         guardianEmail: string;
         guardianRelationship: 'Padre' | 'Madre' | 'Tutor Legal' | 'Familiar' | 'Otro';
@@ -153,6 +154,7 @@ export const PulseService = {
             birthDate: data.birthDate,
             weight: data.weight,
             height: data.height,
+            bloodType: data.bloodType, // Map blood type
             guardian: {
                 fullName: data.guardianName,
                 email: data.guardianEmail,

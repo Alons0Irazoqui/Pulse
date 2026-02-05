@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -18,6 +18,9 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  
+  // Ref to track the last toast for spam prevention
+  const lastToastRef = useRef<{ time: number; type: ToastType }>({ time: 0, type: 'info' });
 
   // Function to remove a specific toast
   const removeToast = useCallback((id: string) => {
@@ -25,11 +28,25 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const addToast = useCallback((message: string, type: ToastType = 'info') => {
+    const now = Date.now();
+    const timeDiff = now - lastToastRef.current.time;
+
+    // SPAM PREVENTION LOGIC:
+    // If a toast of the SAME type tries to appear within 500ms of the previous one, ignore it.
+    // This fixes issues where a function calls 'success' and the parent component also calls 'success'.
+    if (type === lastToastRef.current.type && timeDiff < 500) {
+        return;
+    }
+
+    // Update the ref
+    lastToastRef.current = { time: now, type };
+
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     
     setToasts((prev) => {
-        // Prevent duplicates if multiple clicks happen fast
-        if (prev.length > 0 && prev[prev.length - 1].message === message) return prev;
+        // Prevent exact message duplicates currently on screen
+        if (prev.some(t => t.message === message)) return prev;
+        
         // Limit to 3 toasts max
         const newList = [...prev, { id, message, type }];
         if (newList.length > 3) newList.shift();
@@ -89,4 +106,4 @@ export const useToast = () => {
     throw new Error('useToast must be used within a ToastProvider');
   }
   return context;
-};
+}

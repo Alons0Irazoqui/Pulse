@@ -85,7 +85,7 @@ const StudentRegistration: React.FC = () => {
   const nextStep = async () => {
     let fieldsToValidate: (keyof StudentRegistrationForm)[] = [];
     if (currentStep === 1) fieldsToValidate = ['academyCode', 'email', 'password', 'confirmPassword'];
-    else if (currentStep === 2) fieldsToValidate = ['name', 'age', 'birthDate', 'cellPhone', 'weight', 'height'];
+    else if (currentStep === 2) fieldsToValidate = ['name', 'age', 'birthDate', 'cellPhone', 'weight', 'height', 'bloodType'];
 
     const isStepValid = await trigger(fieldsToValidate);
     
@@ -177,10 +177,18 @@ const StudentRegistration: React.FC = () => {
                     <InputField register={register} errors={errors} label="Nombre Completo" name="name" placeholder="Nombre y Apellidos" />
                     <InputField register={register} errors={errors} label="Celular" name="cellPhone" type="tel" placeholder="10 dígitos" />
                     
-                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
                         <InputField register={register} errors={errors} label="Edad" name="age" type="number" placeholder="Años" cols={2} />
                         <InputField register={register} errors={errors} label="Peso (kg)" name="weight" type="number" placeholder="0" cols={2} />
-                        <InputField register={register} errors={errors} label="Estatura (cm)" name="height" type="number" placeholder="0" cols={2} />
+                        <InputField register={register} errors={errors} label="Estatura" name="height" type="number" placeholder="0" cols={2} />
+                        
+                        <div className="col-span-1">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">T. Sangre</label>
+                            <select {...register('bloodType')} className="w-full rounded-lg bg-gray-100 px-4 py-3.5 text-sm font-medium text-gray-900 border-none focus:bg-white focus:ring-0 focus:border-primary">
+                                <option value="">--</option>
+                                {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
                     </div>
                     
                     <InputField register={register} errors={errors} label="Fecha Nacimiento" name="birthDate" type="date" />
@@ -196,7 +204,7 @@ const StudentRegistration: React.FC = () => {
                             <InputField register={register} errors={errors} label="Nombre Tutor" name="guardianName" placeholder="Nombre completo" />
                             <div className="col-span-1">
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Parentesco</label>
-                                <select {...register('guardianRelationship')} className="w-full rounded-lg bg-gray-100 px-4 py-3.5 text-sm font-medium text-gray-900 border-none focus:bg-white focus:ring-0">
+                                <select {...register('guardianRelationship')} className="w-full rounded-lg bg-gray-100 px-4 py-3.5 text-sm font-medium text-gray-900 border-none focus:bg-white focus:ring-0 focus:border-primary">
                                     {['Padre', 'Madre', 'Tutor Legal', 'Familiar', 'Otro'].map(o => <option key={o} value={o}>{o}</option>)}
                                 </select>
                             </div>
@@ -224,8 +232,15 @@ const StudentRegistration: React.FC = () => {
                 </div>
             )}
 
+            {/* Terms Link (Step 3 only) */}
+            {currentStep === 3 && (
+                <div className="mt-8 mb-2 text-center text-xs text-gray-400 font-medium">
+                    Al completar el registro, aceptas los <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">términos y condiciones</Link> de la plataforma.
+                </div>
+            )}
+
             {/* Actions */}
-            <div className="flex items-center gap-4 mt-10">
+            <div className="flex items-center gap-4 mt-2">
                 {currentStep > 1 ? (
                     <button type="button" onClick={prevStep} className="px-6 py-4 rounded-lg bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-all text-sm">Atrás</button>
                 ) : (

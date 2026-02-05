@@ -8,7 +8,7 @@ import EmergencyCard from '../../components/ui/EmergencyCard';
 import Avatar from '../../components/ui/Avatar';
 
 const Settings: React.FC = () => {
-  const { currentUser, students, academySettings, updateAcademySettings, updateUserProfile, changePassword } = useStore();
+  const { currentUser, students, academySettings, updateAcademySettings, updateUserProfile, changePassword, updateStudentProfile } = useStore();
   const { addToast } = useToast();
   
   // --- TABS & NAVIGATION ---
@@ -93,10 +93,13 @@ const Settings: React.FC = () => {
   const handleEmergencySave = (e: React.FormEvent) => {
       e.preventDefault();
       if (!emergencyData || !student) return;
-      // In a real app, students might request a change rather than direct update.
-      // Since context restricts `updateStudent` to Master role, we should ideally have a `requestProfileUpdate` or loosen the restriction.
-      // For this UI demo, we will simulate the update in local state and toast.
-      addToast('Solicitud de actualización enviada a administración.', 'info');
+      
+      updateStudentProfile(student.id, {
+          cellPhone: emergencyData.cellPhone,
+          height: emergencyData.height,
+          weight: emergencyData.weight,
+          guardian: emergencyData.guardian
+      });
   };
 
   // --- HANDLERS: ACADEMY CONFIGURATION ---
@@ -207,7 +210,7 @@ const Settings: React.FC = () => {
               {[
                   { id: 'profile', label: 'Perfil y Seguridad', icon: 'security' },
                   ...(currentUser?.role === 'master' ? [{ id: 'academy', label: 'Academia & Pagos', icon: 'domain' }] : []),
-                  ...(student ? [{ id: 'emergency', label: 'Contacto Emergencia', icon: 'contact_emergency' }] : []),
+                  ...(student ? [{ id: 'emergency', label: 'Datos Personales y Contacto', icon: 'contact_emergency' }] : []),
               ].map(item => (
                   <button 
                     key={item.id} 
@@ -549,52 +552,80 @@ const Settings: React.FC = () => {
               {activeTab === 'emergency' && student && emergencyData && (
                   <div className="flex flex-col gap-8">
                       {/* Read-Only View of Current Data */}
-                      <EmergencyCard student={student} />
+                      <EmergencyCard student={emergencyData} />
 
                       <form onSubmit={handleEmergencySave} className="bg-white rounded-3xl p-8 shadow-card border border-gray-100">
                           <div className="flex justify-between items-start mb-6">
                               <div>
-                                <h3 className="text-lg font-bold text-text-main">Editar Datos de Contacto</h3>
-                                <p className="text-sm text-text-secondary mt-1">Mantén esta información actualizada para casos de emergencia.</p>
+                                <h3 className="text-lg font-bold text-text-main">Editar Datos Personales</h3>
+                                <p className="text-sm text-text-secondary mt-1">Mantén esta información actualizada.</p>
                               </div>
                           </div>
 
-                          <div className="space-y-5">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div className="space-y-6">
+                              {/* DATOS FÍSICOS Y DE CONTACTO DEL ALUMNO */}
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pb-6 border-b border-gray-100">
                                   <label className="block">
-                                      <span className="text-xs font-bold text-text-secondary uppercase">Nombre Tutor</span>
-                                      <input value={emergencyData.guardian.fullName} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, fullName: e.target.value}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      <span className="text-xs font-bold text-text-secondary uppercase">Celular Alumno</span>
+                                      <input value={emergencyData.cellPhone} onChange={e => setEmergencyData({...emergencyData, cellPhone: e.target.value})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
                                   </label>
                                   <label className="block">
-                                      <span className="text-xs font-bold text-text-secondary uppercase">Parentesco</span>
-                                      <select value={emergencyData.guardian.relationship} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, relationship: e.target.value as any}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm">
-                                          {['Padre', 'Madre', 'Tutor Legal', 'Familiar', 'Otro'].map(r => <option key={r} value={r}>{r}</option>)}
-                                      </select>
+                                      <span className="text-xs font-bold text-text-secondary uppercase">Estatura (cm)</span>
+                                      <input type="number" value={emergencyData.height || ''} onChange={e => setEmergencyData({...emergencyData, height: parseInt(e.target.value)})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                  </label>
+                                  <label className="block">
+                                      <span className="text-xs font-bold text-text-secondary uppercase">Peso (kg)</span>
+                                      <input type="number" step="0.1" value={emergencyData.weight || ''} onChange={e => setEmergencyData({...emergencyData, weight: parseFloat(e.target.value)})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
                                   </label>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                                  <label className="block">
-                                      <span className="text-xs font-bold text-text-secondary uppercase">Tel. Principal</span>
-                                      <input value={emergencyData.guardian.phones.main} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, phones: {...emergencyData.guardian.phones, main: e.target.value}}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
-                                  </label>
-                                  <label className="block">
-                                      <span className="text-xs font-bold text-text-secondary uppercase">Tel. 2 (Opcional)</span>
-                                      <input value={emergencyData.guardian.phones.secondary || ''} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, phones: {...emergencyData.guardian.phones, secondary: e.target.value}}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
-                                  </label>
-                                  <label className="block">
-                                      <span className="text-xs font-bold text-text-secondary uppercase">Tel. 3 (Opcional)</span>
-                                      <input value={emergencyData.guardian.phones.tertiary || ''} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, phones: {...emergencyData.guardian.phones, tertiary: e.target.value}}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
-                                  </label>
+
+                              {/* DATOS DEL TUTOR */}
+                              <div>
+                                  <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-3 block">Información del Tutor</span>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                                      <label className="block">
+                                          <span className="text-xs font-bold text-text-secondary uppercase">Nombre Tutor</span>
+                                          <input value={emergencyData.guardian.fullName} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, fullName: e.target.value}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      </label>
+                                      <label className="block">
+                                          <span className="text-xs font-bold text-text-secondary uppercase">Email Tutor</span>
+                                          <input value={emergencyData.guardian.email} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, email: e.target.value}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      </label>
+                                      <label className="block">
+                                          <span className="text-xs font-bold text-text-secondary uppercase">Parentesco</span>
+                                          <select value={emergencyData.guardian.relationship} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, relationship: e.target.value as any}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm">
+                                              {['Padre', 'Madre', 'Tutor Legal', 'Familiar', 'Otro'].map(r => <option key={r} value={r}>{r}</option>)}
+                                          </select>
+                                      </label>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                      <label className="block">
+                                          <span className="text-xs font-bold text-text-secondary uppercase">Tel. Principal</span>
+                                          <input value={emergencyData.guardian.phones.main} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, phones: {...emergencyData.guardian.phones, main: e.target.value}}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      </label>
+                                      <label className="block">
+                                          <span className="text-xs font-bold text-text-secondary uppercase">Tel. 2 (Opcional)</span>
+                                          <input value={emergencyData.guardian.phones.secondary || ''} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, phones: {...emergencyData.guardian.phones, secondary: e.target.value}}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      </label>
+                                      <label className="block">
+                                          <span className="text-xs font-bold text-text-secondary uppercase">Tel. 3 (Opcional)</span>
+                                          <input value={emergencyData.guardian.phones.tertiary || ''} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, phones: {...emergencyData.guardian.phones, tertiary: e.target.value}}})} className="mt-1 w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      </label>
+                                  </div>
                               </div>
                               
+                              {/* DIRECCIÓN */}
                               <div className="pt-4 border-t border-gray-100">
-                                  <span className="text-xs font-bold text-text-secondary uppercase mb-2 block">Dirección de Emergencia</span>
+                                  <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-3 block">Dirección</span>
                                   <div className="grid grid-cols-4 gap-3">
                                       <div className="col-span-3">
                                           <input placeholder="Calle" value={emergencyData.guardian.address.street} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, address: {...emergencyData.guardian.address, street: e.target.value}}})} className="block w-full rounded-xl border-gray-200 p-2.5 text-sm" />
                                       </div>
                                       <div className="col-span-1">
                                           <input placeholder="No. Ext" value={emergencyData.guardian.address.exteriorNumber} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, address: {...emergencyData.guardian.address, exteriorNumber: e.target.value}}})} className="block w-full rounded-xl border-gray-200 p-2.5 text-sm" />
+                                      </div>
+                                      <div className="col-span-1">
+                                          <input placeholder="Int." value={emergencyData.guardian.address.interiorNumber || ''} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, address: {...emergencyData.guardian.address, interiorNumber: e.target.value}}})} className="block w-full rounded-xl border-gray-200 p-2.5 text-sm" />
                                       </div>
                                       <div className="col-span-2">
                                           <input placeholder="Colonia" value={emergencyData.guardian.address.colony} onChange={e => setEmergencyData({...emergencyData, guardian: {...emergencyData.guardian, address: {...emergencyData.guardian.address, colony: e.target.value}}})} className="block w-full rounded-xl border-gray-200 p-2.5 text-sm" />
@@ -607,7 +638,7 @@ const Settings: React.FC = () => {
                           </div>
 
                           <div className="mt-8 flex justify-end">
-                                <button type="submit" className="px-6 py-2.5 rounded-xl bg-primary text-white text-sm font-bold shadow-lg hover:bg-primary-hover">Solicitar Actualización</button>
+                                <button type="submit" className="px-6 py-2.5 rounded-xl bg-primary text-white text-sm font-bold shadow-lg hover:bg-primary-hover transition-all active:scale-95">Actualizar Datos</button>
                            </div>
                       </form>
                   </div>

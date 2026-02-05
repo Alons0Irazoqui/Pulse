@@ -15,7 +15,10 @@ import Login from './pages/auth/Login';
 import RoleSelection from './pages/auth/RoleSelection';
 import StudentRegistration from './pages/auth/StudentRegistration';
 import MasterRegistration from './pages/auth/MasterRegistration';
-import MasterPinEntry from './pages/auth/MasterPinEntry'; // Nueva Página de PIN
+import MasterPinEntry from './pages/auth/MasterPinEntry';
+
+// Public Pages
+import TermsAndConditions from './pages/TermsAndConditions';
 
 // Master Pages
 import MasterDashboard from './pages/master/MasterDashboard';
@@ -49,7 +52,6 @@ const App: React.FC = () => {
                 <Router>
                     <Routes>
                     {/* --- RUTAS PÚBLICAS --- */}
-                    {/* La Landing Page ha sido eliminada. La raíz es Login. */}
                     <Route path="/" element={<Login />} />
                     <Route path="/login" element={<Login />} />
                     
@@ -58,6 +60,9 @@ const App: React.FC = () => {
                     <Route path="/register/student" element={<StudentRegistration />} />
                     <Route path="/register/master" element={<MasterRegistration />} />
                     
+                    {/* Ruta de Términos y Condiciones (Pública) */}
+                    <Route path="/terms" element={<TermsAndConditions />} />
+
                     <Route path="/403" element={<Forbidden />} />
                     
                     {/* --- RUTAS PROTEGIDAS MAESTRO --- */}

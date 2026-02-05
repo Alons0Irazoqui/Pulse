@@ -18,6 +18,7 @@ export const studentRegistrationSchema = z.object({
   // Physical Data
   weight: z.coerce.number().min(5, "Mínimo 5kg").max(300, "Máximo 300kg").optional(),
   height: z.coerce.number().min(40, "Mínimo 40cm").max(250, "Máximo 250cm").optional(),
+  bloodType: z.string().optional(), // Added bloodType
   
   // Guardian Data
   guardianName: z.string().min(3, "El nombre del tutor es obligatorio"),

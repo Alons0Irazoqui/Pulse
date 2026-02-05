@@ -7,6 +7,7 @@ import { generateReceipt } from '../../utils/pdfGenerator';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import TransactionDetailModal from '../../components/ui/TransactionDetailModal';
+import StudentPaymentHistoryModal from '../../components/finance/StudentPaymentHistoryModal';
 
 // Fix for type errors with motion components
 const MotionDiv = motion.div as any;
@@ -398,6 +399,7 @@ const StudentPayments: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<TuitionRecord | null>(null);
   const [selectedDetailRecord, setSelectedDetailRecord] = useState<TuitionRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const myRecords = useMemo(() => {
       return records
@@ -593,12 +595,20 @@ const StudentPayments: React.FC = () => {
 
               {historyRecords.length > 0 && (
                   <div className="flex flex-col gap-5 pt-6 border-t border-gray-100">
-                      <h3 className="text-lg font-bold text-gray-400 flex items-center gap-2 px-1 uppercase tracking-wider text-sm">
-                          <span className="material-symbols-outlined text-lg">history</span>
-                          Historial Reciente
-                      </h3>
+                      <div className="flex items-center justify-between px-1">
+                          <h3 className="text-lg font-bold text-gray-400 flex items-center gap-2 uppercase tracking-wider text-sm">
+                              <span className="material-symbols-outlined text-lg">history</span>
+                              Historial Reciente
+                          </h3>
+                          <button 
+                              onClick={() => setShowHistoryModal(true)}
+                              className="text-primary hover:text-red-700 text-xs font-bold uppercase tracking-wider transition-colors"
+                          >
+                              Ver historial completo
+                          </button>
+                      </div>
                       <div className="flex flex-col">
-                          {historyRecords.map((record) => (
+                          {historyRecords.slice(0, 5).map((record) => (
                               <div 
                                   key={record.id} 
                                   onClick={() => setSelectedDetailRecord(record)}
@@ -709,6 +719,13 @@ const StudentPayments: React.FC = () => {
               handleOpenPaymentModal(r);
           }}
           onDownloadReceipt={(r) => handleDownloadReceipt(r)}
+      />
+
+      {/* NEW FULL HISTORY DASHBOARD MODAL */}
+      <StudentPaymentHistoryModal 
+          isOpen={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          records={myRecords}
       />
     </div>
   );

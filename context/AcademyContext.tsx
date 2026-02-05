@@ -30,6 +30,7 @@ interface AcademyContextType {
   refreshData: () => void;
   addStudent: (student: Student) => void;
   updateStudent: (student: Student) => void;
+  updateStudentProfile: (studentId: string, updates: Partial<Student>) => void; // NEW: Self-update
   deleteStudent: (id: string) => void;
   updateStudentStatus: (id: string, status: Student['status']) => void;
   
@@ -324,6 +325,23 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       localStorage.setItem('pulse_users_db', JSON.stringify(updatedDB));
       
       addToast('Datos del alumno actualizados', 'success');
+  };
+
+  // --- NEW FUNCTION FOR STUDENT SELF-UPDATE ---
+  const updateStudentProfile = (studentId: string, updates: Partial<Student>) => {
+      // Security Check: Allow update ONLY if Master or if User IS the student
+      const isOwner = currentUser?.studentId === studentId;
+      const isMaster = currentUser?.role === 'master';
+
+      if (!isOwner && !isMaster) {
+          addToast('No tienes permiso para editar este perfil.', 'error');
+          return;
+      }
+
+      const newStudents = students.map(s => s.id === studentId ? { ...s, ...updates } : s);
+      setStudents(newStudents);
+      PulseService.saveStudents(newStudents); // This updates the global "database" immediately
+      addToast('Información actualizada correctamente', 'success');
   };
 
   const batchUpdateStudents = (updatedStudents: Student[]) => {
@@ -810,7 +828,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     <AcademyContext.Provider value={{ 
         students, classes, events, scheduleEvents, libraryResources, academySettings, messages, isLoading,
         refreshData: () => loadData(true),
-        addStudent, updateStudent, deleteStudent, updateStudentStatus, batchUpdateStudents,
+        addStudent, updateStudent, updateStudentProfile, deleteStudent, updateStudentStatus, batchUpdateStudents,
         markAttendance, bulkMarkPresent, promoteStudent, 
         addClass, updateClass, modifyClassSession, deleteClass, enrollStudent, unenrollStudent, 
         addEvent, updateEvent, deleteEvent, registerForEvent, updateEventRegistrants,

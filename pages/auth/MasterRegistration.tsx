@@ -113,10 +113,10 @@ const MasterRegistration: React.FC = () => {
               <input 
                 type="checkbox" 
                 {...register('termsAccepted')}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-0 bg-gray-100 cursor-pointer" 
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer" 
               />
               <label className="text-xs text-gray-500 font-medium leading-snug cursor-pointer select-none">
-                  Acepto los términos y condiciones de IKC Management.
+                  Acepto los <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">términos y condiciones</Link> de IKC Management.
               </label>
             </div>
             {errors.termsAccepted && <p className="text-xs text-red-500 font-bold ml-1">{errors.termsAccepted.message}</p>}
