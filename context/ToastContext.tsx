@@ -31,10 +31,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const now = Date.now();
     const timeDiff = now - lastToastRef.current.time;
 
-    // SPAM PREVENTION LOGIC:
-    // If a toast of the SAME type tries to appear within 500ms of the previous one, ignore it.
-    // This fixes issues where a function calls 'success' and the parent component also calls 'success'.
-    if (type === lastToastRef.current.type && timeDiff < 500) {
+    // SPAM PREVENTION (ENFRIAMIENTO):
+    // Si intentamos mostrar otra alerta del MISMO TIPO en menos de 2 segundos, la ignoramos.
+    // Esto previene dobles mensajes (ej. "Guardado" + "Datos actualizados") para la misma acción.
+    if (type === lastToastRef.current.type && timeDiff < 2000) {
         return;
     }
 
