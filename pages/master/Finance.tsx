@@ -173,25 +173,37 @@ const Finance: React.FC = () => {
               const batchItems = groups[r.batchPaymentId];
               batchItems.forEach(i => processedIds.add(i.id));
               const declared = batchItems.find(i => i.declaredAmount !== undefined)?.declaredAmount;
+              
+              // RECONSTRUCTION LOGIC FOR BATCH
+              const totalRemaining = batchItems.reduce((acc, item) => acc + item.amount + (item.penaltyAmount || 0), 0);
+              const totalPaidHistory = batchItems.reduce((acc, item) => acc + (item.paymentHistory || []).reduce((h, p) => h + p.amount, 0), 0);
+              
               result.push({
                   id: r.batchPaymentId,
                   isBatch: true,
                   records: batchItems,
                   mainRecord: r,
-                  totalOriginalAmount: batchItems.reduce((acc, item) => acc + (item.originalAmount ?? item.amount) + item.penaltyAmount, 0),
-                  totalRemainingDebt: batchItems.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0),
+                  // Total Value = What is left + What was paid. This is infallible.
+                  totalOriginalAmount: totalRemaining + totalPaidHistory,
+                  totalRemainingDebt: totalRemaining,
                   declaredAmount: declared,
                   itemCount: batchItems.length
               });
           } else {
               processedIds.add(r.id);
+              
+              // RECONSTRUCTION LOGIC FOR SINGLE RECORD
+              const totalRemaining = r.amount + (r.penaltyAmount || 0);
+              const totalPaidHistory = (r.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
+
               result.push({
                   id: r.id,
                   isBatch: false,
                   records: [r],
                   mainRecord: r,
-                  totalOriginalAmount: (r.originalAmount ?? r.amount) + r.penaltyAmount,
-                  totalRemainingDebt: r.amount + r.penaltyAmount,
+                  // Total Value = What is left + What was paid.
+                  totalOriginalAmount: totalRemaining + totalPaidHistory,
+                  totalRemainingDebt: totalRemaining,
                   declaredAmount: r.declaredAmount,
                   itemCount: 1
               });
@@ -205,12 +217,17 @@ const Finance: React.FC = () => {
       const freshRecords = records.filter(r => selectedGroup.records.some(old => old.id === r.id));
       if (freshRecords.length === 0) return null;
       const mainRecord = freshRecords.find(r => r.id === selectedGroup.mainRecord.id) || freshRecords[0];
+      
+      // RECONSTRUCTION LOGIC FOR MODAL
+      const totalRemaining = freshRecords.reduce((acc, item) => acc + item.amount + (item.penaltyAmount || 0), 0);
+      const totalPaidHistory = freshRecords.reduce((acc, item) => acc + (item.paymentHistory || []).reduce((h, p) => h + p.amount, 0), 0);
+
       return {
           ...selectedGroup,
           records: freshRecords,
           mainRecord,
-          totalOriginalAmount: freshRecords.reduce((acc, item) => acc + (item.originalAmount ?? item.amount) + item.penaltyAmount, 0),
-          totalRemainingDebt: freshRecords.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0),
+          totalOriginalAmount: totalRemaining + totalPaidHistory,
+          totalRemainingDebt: totalRemaining,
           declaredAmount: freshRecords.find(i => i.declaredAmount !== undefined)?.declaredAmount
       };
   }, [selectedGroup, records]);
@@ -490,7 +507,7 @@ const Finance: React.FC = () => {
                                             ) : (
                                                 <div className="flex flex-col items-end">
                                                     <span className={`font-bold text-sm tabular-nums tracking-tight ${isPaid ? 'text-emerald-700' : 'text-slate-900'}`}>
-                                                        ${((mainRecord.originalAmount ?? mainRecord.amount) + (mainRecord.penaltyAmount || 0)).toFixed(2)}
+                                                        ${totalOriginalAmount.toFixed(2)}
                                                     </span>
                                                     {isPartial && !isPaid && (
                                                         <div className="mt-1 flex flex-col items-end gap-0.5">
@@ -668,13 +685,18 @@ const Finance: React.FC = () => {
                 if (isBatch) {
                      groupRecords = records.filter(item => item.batchPaymentId === r.batchPaymentId);
                 }
+                
+                // RECONSTRUCTION LOGIC FOR MODAL GROUPING
+                const totalRemaining = groupRecords.reduce((acc, item) => acc + item.amount + (item.penaltyAmount || 0), 0);
+                const totalPaidHistory = groupRecords.reduce((acc, item) => acc + (item.paymentHistory || []).reduce((h, p) => h + p.amount, 0), 0);
+
                 const group: GroupedTransaction = {
                     id: isBatch ? r.batchPaymentId! : r.id,
                     isBatch: isBatch,
                     records: groupRecords,
                     mainRecord: r,
-                    totalOriginalAmount: groupRecords.reduce((acc, item) => acc + (item.originalAmount ?? item.amount) + item.penaltyAmount, 0),
-                    totalRemainingDebt: groupRecords.reduce((acc, item) => acc + item.amount + item.penaltyAmount, 0),
+                    totalOriginalAmount: totalRemaining + totalPaidHistory,
+                    totalRemainingDebt: totalRemaining,
                     declaredAmount: groupRecords.find(i => i.declaredAmount !== undefined)?.declaredAmount,
                     itemCount: groupRecords.length
                 };

@@ -48,13 +48,25 @@ export const generateReceipt = (
     // Esto representa cuánto costó el movimiento en total (Base + Recargos) al día de hoy.
     const grandTotal = totalPaidHistory + currentDebt;
 
-    // D. Detectar la Base (Costo Original sin Recargos)
-    // Usamos originalAmount. Si no existe (datos legacy), asumimos que el Gran Total es la base.
-    const baseCost = record.originalAmount !== undefined ? record.originalAmount : grandTotal;
+    // D. Detectar Recargos (Lógica Híbrida Robusta)
+    // Buscamos si existe un recargo activo (penaltyAmount) o si hubo uno histórico (customPenaltyAmount) que ya se absorbió.
+    // Esto es crítico porque al pagar 'full', penaltyAmount se vuelve 0, pero customPenaltyAmount guarda el rastro.
+    const activePenalty = record.penaltyAmount || 0;
+    const storedPenalty = record.customPenaltyAmount || 0;
+    
+    // El recargo real es el mayor de los dos (asumiendo que no se duplican y que customPenaltyAmount es la "memoria" del recargo).
+    let historicalPenalty = Math.max(activePenalty, storedPenalty);
 
-    // E. Deducir el Recargo Histórico
-    // La diferencia entre lo que cuesta finalmente (grandTotal) y lo que costaba al inicio (baseCost) es el recargo.
-    let historicalPenalty = grandTotal - baseCost;
+    // E. Calcular la Base (Costo Original)
+    // La base siempre se deriva restando el recargo identificado al gran total.
+    // Esto evita inconsistencias si 'originalAmount' fue modificado en la base de datos.
+    let baseCost = grandTotal - historicalPenalty;
+
+    // Fallback de seguridad: Si por corrupción de datos la base da negativo, asumimos que no hubo recargo.
+    if (baseCost < 0) {
+        baseCost = grandTotal;
+        historicalPenalty = 0;
+    }
     
     // Limpieza de precisión flotante (ej. 0.0000001 -> 0)
     if (historicalPenalty < 0.01) {
@@ -129,7 +141,7 @@ export const generateReceipt = (
     drawInfoRow('Alumno', record.studentName || 'No registrado', margin, currentY);
     
     // VISUALIZACIÓN DE CONCEPTO
-    // Si hay recargo histórico, mostramos el desglose en el título.
+    // Si hay recargo histórico, mostramos el desglose en el título para máxima claridad.
     // Si NO hay recargo (historicalPenalty === 0), mostramos solo el concepto limpio.
     let conceptText = record.concept;
     if (historicalPenalty > 0) {
@@ -151,7 +163,7 @@ export const generateReceipt = (
 
     // Fila A: Costo Base (Sin Recargo)
     tableBody.push([
-        { content: record.concept, styles: { fontStyle: 'bold' } },
+        { content: conceptText, styles: { fontStyle: 'bold' } },
         formatMoney(baseCost)
     ]);
 
